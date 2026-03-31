@@ -6,8 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>PycHoras · Jornada, Chat, Datos y Cuenta</title>
 <meta name="theme-color" content="#92400e">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-512.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -55,7 +53,7 @@ body{background-color:var(--bg);background-image:linear-gradient(rgba(100,140,20
 /* ============================================================
    ESTILOS CHAT
    ============================================================ */
-.chat-msgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px calc(var(--nav-h) + 72px);display:flex;flex-direction:column;gap:9px;}
+.chat-msgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px calc(var(--nav-h)+160px);display:flex;flex-direction:column;gap:9px;}
 .chat-msgs::-webkit-scrollbar{width:3px;}
 .chat-msgs::-webkit-scrollbar-thumb{background:var(--border2);}
 .msg{max-width:88%;display:flex;flex-direction:column;gap:3px;}
@@ -689,17 +687,46 @@ function updateHeaderMicuenta() { const h = new Date(); document.getElementById(
 // ============================================================
 
 function calcLiquido(y, m) {
-  const st = mesStats(y, m);
+  // Extras y guardias se cobran a mes vencido: la nómina de mes M incluye
+  // las extras trabajadas en M-1 y el plus de guardias terminadas en M-1.
+  const mPrev = m > 0 ? m - 1 : 11;
+  const yPrev = m > 0 ? y : y - 1;
+  const stActual = mesStats(y, m);       // mes actual (para gastos y festivos del mes)
+  const stPrev   = mesStats(yPrev, mPrev); // mes anterior (extras y guardias que se cobran ahora)
+
+  // Plus guardia: solo se cobra en la nómina del mes siguiente al que TERMINA la guardia
+  // Calculamos qué guardias terminan en el mes anterior (mPrev)
+  let plusGuardiaVencido = 0;
+  let guardiasVencidas = 0;
+  GUARDIAS_2026.forEach(g => {
+    const fin = new Date(g); fin.setDate(fin.getDate() + 6);
+    if (fin.getFullYear() === yPrev && fin.getMonth() === mPrev) {
+      plusGuardiaVencido += cfg.guardia;
+      guardiasVencidas++;
+    }
+  });
+
+  const extrasEurosVencidos = parseFloat((Math.max(0, stPrev.ext) / 60 * cfg.precioH).toFixed(2));
+  const plusFestVencido = stPrev.plusFest; // festivos trabajados el mes anterior
+
   const baseFija = nomina.salario + nomina.antiguedad + nomina.beneficios + nomina.transporte + nomina.vestuario + nomina.complemento + nomina.prima + nomina.nocturnidad;
-  const variables = st.extrasEuros + st.plusFest + st.plusGuardia;
+  const variables = extrasEurosVencidos + plusFestVencido + plusGuardiaVencido;
   const totalDevengado = baseFija + variables;
   const baseSSFija = baseFija - nomina.transporte - nomina.vestuario - nomina.prima;
   const deduSS = parseFloat((baseSSFija * 0.065).toFixed(2));
-  const deduExtSS = parseFloat((st.extrasEuros * 0.047).toFixed(2));
+  const deduExtSS = parseFloat((extrasEurosVencidos * 0.047).toFixed(2));
   const deduIRPF = parseFloat((totalDevengado * (nomina.irpf / 100)).toFixed(2));
   const totalDedu = deduSS + deduExtSS + deduIRPF;
   const liquido = totalDevengado - totalDedu;
-  return { baseFija, variables, totalDevengado, deduSS, deduExtSS, deduIRPF, totalDedu, liquido, st };
+
+  // Devolvemos info enriquecida para que renderLiquido pueda mostrar el origen
+  return {
+    baseFija, variables, totalDevengado, deduSS, deduExtSS, deduIRPF, totalDedu, liquido,
+    st: stActual, stPrev,
+    extrasEurosVencidos, extPrevMins: stPrev.ext,
+    plusFestVencido, plusGuardiaVencido, guardiasVencidas,
+    mPrev, yPrev
+  };
 }
 
 function renderLiquido() {
@@ -714,15 +741,20 @@ function renderLiquido() {
 
   document.getElementById('deduCard').innerHTML = `<div class="dedu-row"><div class="dedu-lbl">Cotiz. S.S. (6,50%)<small>Conting. comunes + MEI + paro + form.</small></div><div class="dedu-val">\u2212${c.deduSS.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Cotiz. horas extras (4,70%)<small>Solo sobre horas extras</small></div><div class="dedu-val">\u2212${c.deduExtSS.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.03)"><div class="dedu-lbl">IRPF (${nomina.irpf}%)<small>Variable · actualiza si cambia</small></div><div class="dedu-val" style="font-size:15px">\u2212${c.deduIRPF.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.06)"><div class="dedu-lbl" style="font-weight:800;color:var(--text)">Total deducciones</div><div class="dedu-val" style="font-size:15px">\u2212${c.totalDedu.toFixed(2)}€</div></div>`;
 
-  const st = c.st;
+  const mesAnteriorNom = MESES[c.mPrev];
   let evHtml = '';
-  if (st.ext > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras<small>+${m2str(st.ext)} × ${cfg.precioH}€/h</small></div><div class="extra-val pos">+${st.extrasEuros.toFixed(2)}€</div></div>`;
-  else if (st.ext < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Déficit horas<small>${m2str(st.ext)} vs convenio</small></div><div class="extra-val neg">${(st.ext / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
-  else evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras<small>Exacto al convenio</small></div><div class="extra-val" style="color:var(--text3)">±0€</div></div>`;
-  if (st.guardiasMes > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus guardia semana<small>${st.guardiasMes} semana${st.guardiasMes > 1 ? 's' : ''} × ${cfg.guardia}€</small></div><div class="extra-val purple">+${st.plusGuardia.toFixed(2)}€</div></div>`;
-  if (st.plusFest > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo trabajado<small>${st.plusFest / cfg.festivo} día${st.plusFest / cfg.festivo > 1 ? 's' : ''} × ${cfg.festivo}€</small></div><div class="extra-val purple">+${st.plusFest.toFixed(2)}€</div></div>`;
-  if (st.gas > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Gastos reembolsables<small>Para cotejar con empresa</small></div><div class="extra-val acc">${st.gas.toFixed(2)}€</div></div>`;
-  evHtml += `<div class="extra-row total"><div class="extra-lbl" style="font-weight:800;color:var(--text)">Total variables</div><div class="extra-val pos" style="font-size:15px">+${(st.totalVariables).toFixed(2)}€</div></div>`;
+  // Extras: trabajadas en mes anterior, cobradas este mes
+  if (c.extPrevMins > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras<small>+${m2str(c.extPrevMins)} de ${mesAnteriorNom} × ${cfg.precioH}€/h</small></div><div class="extra-val pos">+${c.extrasEurosVencidos.toFixed(2)}€</div></div>`;
+  else if (c.extPrevMins < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Déficit horas<small>${m2str(c.extPrevMins)} de ${mesAnteriorNom}</small></div><div class="extra-val neg">${(c.extPrevMins / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
+  else evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras<small>Sin extras en ${mesAnteriorNom}</small></div><div class="extra-val" style="color:var(--text3)">±0€</div></div>`;
+  // Plus guardia: guardias terminadas en mes anterior
+  if (c.guardiasVencidas > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus guardia<small>${c.guardiasVencidas} semana${c.guardiasVencidas > 1 ? 's' : ''} terminada${c.guardiasVencidas > 1 ? 's' : ''} en ${mesAnteriorNom}</small></div><div class="extra-val purple">+${c.plusGuardiaVencido.toFixed(2)}€</div></div>`;
+  // Plus festivo trabajado mes anterior
+  if (c.plusFestVencido > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo<small>Festivo trabajado en ${mesAnteriorNom}</small></div><div class="extra-val purple">+${c.plusFestVencido.toFixed(2)}€</div></div>`;
+  // Gastos del mes actual (se reembolsan en el mismo mes)
+  if (c.st.gas > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Gastos reembolsables<small>Para cotejar con empresa</small></div><div class="extra-val acc">${c.st.gas.toFixed(2)}€</div></div>`;
+  const totalVar = c.extrasEurosVencidos + c.plusGuardiaVencido + c.plusFestVencido;
+  evHtml += `<div class="extra-row total"><div class="extra-lbl" style="font-weight:800;color:var(--text)">Total variables</div><div class="extra-val pos" style="font-size:15px">+${totalVar.toFixed(2)}€</div></div>`;
   document.getElementById('extraCard').innerHTML = evHtml;
 }
 
@@ -2689,7 +2721,11 @@ function responder(int_){
 function scrollToLast(){
   const c=document.getElementById('msgs');
   if(!c)return;
-  const doScroll=()=>{ c.scrollTop=c.scrollHeight; };
+  const items=c.querySelectorAll('.msg');
+  if(!items.length)return;
+  const last=items[items.length-1];
+  // scrollIntoView con block:center pone el último mensaje en el centro de pantalla
+  const doScroll=()=>last.scrollIntoView({block:'center',behavior:'smooth'});
   requestAnimationFrame(doScroll);
   setTimeout(doScroll,150);
   setTimeout(doScroll,400);
@@ -2731,8 +2767,8 @@ function enviar(){
   const tid='t'+Date.now();
   const tw=document.createElement('div');tw.className='msg bot';tw.id=tid;
   tw.innerHTML='<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
-  const mc=document.getElementById('msgs');mc.appendChild(tw);
-  requestAnimationFrame(()=>{ mc.scrollTop=mc.scrollHeight; });
+  document.getElementById('msgs').appendChild(tw);
+  tw.scrollIntoView({block:'center'});
   setTimeout(()=>{
     const el=document.getElementById(tid);if(el)el.remove();
     const int_=detectarIntencion(txt);
@@ -2823,13 +2859,6 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
   renderJornada();
   renderMesDatos();
 })();
-</script>
-<script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  });
-}
 </script>
 </body>
 </html>
