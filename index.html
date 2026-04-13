@@ -719,7 +719,7 @@ body{
 
       <div class="sec"><div class="sec-title">Deducciones estimadas</div><div class="dedu-card" id="deduCard"></div></div>
       <div class="sec"><div class="sec-title">Variables del mes</div><div class="extra-card" id="extraCard"></div></div>
-      <div class="sec"><div class="sec-title">Gastos acumulados</div><div class="saldo-card" id="saldoCard"></div><div class="saldo-emp-input-row"><div class="cfg-left"><div class="sei-lbl">Saldo empresa mes actual</div><div class="sei-sub">Dato del Excel / hoja de firma</div></div><input class="sei-input" id="saldoEmpresa" type="number" min="0" step="0.01" placeholder="0,00" oninput="guardarSaldoEmpresa()"></div></div>
+      <div class="sec"><div class="sec-title">Gastos acumulados</div><div class="saldo-card" id="saldoCard"></div></div>
 
       <div class="sec"><div class="sec-title">Parámetros económicos</div><div class="cfg-card"><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Precio hora extra</div><div class="cfg-sub">Convenio seguridad privada</div></div><input class="cfg-input" id="cfgPrecioH" type="number" step="0.01"><span class="cfg-unit">€/h</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus guardia semana</div><div class="cfg-sub">Fijo por semana completa</div></div><input class="cfg-input" id="cfgGuardia" type="number" step="1"><span class="cfg-unit">€</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus festivo trabajado</div><div class="cfg-sub">Por día festivo con guardia</div></div><input class="cfg-input" id="cfgFestivo" type="number" step="1"><span class="cfg-unit">€</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Horas convenio mensual</div><div class="cfg-sub">Base cálculo de extras</div></div><input class="cfg-input" id="cfgConvenio" type="number" step="1"><span class="cfg-unit">h</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Días vacaciones</div><div class="cfg-sub">5h 14min por día</div></div><input class="cfg-input" id="cfgVacDias" type="number" step="1"><span class="cfg-unit">días</span></div></div><button class="btn-save" onclick="guardarConfig()">GUARDAR CONFIGURACIÓN</button></div>
 
@@ -829,7 +829,7 @@ const KB = 'pyc_backup_ts';
 
 let dat = {};
 let cfg = { precioH: 13.53, guardia: 180, festivo: 70, convenio: 162, vacDias: 31 };
-let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0.53 };
+let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0 };
 let guardiasCambios = {};
 let frasesCustom = {};
 let frasesOcultas = {};
@@ -980,7 +980,10 @@ function updateHeaderMicuenta() { updateHeader(); }
 // ============================================================
 
 function calcLiquido(y, m) {
-  const st = mesStats(y, m);
+  // La nómina de este mes se calcula con las horas del mes ANTERIOR
+  let statY = y, statM = m - 1;
+  if (statM < 0) { statM = 11; statY--; }
+  const st = mesStats(statY, statM);
   const baseFija = nomina.salario + nomina.antiguedad + nomina.beneficios + nomina.transporte + nomina.vestuario + nomina.complemento + nomina.prima + nomina.nocturnidad;
   const variables = st.extrasEuros + st.plusFest + st.plusGuardia;
   const totalDevengado = baseFija + variables;
@@ -997,8 +1000,10 @@ function renderLiquido() {
   const y = liqYear, m = liqMes;
   document.getElementById('liqMes').textContent = MESES[m] + ' ' + y;
   const c = calcLiquido(y, m);
+  const refM = m === 0 ? 11 : m - 1;
+  const refY = m === 0 ? y - 1 : y;
   document.getElementById('liqAmount').textContent = c.liquido.toFixed(2) + '€';
-  document.getElementById('liqSub').textContent = 'Devengado: ' + c.totalDevengado.toFixed(2) + '€ · Deducido: ' + c.totalDedu.toFixed(2) + '€';
+  document.getElementById('liqSub').textContent = 'Horas de ' + MESES[refM] + ' · Devengado: ' + c.totalDevengado.toFixed(2) + '€ · Deducido: ' + c.totalDedu.toFixed(2) + '€';
   document.getElementById('liqBase').textContent = c.baseFija.toFixed(2) + '€';
   document.getElementById('liqExtras').textContent = '+' + (c.variables).toFixed(2) + '€';
   document.getElementById('liqDedu').textContent = '\u2212' + c.totalDedu.toFixed(2) + '€';
@@ -1023,32 +1028,17 @@ function recalcLiquido() { renderLiquido(); }
 
 function renderSaldo() {
   const hoy = new Date();
-  const saldosEmp = JSON.parse(localStorage.getItem(KSE) || '{}');
   const card = document.getElementById('saldoCard');
-  let h = '', totT = 0, totE = 0;
+  let h = '', totT = 0;
   const maxG = Math.max(...Array.from({ length: 12 }, (_, m) => mesStats(hoy.getFullYear(), m).gas), 1);
   for (let m = 0; m <= hoy.getMonth(); m++) {
     const st = mesStats(hoy.getFullYear(), m);
-    const semp = saldosEmp[m] || 0;
-    totT += st.gas; totE += semp;
+    totT += st.gas;
     const pct = Math.round(st.gas / maxG * 100);
-    const match = semp > 0 && Math.abs(st.gas - semp) < 0.02;
-    const diff = semp > 0 && !match;
-    h += `<div class="saldo-row"><span class="saldo-mes">${MESES_C[m]}</span><div class="saldo-bar-wrap"><div class="saldo-bar" style="width:${pct}%;background:${diff ? 'var(--red)' : 'var(--acc)'}"></div></div><span class="saldo-val" style="color:${diff ? 'var(--red)' : match ? 'var(--green)' : 'var(--text2)'}">${st.gas.toFixed(2)}€</span>${semp > 0 ? `<span class="saldo-badge ${match ? 'sb-ok' : 'sb-diff'}">${match ? '✓' : 'Δ' + Math.abs(st.gas - semp).toFixed(2) + '€'}</span>` : ''}</div>`;
+    h += `<div class="saldo-row"><span class="saldo-mes">${MESES_C[m]}</span><div class="saldo-bar-wrap"><div class="saldo-bar" style="width:${pct}%;background:var(--acc)"></div></div><span class="saldo-val">${st.gas.toFixed(2)}€</span></div>`;
   }
-  h += `<div class="saldo-row total-row"><span class="saldo-mes" style="font-weight:900;color:var(--text)">Total</span><div class="saldo-bar-wrap"></div><span class="saldo-val" style="color:var(--acc);font-size:12px">${totT.toFixed(2)}€</span>${totE > 0 ? `<span class="saldo-emp">${totE.toFixed(2)}€</span>` : ''}</div>`;
+  h += `<div class="saldo-row total-row"><span class="saldo-mes" style="font-weight:900;color:var(--text)">Total</span><div class="saldo-bar-wrap"></div><span class="saldo-val" style="color:var(--acc);font-size:12px">${totT.toFixed(2)}€</span></div>`;
   card.innerHTML = h;
-  const semp = saldosEmp[hoy.getMonth()] || '';
-  document.getElementById('saldoEmpresa').value = semp || '';
-}
-
-function guardarSaldoEmpresa() {
-  const hoy = new Date();
-  const val = parseFloat(document.getElementById('saldoEmpresa').value) || 0;
-  const d = JSON.parse(localStorage.getItem(KSE) || '{}');
-  d[hoy.getMonth()] = val;
-  localStorage.setItem(KSE, JSON.stringify(d));
-  renderSaldo();
 }
 
 function cargarPDF(input) {
@@ -3117,8 +3107,24 @@ function aplicarTemaGlobal(n) {
   if(document.getElementById('paletaRowMicuenta'))renderPaletaMicuenta();
 }
 
-// Nav button wiring
-document.getElementById('navChat').onclick=()=>showModule('chat');
+// Swipe en Jornada para cambiar de mes
+(function(){
+  const panel = document.getElementById('panelJornada');
+  let jX0 = 0, jY0 = 0;
+  panel.addEventListener('touchstart', e => {
+    jX0 = e.touches[0].clientX;
+    jY0 = e.touches[0].clientY;
+  }, { passive: true });
+  panel.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - jX0;
+    const dy = e.changedTouches[0].clientY - jY0;
+    // Solo si el gesto es más horizontal que vertical y supera 50px
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) goMes(1);   // deslizar izq → mes siguiente
+      else        goMes(-1);  // deslizar der → mes anterior
+    }
+  }, { passive: true });
+})();
 document.getElementById('navJornada').onclick=()=>{showModule('jornada');renderJornada();};
 document.getElementById('navDatos').onclick=()=>{showModule('datos');renderMesDatos();renderTablaDatos();};
 document.getElementById('navMicuenta').onclick=()=>{showModule('micuenta');renderAll();};
