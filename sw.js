@@ -1,4 +1,4 @@
-const CACHE = 'pychoras-v2';
+const CACHE = 'pychoras-v3';
 const ASSETS = [
   './index.html',
   './manifest.json',
