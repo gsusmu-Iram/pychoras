@@ -1020,17 +1020,23 @@ function updateHeaderMicuenta() { const h = new Date(); document.getElementById(
 // ============================================================
 
 function calcLiquido(y, m) {
-  const st = mesStats(y, m);
+  // Las horas extras se cobran en la nómina del mes siguiente
+  // → extras y su cotización vienen del mes ANTERIOR
+  let prevY = y, prevM = m - 1;
+  if (prevM < 0) { prevM = 11; prevY--; }
+  const st = mesStats(y, m);           // mes actual → guardia, festivo, gastos
+  const stPrev = mesStats(prevY, prevM); // mes anterior → horas extras
+
   const baseFija = nomina.salario + nomina.antiguedad + nomina.beneficios + nomina.transporte + nomina.vestuario + nomina.complemento + nomina.prima + nomina.nocturnidad;
-  const variables = st.extrasEuros + st.plusFest + st.plusGuardia;
+  const variables = stPrev.extrasEuros + st.plusFest + st.plusGuardia;
   const totalDevengado = baseFija + variables;
   const baseSSFija = baseFija - nomina.transporte - nomina.vestuario - nomina.prima;
   const deduSS = parseFloat((baseSSFija * 0.065).toFixed(2));
-  const deduExtSS = parseFloat((st.extrasEuros * 0.047).toFixed(2));
+  const deduExtSS = parseFloat((stPrev.extrasEuros * 0.047).toFixed(2));
   const deduIRPF = parseFloat((totalDevengado * (nomina.irpf / 100)).toFixed(2));
   const totalDedu = deduSS + deduExtSS + deduIRPF;
   const liquido = totalDevengado - totalDedu;
-  return { baseFija, variables, totalDevengado, deduSS, deduExtSS, deduIRPF, totalDedu, liquido, st };
+  return { baseFija, variables, totalDevengado, deduSS, deduExtSS, deduIRPF, totalDedu, liquido, st, stPrev, prevM, prevY };
 }
 
 function renderLiquido() {
@@ -1046,14 +1052,16 @@ function renderLiquido() {
   document.getElementById('deduCard').innerHTML = `<div class="dedu-row"><div class="dedu-lbl">Cotiz. S.S. (6,50%)<small>Conting. comunes + MEI + paro + form.</small></div><div class="dedu-val">\u2212${c.deduSS.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Cotiz. horas extras (4,70%)<small>Solo sobre horas extras</small></div><div class="dedu-val">\u2212${c.deduExtSS.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.03)"><div class="dedu-lbl">IRPF (${nomina.irpf}%)<small>Variable · actualiza si cambia</small></div><div class="dedu-val" style="font-size:15px">\u2212${c.deduIRPF.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.06)"><div class="dedu-lbl" style="font-weight:800;color:var(--text)">Total deducciones</div><div class="dedu-val" style="font-size:15px">\u2212${c.totalDedu.toFixed(2)}€</div></div>`;
 
   const st = c.st;
+  const stPrev = c.stPrev;
+  const prevLabel = MESES_C[c.prevM];
   let evHtml = '';
-  if (st.ext > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras<small>+${m2str(st.ext)} × ${cfg.precioH}€/h</small></div><div class="extra-val pos">+${st.extrasEuros.toFixed(2)}€</div></div>`;
-  else if (st.ext < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Déficit horas<small>${m2str(st.ext)} vs convenio</small></div><div class="extra-val neg">${(st.ext / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
-  else evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras<small>Exacto al convenio</small></div><div class="extra-val" style="color:var(--text3)">±0€</div></div>`;
+  if (stPrev.ext > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small>${prevLabel} · +${m2str(stPrev.ext)} × ${cfg.precioH}€/h</small></div><div class="extra-val pos">+${stPrev.extrasEuros.toFixed(2)}€</div></div>`;
+  else if (stPrev.ext < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">D\u00e9ficit horas <small>${prevLabel} · ${m2str(stPrev.ext)} vs convenio</small></div><div class="extra-val neg">${(stPrev.ext / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
+  else evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small>${prevLabel} · Exacto al convenio</small></div><div class="extra-val" style="color:var(--text3)">\u00b10€</div></div>`;
   if (st.guardiasMes > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus guardia semana<small>${st.guardiasMes} semana${st.guardiasMes > 1 ? 's' : ''} × ${cfg.guardia}€</small></div><div class="extra-val purple">+${st.plusGuardia.toFixed(2)}€</div></div>`;
-  if (st.plusFest > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo trabajado<small>${st.plusFest / cfg.festivo} día${st.plusFest / cfg.festivo > 1 ? 's' : ''} × ${cfg.festivo}€</small></div><div class="extra-val purple">+${st.plusFest.toFixed(2)}€</div></div>`;
+  if (st.plusFest > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo trabajado<small>${st.plusFest / cfg.festivo} d\u00eda${st.plusFest / cfg.festivo > 1 ? 's' : ''} × ${cfg.festivo}€</small></div><div class="extra-val purple">+${st.plusFest.toFixed(2)}€</div></div>`;
   if (st.gas > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Gastos reembolsables<small>Para cotejar con empresa</small></div><div class="extra-val acc">${st.gas.toFixed(2)}€</div></div>`;
-  evHtml += `<div class="extra-row total"><div class="extra-lbl" style="font-weight:800;color:var(--text)">Total variables</div><div class="extra-val pos" style="font-size:15px">+${(st.totalVariables).toFixed(2)}€</div></div>`;
+  evHtml += `<div class="extra-row total"><div class="extra-lbl" style="font-weight:800;color:var(--text)">Total variables</div><div class="extra-val pos" style="font-size:15px">+${(c.variables).toFixed(2)}€</div></div>`;
   document.getElementById('extraCard').innerHTML = evHtml;
 }
 
