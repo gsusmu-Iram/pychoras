@@ -908,7 +908,7 @@ const FESTIVOS_2026 = [
   { d: '2026-12-08', n: 'Inmaculada' }, { d: '2026-12-25', n: 'Navidad' }
 ];
 const FEST_SET = new Set(FESTIVOS_2026.map(f => f.d));
-const GUARDIAS_2026 = [new Date(2026,1,27), new Date(2026,3,24), new Date(2026,5,19), new Date(2026,7,14), new Date(2026,9,9), new Date(2026,11,4)];
+const GUARDIAS_2026 = []; // Guardias gestionadas manualmente desde Mi Cuenta
 function buildGuardiaSet() {
   const s = new Set();
   GUARDIAS_2026.forEach(g => {
@@ -1851,6 +1851,14 @@ function guardiaDelMesDatos(y, m) {
       return{inicio:g,fin,cambio:guardiasCambios[key]};
     }
   }
+  const extras=guardiasCambios._extra||[];
+  for(const dateStr of extras){
+    const g=new Date(dateStr+'T12:00:00');
+    const fin=new Date(g);fin.setDate(fin.getDate()+6);
+    if(g.getFullYear()===y&&(g.getMonth()===m||fin.getMonth()===m)){
+      return{inicio:g,fin,cambio:null};
+    }
+  }
   return null;
 }
 
@@ -1858,7 +1866,7 @@ function renderMesDatos() {
   const y=cY_datos, m=cM_datos, hoy=new Date();
   document.getElementById('mesTitulo').textContent=MESES[m]+' '+y;
   const st=mesStats(y,m);
-  const imp=(st.tot/60*cfg.precioH+st.plusFest).toFixed(2);
+  const imp=st.totalVariables.toFixed(2);
 
   let h='';
   h+=`<div class="sec-label">Resumen del mes</div><div class="stats-grid">
@@ -2812,11 +2820,15 @@ function _detectar(raw,s_norm){
   if(/\b(comida|pausa|almuerzo|comer|descanso)\b/.test(s)){
     const fecha=parseFecha(s)||ctxConv.ultimaFecha||fechaHoy;
     const rango=raw.match(/(\d{1,2}[:.\s]\d{2})\s*(?:a|hasta|-)\s*(\d{1,2}[:.\s]\d{2})/i);
-    if(rango){const ini=extraerHora(rango[1]),fin=extraerHora(rango[2]);if(ini>=0&&fin>ini)return{accion:'pausa',fecha,mins:fin-ini,desc:rango[1]+'-'+rango[2]};}
-    let mins=0;const hM=s.match(/(\d+(?:[.,]\d+)?)\s*h(?:ora)?/i),mM=s.match(/(\d+)\s*min/i);
-    if(hM)mins=Math.round(parseFloat(hM[1].replace(',','.'))*60);else if(mM)mins=+mM[1];
-    else if(/una hora/.test(s))mins=60;else if(/media hora/.test(s))mins=30;
-    if(mins>0)return{accion:'pausa',fecha,mins,desc:mins+'min'};
+    let pausaMins=0,pausaDesc='';
+    if(rango){const ini=extraerHora(rango[1]),fin_=extraerHora(rango[2]);if(ini>=0&&fin_>ini){pausaMins=fin_-ini;pausaDesc=rango[1]+'-'+rango[2];}}
+    else{const hM=s.match(/(\d+(?:[.,]\d+)?)\s*h(?:ora)?/i),mM=s.match(/(\d+)\s*min/i);if(hM)pausaMins=Math.round(parseFloat(hM[1].replace(',','.'))*60);else if(mM)pausaMins=+mM[1];else if(/una hora/.test(s))pausaMins=60;else if(/media hora/.test(s))pausaMins=30;pausaDesc=pausaMins+'min';}
+    if(pausaMins>0&&/\b(fin|salgo|termino|termina|salida|acabo|paro|finalizo)\b/.test(s)){
+      const sinV=s.replace(/\b(fin|salgo|termino|termina|salida|acabo|paro|finalizo)\b/,'').trim();
+      const hora=extraerHora(sinV)>=0?extraerHora(sinV):extraerHora(s);
+      if(hora>=0)return{accion:'fin',hora,fecha,pausaMins,pausaDesc};
+    }
+    if(pausaMins>0)return{accion:'pausa',fecha,mins:pausaMins,desc:pausaDesc};
   }
 
   if(/\b(inicio|empiezo|entro|comienzo|arranco|entrada)\b/.test(s)){
@@ -2906,8 +2918,9 @@ function responder(int_){
     const finMin=int_.hora;
     if(finMin<=inicioMin)return`La salida (${m2hhmm(finMin)}) es anterior a la entrada (${m2hhmm(inicioMin)}). Para nocturno: <span class="pill">22:00-02:30</span>`;
     const o=gD(fecha.y,fecha.m,fecha.d)||{};
-    const pausa=o.pausa_min||0;const mins=Math.max(0,finMin-inicioMin-pausa);const ext=mins-BASE_MIN;
-    sD(fecha.y,fecha.m,fecha.d,{...o,tipo:'laboral',tramos_txt:m2hhmm(inicioMin)+'-'+m2hhmm(finMin)});
+    const pausaExtra=int_.pausaMins||0;
+    const pausa=(o.pausa_min||0)+pausaExtra;const mins=Math.max(0,finMin-inicioMin-pausa);const ext=mins-BASE_MIN;
+    sD(fecha.y,fecha.m,fecha.d,{...o,tipo:'laboral',tramos_txt:m2hhmm(inicioMin)+'-'+m2hhmm(finMin),pausa_min:pausa||undefined});
     ctxConv.inicioPendiente=null;ctxConv.ultimaFecha=fecha;
     const st=mesStats(fecha.y,fecha.m);
     const _t2=getCtxTemporal();
