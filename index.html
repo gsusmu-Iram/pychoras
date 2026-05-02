@@ -880,11 +880,10 @@ body{
           <div class="sticky" id="compStickyHdr" style="display:none">
             <div class="comp-summary" id="compSummary"></div>
             <div class="comp-status" id="compStatus"></div>
-            <div class="comp-legend">
-              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:var(--green)"></div>Coincide</div>
-              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:#FBBF24"></div>&le;15min</div>
-              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:var(--red)"></div>Diferencia</div>
-              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:rgba(249,115,22,0.3)"></div>Base (sin editar)</div>
+            <div id="compMesBanner" style="display:none;padding:8px 14px;background:rgba(249,115,22,0.1);border-bottom:1px solid rgba(249,115,22,0.25);font-size:11px;font-weight:700;color:var(--acc);display:none;align-items:center;gap:8px">
+              <span style="flex:1" id="compMesBannerTxt"></span>
+              <button onclick="irAMesComparacion()" style="background:var(--acc);border:none;border-radius:6px;color:white;font-size:10px;font-weight:800;padding:4px 10px;cursor:pointer">Ir al mes</button>
+              <button onclick="document.getElementById('compMesBanner').style.display='none'" style="background:none;border:none;color:var(--acc);font-size:16px;cursor:pointer;padding:0 4px">×</button>
             </div>
             <div class="comp-hdr">
               <div class="comp-hdr-cell">DÍA</div>
@@ -897,11 +896,11 @@ body{
             <div class="comp-upload-area">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
               <div style="font-size:14px;font-weight:700;color:var(--text2)">Carga la hoja de la empresa</div>
-              <div class="comp-upload-hint">PDF · foto · pantallazo · 100% local</div>
+              <div class="comp-upload-hint">Foto o pantallazo de la hoja · 100% local</div>
               <label class="comp-upload-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                PDF o imagen
-                <input type="file" accept="application/pdf,image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
+                Seleccionar imagen
+                <input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
               </label>
             </div>
           </div>
@@ -4068,45 +4067,76 @@ function _loadTesseract() {
 }
 
 // ── Parser imagen: OCR con Tesseract.js ──────────────────────
-async function _parsearImagenHoras(file, onPct) {
+async function _parsearImagenHoras(file, onPct, onRaw) {
   const Tesseract = await _loadTesseract();
   const { data: { text } } = await Tesseract.recognize(file, 'spa', {
     logger: m => { if (m.status==='recognizing text' && onPct) onPct(Math.round(m.progress*100)); }
   });
+  if (onRaw) onRaw(text);
   return _parsearTextoHoras(text);
 }
 
-// ── Cargar hoja empresa: PDF o imagen ────────────────────────
+// ── Detectar mes/año del texto OCR ───────────────────────────
+let _empresaMesDetectado = null; // { y, m } si se detectó
+
+function _detectarMesTexto(text) {
+  const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const upper = text.toUpperCase();
+  for (let mi = 0; mi < 12; mi++) {
+    const re = new RegExp(MESES_ES[mi].toUpperCase());
+    if (re.test(upper)) {
+      const ym = upper.match(/20(\d{2})/);
+      return { m: mi, y: ym ? parseInt('20'+ym[1]) : 2026 };
+    }
+  }
+  return null;
+}
+
+// ── Cargar hoja empresa: solo imagen ─────────────────────────
 async function cargarHojaEmpresa(input) {
   const file = input.files[0];
   if (!file) return;
-  const isImg = file.type.startsWith('image/');
   const compBody = document.getElementById('compBody');
-
   const setMsg = txt => { compBody.innerHTML = '<div id="cmpMsg" style="padding:44px 20px;text-align:center;color:var(--text3);font-family:var(--mono);font-size:13px">' + txt + '</div>'; };
-  setMsg(isImg ? '\u23f3 Cargando OCR\u2026 (primera vez descarga el paquete de idioma)' : '\u23f3 Leyendo PDF\u2026');
+  setMsg('\u23f3 Reconociendo texto\u2026 (primera vez puede tardar)');
   document.getElementById('compStickyHdr').style.display = 'none';
-
   try {
-    let days;
-    if (isImg) {
-      days = await _parsearImagenHoras(file, pct => {
-        const el = document.getElementById('cmpMsg');
-        if (el) el.textContent = 'Reconociendo texto: ' + pct + '%\u2026';
-      });
-    } else {
-      days = await _parsearPDFHoras(await file.arrayBuffer());
-    }
+    let rawText = '';
+    const days = await _parsearImagenHoras(file, pct => {
+      const el = document.getElementById('cmpMsg');
+      if (el) el.textContent = 'Leyendo imagen: ' + pct + '%\u2026';
+    }, txt => { rawText = txt; });
     const n = Object.keys(days).length;
-    if (!n) throw new Error('No se encontraron d\u00edas en el archivo. Prueba con otro formato.');
+    if (!n) throw new Error('No se detectaron días. Asegúrate de que la imagen muestra la tabla de horas.');
     _empresaDays = days; _empresaMes = file.name; _compCargado = true;
-    if (isImg) { const r2=new FileReader(); r2.onload=e=>{_empresaImgSrc=e.target.result;}; r2.readAsDataURL(file); } else { _empresaImgSrc=null; }
+    _empresaImgSrc = null; // no almacenamos la imagen
+    _empresaMesDetectado = _detectarMesTexto(rawText);
     renderComparacion();
-    showToast('\u2713 ' + n + ' d\u00edas le\u00eddos \u00b7 ' + (isImg ? 'OCR' : 'PDF'));
+    showToast('\u2713 ' + n + ' días leídos');
   } catch(e) {
     compBody.innerHTML = '<div style="padding:32px 20px;text-align:center"><div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px">\u26a0 Error al leer</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono)">' + e.message + '</div></div>';
   }
   input.value = '';
+}
+
+// ── Eliminar hoja cargada ─────────────────────────────────────
+function eliminarHojaEmpresa() {
+  _empresaDays = {}; _empresaMes = null; _empresaImgSrc = null;
+  _compCargado = false; _empresaMesDetectado = null;
+  document.getElementById('compStickyHdr').style.display = 'none';
+  renderComparacion();
+  showToast('Hoja eliminada');
+}
+
+// ── Ir al mes detectado ───────────────────────────────────────
+function irAMesComparacion() {
+  if (!_empresaMesDetectado) return;
+  cY_datos = _empresaMesDetectado.y;
+  cM_datos = _empresaMesDetectado.m;
+  _mesSync.y = cY_datos; _mesSync.m = cM_datos;
+  renderMesDatos(); renderTablaDatos();
+  document.getElementById('compMesBanner').style.display = 'none';
+  renderComparacion();
 }
 
 // ── Renderizar tabla comparativa ─────────────────────────────
@@ -4127,7 +4157,7 @@ function renderComparacion() {
         <label class="comp-upload-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Seleccionar PDF
-          <input type="file" accept="application/pdf,image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
+          <input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
         </label>
       </div>`;
     return;
@@ -4267,7 +4297,7 @@ function renderComparacion() {
     '<div class="comp-status-dot" style="background:' + (nErr ? 'var(--red)' : nWarn ? '#FBBF24' : 'var(--green)') + '"></div>' +
     '<span style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">' + (_empresaMes || 'Hoja cargada') + '</span>' +
     '<span style="margin-left:auto;cursor:pointer;color:var(--acc);font-size:10px;font-weight:700;white-space:nowrap" onclick="document.getElementById(\'compPdfInput\').click()">' +
-      '\u21ba Cambiar<input type="file" accept="application/pdf,image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)"></span>';
+      '\u21ba Cambiar<input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)"></span>';
 
   stickyHdr.style.display = '';
   compBody.innerHTML = rows;
@@ -4279,44 +4309,56 @@ function cerrarDiscDetail(e) {
 }
 
 function verDiscrepancia(y, m, d) {
-  const emp  = _empresaDays[d];
-  const inf  = dayInfoDatos(y, m, d);
-  const diff = inf.mins - (emp ? emp.mins : 0);
+  const emp   = _empresaDays[d];
+  const inf   = dayInfoDatos(y, m, d);
+  const diff  = inf.mins - (emp ? emp.mins : 0);
   const isNeg = diff < 0;
   const absd  = Math.abs(diff);
   const dcol  = absd > 15 ? '#dc2626' : '#B45309';
   const dbg   = absd > 15 ? 'rgba(220,38,38,0.08)' : 'rgba(251,191,36,0.1)';
+  const euros = parseFloat((absd / 60 * cfg.precioH).toFixed(2));
+  const fecha = new Date(y, m, d);
+  const dsem  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][fecha.getDay()];
 
   document.getElementById('discDetailTitle').textContent =
-    'D\u00eda ' + d + ' \u00b7 ' + MESES[m] + ' ' + y;
+    dsem + ' ' + d + ' \u00b7 ' + MESES[m] + ' ' + y;
 
-  let html = '';
+  // Contexto inteligente
+  let motivo = '';
+  if (isNeg && absd > 60) motivo = 'Posible turno de tarde no registrado en la app';
+  else if (isNeg && absd > 20) motivo = 'Inicio de jornada más temprano según empresa';
+  else if (!isNeg && absd > 20) motivo = 'La app tiene más horas — revisa si hay pausa no registrada';
+  else motivo = 'Diferencia de minutos al fichar';
 
-  // Imagen de referencia (si fue cargada como imagen)
-  if (_empresaImgSrc) {
-    html += '<div class="disc-img-wrap">' +
-      '<div class="disc-img-lbl">Busca el d\u00eda ' + d + ' en la hoja de la empresa</div>' +
-      '<img class="disc-img" src="' + _empresaImgSrc + '" alt="Hoja empresa">' +
-      '</div>';
-  }
+  let html = '<div style="padding:14px 16px 4px">' +
 
-  // Tarjeta comparativa
-  html += '<div class="disc-cmp-card">' +
-    '<div class="disc-cmp-grid">' +
-      '<div class="disc-cmp-cell">' +
-        '<div class="disc-cmp-lbl">Mi registro</div>' +
-        '<div class="disc-cmp-val" style="color:var(--acc)">' + m2hhmmFmt(inf.mins) + '</div>' +
+    // Tarjeta comparativa
+    '<div class="disc-cmp-card">' +
+      '<div class="disc-cmp-grid">' +
+        '<div class="disc-cmp-cell">' +
+          '<div class="disc-cmp-lbl">Mi registro (app)</div>' +
+          '<div class="disc-cmp-val" style="color:var(--acc)">' + m2hhmmFmt(inf.mins) + '</div>' +
+          (inf.inicio && inf.inicio !== '-' ? '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px">' + inf.inicio + ' \u2192 ' + inf.fin + '</div>' : '') +
+        '</div>' +
+        '<div class="disc-cmp-cell">' +
+          '<div class="disc-cmp-lbl">Empresa (hoja)</div>' +
+          '<div class="disc-cmp-val">' + (emp ? (emp.totalStr || m2hhmmFmt(emp.mins)) : '\u2014') + '</div>' +
+          (emp && emp.inicio ? '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px">' + emp.inicio + ' \u2192 ' + (emp.fin||'?') + '</div>' : '') +
+        '</div>' +
       '</div>' +
-      '<div class="disc-cmp-cell">' +
-        '<div class="disc-cmp-lbl">Empresa</div>' +
-        '<div class="disc-cmp-val">' + (emp ? (emp.totalStr||m2hhmmFmt(emp.mins)) : '\u2014') + '</div>' +
+      '<div class="disc-diff-row" style="color:' + dcol + ';background:' + dbg + '">' +
+        (isNeg ? '\u2212' : '+') + m2hm(absd) +
+        ' \u00b7 \u2248\u202f' + euros.toFixed(2) + '\u20ac en extras' +
       '</div>' +
     '</div>' +
-    '<div class="disc-diff-row" style="color:' + dcol + ';background:' + dbg + '">' +
-      (isNeg ? '\u2212' : '+') + m2hm(absd) + '\u00a0\u00b7\u00a0' +
-      (isNeg ? 'la empresa registra m\u00e1s' : 'registras m\u00e1s que la empresa') +
+
+    // Motivo
+    '<div style="margin-top:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);font-size:12px;color:var(--text2);line-height:1.5">' +
+      '<span style="font-size:10px;font-weight:900;color:var(--text3);font-family:var(--mono);display:block;margin-bottom:4px">POSIBLE CAUSA</span>' +
+      motivo +
     '</div>' +
-    '</div>';
+
+  '</div>';
 
   // Botón editar
   html += '<button class="disc-edit-btn" onclick="cerrarDiscDetail();setTimeout(()=>openModalJornada(' + y + ',' + m + ',' + d + '),200)">' +
