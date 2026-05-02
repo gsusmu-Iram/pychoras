@@ -12,6 +12,7 @@
 <meta name="theme-color" content="#FFFFFF">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 /* ============================================================
    PYCHORAS — LIGHT PRO · CAMPO-READY
@@ -272,8 +273,8 @@ body{
 
 /* ── DATOS ── */
 .swipe-wrap{flex:1;overflow:hidden;position:relative;}
-.swipe-track{display:flex;width:300%;height:100%;transition:transform .35s cubic-bezier(.4,0,.2,1);}
-.swipe-panel{width:33.333%;height:100%;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.swipe-track{display:flex;width:400%;height:100%;transition:transform .35s cubic-bezier(.4,0,.2,1);}
+.swipe-panel{width:25%;height:100%;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
 .dots{position:absolute;bottom:calc(var(--nav-h)+10px);left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:30;pointer-events:none;}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--border2);transition:all .2s;}
 .dot.active{background:var(--acc);width:18px;border-radius:3px;}
@@ -555,6 +556,42 @@ body{
 .b-cambio{background:rgba(220,38,38,0.1);color:var(--red);}
 
 
+/* ── MI CUENTA — MEJORAS VISUALES ── */
+.mc-group{margin-bottom:20px;}
+.mc-group-title{
+  display:flex;align-items:center;gap:7px;
+  font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;
+  letter-spacing:.15em;font-family:var(--mono);
+  padding:0 2px 6px;border-bottom:2px solid var(--border);margin-bottom:12px;
+}
+.mc-group-title svg{opacity:.5;}
+.mc-divider{height:1px;background:var(--border);margin:20px 0;position:relative;}
+.mc-divider::after{
+  content:attr(data-label);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:var(--bg);padding:0 10px;font-size:9px;font-weight:800;
+  color:var(--text3);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;
+}
+/* Collapsible nómina */
+.nomina-toggle-btn{
+  display:flex;align-items:center;justify-content:space-between;width:100%;
+  background:none;border:none;cursor:pointer;padding:12px 15px;text-align:left;
+  border-bottom:1px solid var(--border);
+}
+.nomina-toggle-summary{font-size:12px;color:var(--text2);font-family:var(--mono);}
+.nomina-toggle-summary strong{font-size:14px;font-weight:900;color:var(--text);}
+.nomina-toggle-arrow{font-size:16px;color:var(--text3);transition:transform .25s;flex-shrink:0;}
+.nomina-toggle-arrow.open{transform:rotate(180deg);}
+.nomina-collapsible{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+.nomina-collapsible.expanded{max-height:900px;}
+/* Guardia quick-card en Líquido */
+.liq-guardia-badge{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin-top:10px;padding:8px 14px;border-radius:var(--rs);
+  background:rgba(167,139,250,.18);border:1px solid rgba(167,139,250,.3);
+  font-size:11px;font-weight:800;color:#c4b5fd;font-family:var(--mono);
+  position:relative;z-index:1;
+}
+.liq-guardia-dot{width:6px;height:6px;border-radius:50%;background:#a78bfa;flex-shrink:0;}
 /* ── GUARDIA EDITOR ── */
 .guardia-edit-card{
   background:var(--bg2);border:1px solid var(--border);
@@ -616,6 +653,146 @@ body{
 }
 .ge-date-input:focus{border-color:rgba(37,99,235,0.4);}
 
+
+/* ── GEAR BUTTON ── */
+.hdr-gear{background:none;border:none;padding:6px;cursor:pointer;color:var(--text3);display:flex;align-items:center;border-radius:50%;transition:background .15s;margin-left:4px;}
+.hdr-gear:active{background:rgba(0,0,0,0.08);}
+.hdr-gear svg{width:17px;height:17px;stroke:var(--text3);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+/* ── SETTINGS SHEET ── */
+.settings-ov{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0);pointer-events:none;transition:background .3s;}
+.settings-ov.open{background:rgba(0,0,0,0.4);pointer-events:all;}
+.settings-sheet{position:absolute;bottom:0;left:0;right:0;background:var(--bg);border-radius:20px 20px 0 0;max-height:86vh;overflow-y:auto;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);}
+.settings-ov.open .settings-sheet{transform:translateY(0);}
+.settings-drag{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 6px;}
+.settings-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 18px 12px;border-bottom:1px solid var(--border);}
+.settings-hdr-title{font-size:15px;font-weight:800;color:var(--text);font-family:var(--sans);}
+.settings-close{background:none;border:none;font-size:18px;color:var(--text3);cursor:pointer;padding:4px 8px;border-radius:8px;}
+.settings-close:active{background:rgba(0,0,0,0.06);}
+.settings-body{padding:16px 16px calc(env(safe-area-inset-bottom) + 24px);}
+
+/* ── JORNADA — GUARDIAS ── */
+.jornada-guardias{padding:20px 14px calc(var(--nav-h) + 24px);}
+.jornada-guardias-title{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;font-family:var(--mono);padding-bottom:8px;border-bottom:2px solid var(--border);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+
+/* ── NÓMINA — DESGLOSE COLAPSABLE ── */
+.desglose-toggle-btn{display:flex;align-items:center;justify-content:space-between;width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;padding:13px 15px;text-align:left;margin-bottom:12px;}
+.desglose-toggle-arrow{font-size:16px;color:var(--text3);transition:transform .25s;flex-shrink:0;}
+.desglose-toggle-arrow.open{transform:rotate(90deg);}
+.desglose-collapsible{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+.desglose-collapsible.expanded{max-height:1200px;}
+
+/* ── MODAL VERIFICAR ── */
+.verif-ov{position:fixed;inset:0;z-index:400;background:var(--bg);transform:translateX(105%);transition:transform .35s cubic-bezier(.4,0,.2,1);}
+.verif-ov.open{transform:translateX(0);}
+.verif-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:1;}
+.verif-back{background:none;border:none;font-size:22px;color:var(--text3);cursor:pointer;padding:2px 8px 2px 0;line-height:1;}
+.verif-back:active{color:var(--text);}
+.verif-hdr-title{font-size:16px;font-weight:800;color:var(--text);flex:1;font-family:var(--sans);}
+.verif-tabs{display:flex;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:53px;z-index:1;}
+.verif-tab{flex:1;padding:11px 8px;font-size:12px;font-weight:700;border:none;background:none;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;font-family:var(--sans);}
+.verif-tab.active{color:var(--purple);border-bottom-color:var(--purple);}
+.verif-body{padding:16px 16px calc(env(safe-area-inset-bottom)+24px);overflow-y:auto;}
+.verif-data-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 15px;margin-bottom:14px;box-shadow:var(--sh-card);}
+.verif-data-lbl-top{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.14em;font-family:var(--mono);margin-bottom:10px;}
+.verif-data-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(0,0,0,0.04);}
+.verif-data-row:last-child{border-bottom:none;}
+.verif-data-lbl{font-size:12px;color:var(--text2);}
+.verif-data-val{font-size:13px;font-weight:800;font-family:var(--mono);color:var(--text);}
+.verif-upload-area{position:relative;margin-bottom:12px;}
+.verif-upload-btn{display:flex;align-items:center;gap:10px;width:100%;padding:16px;background:var(--bg3);border:2px dashed var(--border2);border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--text2);font-weight:600;box-sizing:border-box;transition:all .2s;}
+.verif-upload-btn.loaded{background:rgba(22,163,74,0.06);border-color:rgba(22,163,74,0.3);color:var(--green);}
+.verif-preview{width:100%;max-height:180px;object-fit:cover;border-radius:var(--rs);margin-bottom:12px;display:none;border:1px solid var(--border);}
+.verif-preview.show{display:block;}
+.verif-btn-analizar{width:100%;padding:14px;background:var(--purple);border:none;border-radius:var(--r);color:white;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--sans);transition:opacity .15s;}
+.verif-btn-analizar:disabled{opacity:.45;pointer-events:none;}
+.verif-btn-analizar:active{opacity:.8;}
+.verif-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:28px;color:var(--text3);font-size:13px;}
+.verif-spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite;}
+.verif-result{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-top:14px;font-size:13px;line-height:1.65;color:var(--text);box-shadow:var(--sh-card);}
+.verif-result-veredicto{display:inline-block;font-size:13px;font-weight:900;padding:8px 14px;border-radius:var(--rs);margin-bottom:10px;}
+.verif-result-ok{background:rgba(22,163,74,0.1);color:var(--green);}
+.verif-result-warn{background:rgba(249,115,22,0.1);color:var(--acc);}
+.verif-result-err{background:rgba(220,38,38,0.1);color:var(--red);}
+
+/* ── PANEL COMPARAR ── */
+.comp-wrap{flex:1;overflow-y:auto;padding:0;}
+.comp-upload-area{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;gap:14px;text-align:center;}
+.comp-upload-btn{display:flex;align-items:center;gap:10px;padding:15px 22px;background:var(--bg2);border:2px dashed var(--border2);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:700;color:var(--text2);transition:all .2s;}
+.comp-upload-btn:active,.comp-upload-btn:hover{border-color:var(--acc);color:var(--acc);}
+.comp-upload-hint{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.comp-summary{margin:0;border-bottom:1px solid var(--border);background:var(--bg2);}
+.comp-sum-mes{font-size:11px;font-weight:800;color:var(--text);text-align:center;padding:10px 14px 0;letter-spacing:.01em;}
+.comp-sum-mes span{color:var(--acc);font-family:var(--mono);}
+.comp-sum-grid{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border);margin-top:8px;}
+.comp-sum-item{display:flex;flex-direction:column;align-items:center;padding:10px 6px 12px;border-right:1px solid var(--border);}
+.comp-sum-item:last-child{border-right:none;}
+.comp-sum-lbl{font-size:8px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono);margin-bottom:5px;}
+.comp-sum-val{font-size:17px;font-weight:900;font-family:var(--mono);}
+.comp-sum-sub{font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:3px;}
+.comp-hdr{display:grid;grid-template-columns:28px 1fr 1fr 64px;gap:0;padding:6px 14px;background:var(--bg3);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:5;}
+.comp-hdr-cell{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);text-align:center;}
+.comp-hdr-cell:first-child{text-align:left;}
+.comp-row{display:grid;grid-template-columns:28px 1fr 1fr 64px;gap:0;padding:8px 14px;border-left:3px solid transparent;border-bottom:1px solid rgba(0,0,0,0.04);align-items:center;cursor:pointer;transition:background .1s;}
+.comp-row:active{filter:brightness(.96);}
+.comp-row-ok{background:rgba(22,163,74,0.05);border-left-color:var(--green);}
+.comp-row-warn{background:rgba(251,191,36,0.07);border-left-color:#FBBF24;}
+.comp-row-err{background:rgba(220,38,38,0.06);border-left-color:var(--red);}
+.comp-row-fds{background:rgba(0,0,0,0.015);border-left-color:transparent;}
+.comp-row-base{background:rgba(249,115,22,0.04);border-left-color:rgba(249,115,22,0.3);}
+.comp-row-none{border-left-color:var(--border);}
+.comp-day{font-size:12px;font-weight:800;color:var(--text2);font-family:var(--mono);}
+.comp-cell{font-size:12px;font-family:var(--mono);font-weight:700;color:var(--text);text-align:center;}
+.comp-cell.muted{color:var(--text3);font-weight:400;}
+.comp-badge{font-size:10px;font-weight:900;font-family:var(--mono);text-align:center;padding:2px 5px;border-radius:5px;display:inline-block;}
+.comp-badge-ok{color:var(--green);}
+.comp-badge-warn{color:#B45309;background:rgba(251,191,36,0.15);}
+.comp-badge-err{color:var(--red);background:rgba(220,38,38,0.1);}
+.comp-badge-none{color:var(--text3);}
+.comp-tag{font-size:9px;font-weight:900;font-family:var(--mono);padding:2px 5px;border-radius:4px;letter-spacing:.04em;}
+.comp-tag-fds{color:var(--text3);background:var(--bg3);}
+.comp-tag-fest{color:var(--purple);background:rgba(124,58,237,0.08);}
+.comp-tag-vac{color:var(--green);background:rgba(22,163,74,0.08);}
+.comp-tag-base{color:var(--acc);background:rgba(249,115,22,0.08);}
+.comp-status{display:flex;align-items:center;gap:8px;padding:10px 14px 6px;font-size:11px;color:var(--text3);font-family:var(--mono);}
+.comp-status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.comp-legend{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px 10px;border-bottom:1px solid var(--border);}
+.comp-leg-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);font-family:var(--mono);}
+.comp-leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.comp-footer{height:calc(var(--nav-h) + 24px);}
+
+/* ── DISCREPANCIAS RESUMEN ── */
+.comp-disc-section{margin:16px 14px 4px;}
+.comp-disc-hdr{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.14em;font-family:var(--mono);padding-bottom:8px;border-bottom:2px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.comp-disc-row{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;cursor:pointer;transition:filter .1s;}
+.comp-disc-row:active{filter:brightness(.94);}
+.comp-disc-day{font-size:13px;font-weight:900;font-family:var(--mono);color:var(--text);min-width:32px;}
+.comp-disc-vals{flex:1;font-size:11px;font-family:var(--mono);color:var(--text2);}
+.comp-disc-diff{font-size:12px;font-weight:900;font-family:var(--mono);padding:3px 8px;border-radius:6px;}
+.comp-disc-arrow{font-size:16px;color:var(--text3);}
+/* ── DETAIL SHEET ── */
+.disc-detail-ov{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0);pointer-events:none;transition:background .3s;}
+.disc-detail-ov.open{background:rgba(0,0,0,0.45);pointer-events:all;}
+.disc-detail-sheet{position:absolute;bottom:0;left:0;right:0;background:var(--bg);border-radius:20px 20px 0 0;max-height:90vh;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);}
+.disc-detail-ov.open .disc-detail-sheet{transform:translateY(0);}
+.disc-detail-drag{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;}
+.disc-detail-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.disc-detail-title{font-size:16px;font-weight:800;color:var(--text);}
+.disc-detail-close{background:none;border:none;font-size:20px;color:var(--text3);cursor:pointer;padding:4px 8px;}
+.disc-detail-body{overflow-y:auto;flex:1;padding-bottom:env(safe-area-inset-bottom,0);}
+.disc-img-wrap{padding:12px 14px 4px;}
+.disc-img-lbl{font-size:10px;font-weight:700;color:var(--text3);font-family:var(--mono);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.disc-img-lbl::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc);}
+.disc-img{width:100%;border-radius:var(--rs);border:1px solid var(--border);display:block;}
+.disc-cmp-card{margin:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.disc-cmp-grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);}
+.disc-cmp-cell{padding:12px 14px;}
+.disc-cmp-cell:first-child{border-right:1px solid var(--border);}
+.disc-cmp-lbl{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);margin-bottom:5px;}
+.disc-cmp-val{font-size:18px;font-weight:900;font-family:var(--mono);}
+.disc-diff-row{padding:12px 14px;text-align:center;font-size:14px;font-weight:900;font-family:var(--mono);}
+.disc-edit-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 28px);margin:8px 14px 16px;padding:14px;background:var(--acc);border:none;border-radius:var(--r);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);}
+.disc-edit-btn:active{opacity:.85;}
 </style>
 </head>
 <body>
@@ -624,12 +801,13 @@ body{
     <div class="hdr-icon" id="headerIcon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
     <div>
       <div class="hdr-title" id="headerTitle">PycHoras</div>
-      <div class="hdr-sub" id="headerSub">Pycseca · Mi Cuenta</div>
+      <div class="hdr-sub" id="headerSub">Pycseca · Nómina</div>
     </div>
   </div>
   <div class="hdr-right">
     <div class="hdr-fecha" id="hFecha">&mdash;</div>
     <div class="hdr-stats" id="hStats">&mdash;</div>
+    <button class="hdr-gear" onclick="abrirSettings()" title="Ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
   </div>
 </div>
 
@@ -672,6 +850,11 @@ body{
         <div class="legend-scale"><span>Menos</span><div class="ls-dot" style="background:var(--c1);border:1px solid var(--c2)"></div><div class="ls-dot" style="background:var(--c2)"></div><div class="ls-dot" style="background:var(--c3)"></div><div class="ls-dot" style="background:var(--c4)"></div><div class="ls-dot" style="background:var(--c5)"></div><span>Más</span></div>
         <div class="legend-items"><div class="li"><div class="li-dot" style="background:var(--c1);border:1px solid var(--c2)"></div>Vacaciones</div><div class="li"><div class="li-dot" style="background:var(--c2)"></div>Día corto</div><div class="li"><div class="li-dot" style="background:var(--c3)"></div>Normal 8h</div><div class="li"><div class="li-dot" style="background:var(--c4)"></div>Extras</div><div class="li"><div class="li-dot" style="background:var(--c5)"></div>FDS / Festivo</div><div class="li"><div class="li-dot" style="background:#a78bfa;border-radius:50%"></div>Guardia</div></div>
       </div>
+      <!-- GUARDIAS EN JORNADA -->
+      <div class="jornada-guardias">
+        <div class="jornada-guardias-title"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Mis guardias</div>
+        <div class="guardia-edit-card" id="guardiaEditCard"></div>
+      </div>
     </div>
   </div>
 
@@ -680,7 +863,7 @@ body{
     <div class="swipe-wrap" id="swipeWrapDatos">
       <div class="swipe-track" id="swipeTrackDatos">
         <div class="swipe-panel">
-          <div class="sticky"><div class="sticky-top"><div><div class="sticky-titulo" id="mesTitulo">&mdash;</div><div class="sticky-sub">Desliza para ver tabla o año</div></div><div class="mes-nav"><div class="marr" id="prevMesDatos">‹</div><div class="marr" id="nextMesDatos">›</div></div></div></div>
+          <div class="sticky"><div class="sticky-top"><div><div class="sticky-titulo" id="mesTitulo">&mdash;</div><div class="sticky-sub">Desliza: tabla · año · comparar</div></div><div class="mes-nav"><div class="marr" id="prevMesDatos">‹</div><div class="marr" id="nextMesDatos">›</div></div></div></div>
           <div class="scroll-body" id="mesBody"></div>
         </div>
         <div class="swipe-panel">
@@ -693,14 +876,46 @@ body{
           <div class="sticky"><div class="sticky-top"><div><div class="sticky-titulo">Resumen 2026</div><div class="sticky-sub">Toca un mes para ir a él</div></div></div></div>
           <div class="anual-scroll" id="anualBody"></div>
         </div>
+        <div class="swipe-panel" id="panelComparar">
+          <div class="sticky" id="compStickyHdr" style="display:none">
+            <div class="comp-summary" id="compSummary"></div>
+            <div class="comp-status" id="compStatus"></div>
+            <div class="comp-legend">
+              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:var(--green)"></div>Coincide</div>
+              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:#FBBF24"></div>&le;15min</div>
+              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:var(--red)"></div>Diferencia</div>
+              <div class="comp-leg-item"><div class="comp-leg-dot" style="background:rgba(249,115,22,0.3)"></div>Base (sin editar)</div>
+            </div>
+            <div class="comp-hdr">
+              <div class="comp-hdr-cell">DÍA</div>
+              <div class="comp-hdr-cell">APP</div>
+              <div class="comp-hdr-cell">EMPRESA</div>
+              <div class="comp-hdr-cell">DIFF</div>
+            </div>
+          </div>
+          <div class="comp-wrap" id="compBody">
+            <div class="comp-upload-area">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              <div style="font-size:14px;font-weight:700;color:var(--text2)">Carga la hoja de la empresa</div>
+              <div class="comp-upload-hint">PDF · foto · pantallazo · 100% local</div>
+              <label class="comp-upload-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                PDF o imagen
+                <input type="file" accept="application/pdf,image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="dots"><div class="dot active" id="dot0"></div><div class="dot" id="dot1"></div><div class="dot" id="dot2"></div></div>
+      <div class="dots"><div class="dot active" id="dot0"></div><div class="dot" id="dot1"></div><div class="dot" id="dot2"></div><div class="dot" id="dot3"></div></div>
     </div>
   </div>
 
   <!-- PANEL MI CUENTA -->
   <div id="panelMicuenta" class="module-panel hidden">
     <div class="scroll-body" id="micuentaBody">
+
+      <!-- ① LÍQUIDO ESTIMADO -->
       <div class="liquido-card">
         <div class="liq-mes-nav">
           <div class="liq-mes-lbl" id="liqMes">&mdash;</div>
@@ -719,9 +934,31 @@ body{
           <div class="liq-item"><div class="liq-item-val pos" id="liqExtras">&mdash;</div><div class="liq-item-lbl">Variables</div></div>
           <div class="liq-item"><div class="liq-item-val neg" id="liqDedu">&mdash;</div><div class="liq-item-lbl">Deducciones</div></div>
         </div>
+        <div class="liq-guardia-badge" id="liqGuardiaBadge" style="display:none">
+          <div class="liq-guardia-dot"></div>
+          <span id="liqGuardiaInfo">Guardia semana</span>
+        </div>
       </div>
-            <div class="sec">
-        <div class="sec-title">Nómina</div>
+
+      <!-- ② DESGLOSE COLAPSABLE (Variables + Deducciones) -->
+      <button class="desglose-toggle-btn" onclick="toggleDesglose()">
+        <div>
+          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Desglose del cálculo</div>
+          <div style="font-size:12px;color:var(--text2);">Variables del mes · Deducciones estimadas</div>
+        </div>
+        <span class="desglose-toggle-arrow" id="desgloseArrow">›</span>
+      </button>
+      <div class="desglose-collapsible" id="desgloseCollapsible">
+        <div class="sec"><div class="sec-title">Variables</div><div class="extra-card" id="extraCard"></div></div>
+        <div class="sec"><div class="sec-title">Deducciones estimadas</div><div class="dedu-card" id="deduCard"></div></div>
+      </div>
+
+      <!-- ③ NÓMINA (colapsable) -->
+      <div class="mc-group">
+        <div class="mc-group-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Nómina
+        </div>
         <div class="pdf-card">
           <div class="pdf-upload" id="pdfUploadArea">
             <input type="file" accept=".pdf,application/pdf" id="pdfFileInput">
@@ -733,48 +970,52 @@ body{
             <span class="pdf-loaded-txt" id="pdfLoadedTxt">✓ Nómina cargada</span>
             <span class="pdf-loaded-btn" id="nuevoPdfBtn">Cambiar</span>
           </div>
-          <div class="nomina-section">
-            <div class="nomina-sec-lbl">Conceptos fijos</div>
-            <div class="nomina-row"><span class="nomina-lbl">Salario base</span><input class="nomina-input" id="nSalario" type="number" step="0.01"><span class="nomina-unit">€</span></div>
-            <div class="nomina-row"><span class="nomina-lbl">Antigüedad</span><input class="nomina-input" id="nAntiguedad" type="number" step="0.01"><span class="nomina-unit">€</span></div>
-            <div class="nomina-row"><span class="nomina-lbl">Beneficios</span><input class="nomina-input" id="nBeneficios" type="number" step="0.01"><span class="nomina-unit">€</span></div>
-            <div class="nomina-row"><span class="nomina-lbl">Plus transporte</span><input class="nomina-input" id="nTransporte" type="number" step="0.01"><span class="nomina-unit">€</span></div>
-            <div class="nomina-row"><span class="nomina-lbl">Plus vestuario</span><input class="nomina-input" id="nVestuario" type="number" step="0.01"><span class="nomina-unit">€</span></div>
-            <div class="nomina-row"><span class="nomina-lbl">Complemento personal</span><input class="nomina-input" id="nComplemento" type="number" step="0.01"><span class="nomina-unit">€</span></div>
-            <div class="nomina-row"><span class="nomina-lbl">Prima seguro AT</span><input class="nomina-input" id="nPrima" type="number" step="0.01"><span class="nomina-unit">€</span></div>
-            <div class="nomina-sec-lbl">Variables (cambian cada mes)</div>
-            <div class="nomina-row"><span class="nomina-lbl">IRPF %</span><input class="nomina-input variable" id="nIRPF" type="number" step="0.01" oninput="recalcLiquido()"><span class="nomina-unit">%</span></div>
-            <div class="nomina-row"><span class="nomina-lbl">Nocturnidad</span><input class="nomina-input variable" id="nNocturnidad" type="number" step="0.01" oninput="recalcLiquido()"><span class="nomina-unit">€</span></div>
+          <!-- Toggle collapse -->
+          <button class="nomina-toggle-btn" id="nominaToggleBtn" onclick="toggleNominaForm()">
+            <div>
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Conceptos fijos</div>
+              <div class="nomina-toggle-summary"><strong id="nominaToggleSalary">&mdash;</strong> <span style="font-size:11px;color:var(--text3)">salario base · toca para editar</span></div>
+            </div>
+            <span class="nomina-toggle-arrow" id="nominaToggleArrow">›</span>
+          </button>
+          <div class="nomina-collapsible" id="nominaCollapsible">
+            <div class="nomina-section">
+              <div class="nomina-sec-lbl">Conceptos fijos</div>
+              <div class="nomina-row"><span class="nomina-lbl">Salario base</span><input class="nomina-input" id="nSalario" type="number" step="0.01"><span class="nomina-unit">€</span></div>
+              <div class="nomina-row"><span class="nomina-lbl">Antigüedad</span><input class="nomina-input" id="nAntiguedad" type="number" step="0.01"><span class="nomina-unit">€</span></div>
+              <div class="nomina-row"><span class="nomina-lbl">Beneficios</span><input class="nomina-input" id="nBeneficios" type="number" step="0.01"><span class="nomina-unit">€</span></div>
+              <div class="nomina-row"><span class="nomina-lbl">Plus transporte</span><input class="nomina-input" id="nTransporte" type="number" step="0.01"><span class="nomina-unit">€</span></div>
+              <div class="nomina-row"><span class="nomina-lbl">Plus vestuario</span><input class="nomina-input" id="nVestuario" type="number" step="0.01"><span class="nomina-unit">€</span></div>
+              <div class="nomina-row"><span class="nomina-lbl">Complemento personal</span><input class="nomina-input" id="nComplemento" type="number" step="0.01"><span class="nomina-unit">€</span></div>
+              <div class="nomina-row"><span class="nomina-lbl">Prima seguro AT</span><input class="nomina-input" id="nPrima" type="number" step="0.01"><span class="nomina-unit">€</span></div>
+              <div class="nomina-sec-lbl">Variables (cambian cada mes)</div>
+              <div class="nomina-row"><span class="nomina-lbl">IRPF %</span><input class="nomina-input variable" id="nIRPF" type="number" step="0.01" oninput="recalcLiquido()"><span class="nomina-unit">%</span></div>
+              <div class="nomina-row"><span class="nomina-lbl">Nocturnidad</span><input class="nomina-input variable" id="nNocturnidad" type="number" step="0.01" oninput="recalcLiquido()"><span class="nomina-unit">€</span></div>
+            </div>
+            <div style="padding:0 14px 12px"><button class="btn-save" onclick="guardarNomina()">GUARDAR NÓMINA</button></div>
           </div>
-          <div style="padding:0 14px 12px"><button class="btn-save" onclick="guardarNomina()">GUARDAR NÓMINA</button></div>
         </div>
       </div>
 
-      <div class="sec"><div class="sec-title">Deducciones estimadas</div><div class="dedu-card" id="deduCard"></div></div>
-      <div class="sec"><div class="sec-title">Variables del mes</div><div class="extra-card" id="extraCard"></div></div>
-      <div class="sec"><div class="sec-title">Gastos acumulados</div><div class="saldo-card" id="saldoCard"></div><div class="saldo-emp-input-row"><div class="cfg-left"><div class="sei-lbl">Saldo empresa mes actual</div><div class="sei-sub">Dato del Excel / hoja de firma</div></div><input class="sei-input" id="saldoEmpresa" type="number" min="0" step="0.01" placeholder="0,00" oninput="guardarSaldoEmpresa()"></div></div>
-
-      <div class="sec"><div class="sec-title">Mis guardias</div><div class="guardia-edit-card" id="guardiaEditCard"></div></div>
-
-      <div class="sec"><div class="sec-title">Parámetros económicos</div><div class="cfg-card"><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Precio hora extra</div><div class="cfg-sub">Convenio seguridad privada</div></div><input class="cfg-input" id="cfgPrecioH" type="number" step="0.01"><span class="cfg-unit">€/h</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus guardia semana</div><div class="cfg-sub">Fijo por semana completa</div></div><input class="cfg-input" id="cfgGuardia" type="number" step="1"><span class="cfg-unit">€</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus festivo trabajado</div><div class="cfg-sub">Por día festivo con guardia</div></div><input class="cfg-input" id="cfgFestivo" type="number" step="1"><span class="cfg-unit">€</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Horas convenio mensual</div><div class="cfg-sub">Base cálculo de extras</div></div><input class="cfg-input" id="cfgConvenio" type="number" step="1"><span class="cfg-unit">h</span></div><div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Días vacaciones</div><div class="cfg-sub">5h 14min por día</div></div><input class="cfg-input" id="cfgVacDias" type="number" step="1"><span class="cfg-unit">días</span></div></div><button class="btn-save" onclick="guardarConfig()">GUARDAR CONFIGURACIÓN</button></div>
-
-      <div class="sec"><div class="sec-title">Color de la app</div><div class="paleta-card"><div class="paleta-row" id="paletaRowMicuenta"></div></div></div>
-
-      <div class="sec"><div class="sec-title">Backup & Datos</div>
-        <div class="backup-group">
-          <div class="backup-group-lbl">📋 Excel (recomendado)</div>
-          <button class="btn-export" onclick="exportarExcel()"><svg viewBox="0 0 24 24" style="stroke:white;fill:none;width:13px;height:13px;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar Excel</button>
-          <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar Excel<input type="file" accept=".xlsx,.xls" id="excelFileInput"></label>
+      <!-- ⑥ PARÁMETROS ECONÓMICOS -->
+      <div class="mc-group">
+        <div class="mc-group-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          Parámetros económicos
         </div>
-        <div class="backup-group" style="margin-top:8px">
-          <div class="backup-group-lbl">🗄 JSON (backup completo)</div>
-          <button class="btn-export" style="background:var(--blue);border-color:#1e3a8a" onclick="exportarBackupCompleto()"><svg viewBox="0 0 24 24" style="stroke:white;fill:none;width:13px;height:13px;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar JSON</button>
-          <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
+        <div class="sec" style="margin-bottom:0">
+          <div class="cfg-card">
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Precio hora extra</div><div class="cfg-sub">Convenio seguridad privada</div></div><input class="cfg-input" id="cfgPrecioH" type="number" step="0.01"><span class="cfg-unit">€/h</span></div>
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus guardia semana</div><div class="cfg-sub">Fijo por semana completa</div></div><input class="cfg-input" id="cfgGuardia" type="number" step="1"><span class="cfg-unit">€</span></div>
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus festivo trabajado</div><div class="cfg-sub">Por día festivo con guardia</div></div><input class="cfg-input" id="cfgFestivo" type="number" step="1"><span class="cfg-unit">€</span></div>
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Horas convenio mensual</div><div class="cfg-sub">Base cálculo de extras</div></div><input class="cfg-input" id="cfgConvenio" type="number" step="1"><span class="cfg-unit">h</span></div>
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Días vacaciones</div><div class="cfg-sub">5h 14min por día</div></div><input class="cfg-input" id="cfgVacDias" type="number" step="1"><span class="cfg-unit">días</span></div>
+          </div>
+          <button class="btn-save" onclick="guardarConfig()">GUARDAR CONFIGURACIÓN</button>
         </div>
-        <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
-        <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
+
+
     </div>
   </div>
 </div>
@@ -821,11 +1062,98 @@ body{
   </div>
 </div>
 
+<!-- MODAL VERIFICAR — IN-APP ANALYSIS -->
+<div class="verif-ov" id="verifOv">
+  <div class="verif-hdr">
+    <button class="verif-back" onclick="cerrarVerificar()">‹</button>
+    <div class="verif-hdr-title" id="verifTitle">Verificar mes</div>
+  </div>
+  <div class="verif-tabs">
+    <button class="verif-tab active" id="verifTabHoras" onclick="switchVerifTab('horas')">📋 Hoja de horas</button>
+    <button class="verif-tab" id="verifTabNomina" onclick="switchVerifTab('nomina')">💰 Nómina</button>
+  </div>
+
+  <!-- TAB HORAS -->
+  <!-- TAB HORAS: redirige a Datos → Comparar (100% local) -->
+  <div class="verif-body" id="verifBodyHoras">
+    <div class="verif-data-card" id="verifResumenHoras"></div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px 16px;text-align:center;margin-bottom:12px">
+      <div style="font-size:32px;margin-bottom:10px">📊</div>
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:6px">Comparativa día a día</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.5">La comparativa detallada con la hoja de la empresa está en <strong>Datos → panel Comparar</strong>.<br>Carga el PDF allí y verás cada día lado a lado en local.</div>
+      <button class="verif-btn-analizar" style="background:var(--acc)" onclick="irAComparar()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+        Ir a Datos → Comparar
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB NÓMINA: parsing local con pdf.js -->
+  <div class="verif-body" id="verifBodyNomina" style="display:none">
+    <div class="verif-data-card" id="verifResumenNomina"></div>
+    <label class="verif-upload-btn" id="verifUploadNominaBtn">
+      <span id="verifIconNomina" style="font-size:22px">📄</span>
+      <div>
+        <div id="verifUploadNominaTxt" style="font-weight:700">PDF de la nómina</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Procesado en local · sin conexión</div>
+      </div>
+      <input type="file" accept="application/pdf" id="verifFotoNomina" style="display:none" onchange="onFotoNomina(this)">
+    </label>
+    <div id="verifPdfTagNomina" style="display:none;padding:10px 14px;background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.2);border-radius:var(--rs);font-size:12px;color:var(--blue);font-family:var(--mono);font-weight:700;margin-bottom:12px"></div>
+    <button class="verif-btn-analizar" id="verifBtnNomina" onclick="analizarNomina()" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Comparar nómina
+    </button>
+    <div id="verifResultNomina"></div>
+  </div>
+</div>
+
+<!-- DISCREPANCY DETAIL SHEET -->
+<div class="disc-detail-ov" id="discDetailOv" onclick="cerrarDiscDetail(event)">
+  <div class="disc-detail-sheet" id="discDetailSheet">
+    <div class="disc-detail-drag"></div>
+    <div class="disc-detail-hdr">
+      <div class="disc-detail-title" id="discDetailTitle">Día —</div>
+      <button class="disc-detail-close" onclick="cerrarDiscDetail()">✕</button>
+    </div>
+    <div class="disc-detail-body" id="discDetailBody"></div>
+  </div>
+</div>
+
+<!-- SETTINGS SHEET -->
+<div class="settings-ov" id="settingsOv" onclick="cerrarSettingsOv(event)">
+  <div class="settings-sheet" id="settingsSheet">
+    <div class="settings-drag"></div>
+    <div class="settings-hdr">
+      <div class="settings-hdr-title">Ajustes</div>
+      <button class="settings-close" onclick="cerrarSettings()">✕</button>
+    </div>
+    <div class="settings-body">
+      <div class="sec"><div class="sec-title">Color de la app</div><div class="paleta-card"><div class="paleta-row" id="paletaRowMicuenta"></div></div></div>
+      <div class="sec">
+        <div class="backup-group">
+          <div class="backup-group-lbl">📋 Excel (recomendado)</div>
+          <button class="btn-export" onclick="exportarExcel()"><svg viewBox="0 0 24 24" style="stroke:white;fill:none;width:13px;height:13px;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar Excel</button>
+          <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar Excel<input type="file" accept=".xlsx,.xls" id="excelFileInput"></label>
+        </div>
+        <div class="backup-group" style="margin-top:8px">
+          <div class="backup-group-lbl">🗄 JSON (backup completo)</div>
+          <button class="btn-export" style="background:var(--blue);border-color:#1e3a8a" onclick="exportarBackupCompleto()"><svg viewBox="0 0 24 24" style="stroke:white;fill:none;width:13px;height:13px;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar JSON</button>
+          <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
+        </div>
+        <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <nav class="nav-bar">
   <button class="nb" id="navChat"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</button>
   <button class="nb" id="navJornada"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Jornada</button>
   <button class="nb" id="navDatos"><svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>Datos</button>
-  <button class="nb" id="navMicuenta"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Mi Cuenta</button>
+  <button class="nb" id="navMicuenta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Nómina</button>
 </nav>
 
 <div class="toast-w"><div class="toast" id="toastEl"></div></div>
@@ -962,12 +1290,12 @@ function mesStats(y, m) {
   for (const g of GUARDIAS_2026) {
     const key = g.toISOString().split('T')[0];
     if (guardiasCambios[key] === 'eliminada' || guardiasCambios[key] === 'cancelada') continue;
-    if (g.getFullYear() === y) { const fin = new Date(g); fin.setDate(fin.getDate() + 6); if (g.getMonth() === m || fin.getMonth() === m) guardiasMes++; }
+    if (g.getFullYear() === y && g.getMonth() === m) guardiasMes++;
   }
   const _extras = guardiasCambios._extra || [];
   for (const dateStr of _extras) {
     const g = new Date(dateStr + 'T12:00:00');
-    if (g.getFullYear() === y) { const fin = new Date(g); fin.setDate(fin.getDate() + 6); if (g.getMonth() === m || fin.getMonth() === m) guardiasMes++; }
+    if (g.getFullYear() === y && g.getMonth() === m) guardiasMes++;
   }
   plusGuardia = guardiasMes * cfg.guardia;
   for (let d = 1; d <= dm; d++) {
@@ -999,7 +1327,7 @@ function showModule(moduleName) {
   document.getElementById('navDatos').classList.remove('active');
   document.getElementById('navMicuenta').classList.remove('active');
   document.getElementById('nav' + moduleName.charAt(0).toUpperCase() + moduleName.slice(1)).classList.add('active');
-  const headers = { chat: { icon: '📝', sub: 'Iram · Asistente de jornada' }, jornada: { icon: '⏰', sub: 'Pycseca · Jornada' }, datos: { icon: '📊', sub: 'Pycseca · Datos' }, micuenta: { icon: '💰', sub: 'Pycseca · Mi Cuenta' } };
+  const headers = { chat: { icon: '📝', sub: 'Iram · Asistente de jornada' }, jornada: { icon: '⏰', sub: 'Pycseca · Jornada' }, datos: { icon: '📊', sub: 'Pycseca · Datos' }, micuenta: { icon: '💰', sub: 'Pycseca · Nómina' } };
   const h = headers[moduleName]; if (h) { document.querySelector('.hdr-icon').textContent = h.icon; document.getElementById('headerSub').textContent = h.sub; }
   currentModule = moduleName;
   if (moduleName === 'jornada') updateHeaderJornada(); else if (moduleName === 'chat') updateHeaderChat(); else if (moduleName === 'datos') updateHeaderDatos(); else if (moduleName === 'micuenta') updateHeaderMicuenta();
@@ -1046,6 +1374,18 @@ function renderLiquido() {
   document.getElementById('liqAmount').textContent = c.liquido.toFixed(2) + '€';
   document.getElementById('liqSub').textContent = 'Devengado: ' + c.totalDevengado.toFixed(2) + '€ · Deducido: ' + c.totalDedu.toFixed(2) + '€';
   document.getElementById('liqBase').textContent = c.baseFija.toFixed(2) + '€';
+  // Guardia badge
+  const badge = document.getElementById('liqGuardiaBadge');
+  const info = document.getElementById('liqGuardiaInfo');
+  if (badge && info) {
+    if (c.st.guardiasMes > 0) {
+      info.textContent = c.st.guardiasMes + ' guardia' + (c.st.guardiasMes > 1 ? 's' : '') + ' · +' + c.st.plusGuardia.toFixed(0) + '€';
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  _updateNominaToggle();
   document.getElementById('liqExtras').textContent = '+' + (c.variables).toFixed(2) + '€';
   document.getElementById('liqDedu').textContent = '\u2212' + c.totalDedu.toFixed(2) + '€';
 
@@ -1065,9 +1405,39 @@ function renderLiquido() {
   document.getElementById('extraCard').innerHTML = evHtml;
 }
 
-function goLiqMes(dir) { liqMes += dir; if (liqMes > 11) { liqMes = 0; liqYear++; } if (liqMes < 0) { liqMes = 11; liqYear--; } renderLiquido(); }
 
 function recalcLiquido() { renderLiquido(); }
+
+function toggleNominaForm() {
+  const col = document.getElementById('nominaCollapsible');
+  const arrow = document.getElementById('nominaToggleArrow');
+  const open = col.classList.toggle('expanded');
+  arrow.classList.toggle('open', open);
+}
+
+
+function abrirSettings() {
+  document.getElementById('settingsOv').classList.add('open');
+  renderPaletaMicuenta();
+  renderInfo();
+}
+function cerrarSettings() {
+  document.getElementById('settingsOv').classList.remove('open');
+}
+function cerrarSettingsOv(e) {
+  if (e.target === document.getElementById('settingsOv')) cerrarSettings();
+}
+function toggleDesglose() {
+  const col = document.getElementById('desgloseCollapsible');
+  const arrow = document.getElementById('desgloseArrow');
+  if (!col) return;
+  const open = col.classList.toggle('expanded');
+  arrow.classList.toggle('open', open);
+}
+function _updateNominaToggle() {
+  const el = document.getElementById('nominaToggleSalary');
+  if (el) el.textContent = nomina.salario ? nomina.salario.toFixed(2) + '€' : '—';
+}
 
 function renderGuardiaEditor() {
   const card = document.getElementById('guardiaEditCard');
@@ -1261,6 +1631,11 @@ function guardarNomina() {
   nomina.irpf = parseFloat(document.getElementById('nIRPF').value) || nomina.irpf;
   nomina.nocturnidad = parseFloat(document.getElementById('nNocturnidad').value) || nomina.nocturnidad;
   saveNomina(); renderLiquido();
+  // Cerrar el formulario y actualizar el resumen del toggle
+  const col = document.getElementById('nominaCollapsible');
+  const arrow = document.getElementById('nominaToggleArrow');
+  if (col) { col.classList.remove('expanded'); }
+  if (arrow) { arrow.classList.remove('open'); }
   showToast('✓ Nómina guardada');
 }
 
@@ -1398,16 +1773,17 @@ function exportarExcel() {
   // ── HOJA RESUMEN ─────────────────────────────────────
   const resAoa = [['RESUMEN JORNADA 2026','','','','','','','','']];
   resAoa.push(['MES','DÍAS TRAB.','HORAS REALES','HORAS CONV.','EXTRAS','GASTOS €','GUARDIAS','€/HORA','IMPORTE €']);
-  let totY=0,extY=0,labY=0,gasY=0,impY=0;
+  let totY=0,extY=0,labY=0,gasY=0,impY=0,gSemsY=0;
   for (let mi = 0; mi < 12; mi++) {
     const st = mesStats(2026, mi);
-    let gSems=0;
-    GUARDIAS_2026.forEach(g=>{const fin=new Date(g);fin.setDate(fin.getDate()+6);if(g.getFullYear()===2026&&(g.getMonth()===mi||fin.getMonth()===mi))gSems++;});
+    // Contar guardias: base (vacías por diseño) + extras añadidas por usuario
+    let gSems = st.guardiasMes; // mesStats ya cuenta ambas correctamente
+    gSemsY += gSems;
     const e = st.ext, imp = parseFloat((st.tot/60*cfg.precioH).toFixed(2));
     resAoa.push([MESES[mi],st.lab,minsToHHMM(st.tot),minsToHHMM(cfg.convenio*60),(e>=0?'+':'')+minsToHHMM(e),st.gas>0?parseFloat(st.gas.toFixed(2)):'',gSems>0?gSems+' sem.':'',cfg.precioH,imp]);
     totY+=st.tot; extY+=e; labY+=st.lab; gasY+=st.gas; impY+=imp;
   }
-  resAoa.push(['TOTAL 2026',labY,minsToHHMM(totY),minsToHHMM(cfg.convenio*60*12),(extY>=0?'+':'')+minsToHHMM(extY),gasY>0?parseFloat(gasY.toFixed(2)):'','6 sem.',cfg.precioH,parseFloat(impY.toFixed(2))]);
+  resAoa.push(['TOTAL 2026',labY,minsToHHMM(totY),minsToHHMM(cfg.convenio*60*12),(extY>=0?'+':'')+minsToHHMM(extY),gasY>0?parseFloat(gasY.toFixed(2)):'',gSemsY>0?gSemsY+' sem.':'',cfg.precioH,parseFloat(impY.toFixed(2))]);
   const wsRes = XLSX.utils.aoa_to_sheet(resAoa);
   wsRes['!cols'] = [{wch:14},{wch:10},{wch:13},{wch:12},{wch:9},{wch:9},{wch:9},{wch:7},{wch:11}];
   XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen 2026');
@@ -1435,6 +1811,16 @@ function exportarExcel() {
     const estado=cambio==='cancelada'?'Cambiada':fin<new Date()?'Completada':g<=new Date()&&fin>=new Date()?'En curso':'Pendiente';
     let lab=0;for(let i=0;i<7;i++){const d=new Date(g);d.setDate(d.getDate()+i);if(d.getDay()>0&&d.getDay()<6)lab++;}
     gAoa.push([`${g.getDate()}/${g.getMonth()+1}/2026`,`${fin.getDate()}/${fin.getMonth()+1}/2026`,lab,cfg.guardia,estado]);
+    totG+=cfg.guardia;
+  });
+  // ── Guardias extra añadidas por el usuario ──
+  const _extrasExport = guardiasCambios._extra || [];
+  _extrasExport.forEach(dateStr=>{
+    const g=new Date(dateStr+'T12:00:00');
+    const fin=new Date(g);fin.setDate(fin.getDate()+6);
+    const estado=fin<new Date()?'Completada':g<=new Date()&&fin>=new Date()?'En curso':'Pendiente';
+    let lab=0;for(let i=0;i<7;i++){const d=new Date(g);d.setDate(d.getDate()+i);if(d.getDay()>0&&d.getDay()<6)lab++;}
+    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/2026`,`${fin.getDate()}/${fin.getMonth()+1}/2026`,lab,cfg.guardia,estado+' (+extra)']);
     totG+=cfg.guardia;
   });
   gAoa.push(['TOTAL','','',totG,'']);
@@ -1640,7 +2026,6 @@ function renderJornada() {
   }
 }
 
-function goMes(dir) { cM += dir; if (cM > 11) { cM = 0; cY++; } if (cM < 0) { cM = 11; cY--; } renderJornada(); }
 
 function openModalJornada(y, m, d) {
   mF = { y, m, d };
@@ -1758,59 +2143,231 @@ function borrarJornada() {
   sD(y, m, d, null); closeModal(); renderJornada(); showToast('Día restablecido a 8h base');
 }
 
+let _verifB64Horas = null, _verifTypeHoras = null;
+let _verifB64Nomina = null, _verifTypeNomina = null;
+let _verifY = 2026, _verifM = 0, _verifDetalleHoras = '';
+
 function abrirClaudeAnalisis() {
   const y = cY, m = cM;
+  _verifY = y; _verifM = m;
   const st = mesStats(y, m);
+  const c = calcLiquido(y, m);
   const mesNom = MESES[m];
-  const conv = cfg.convenio;
 
-  // Construir detalle de días del mes
+  document.getElementById('verifTitle').textContent = 'Verificar · ' + mesNom + ' ' + y;
+
+  // Resumen horas
   const dm = new Date(y, m+1, 0).getDate();
   const lineas = [];
   for (let d = 1; d <= dm; d++) {
-    const o = gD(y, m, d);
-    if (!o) continue;
     const fecha = new Date(y, m, d);
-    const dstr = DSEM[fecha.getDay()];
+    const o = gD(y, m, d);
+    if (!o) { if (!isFDS(fecha) && !isFest(ds(y,m,d))) lineas.push('Día ' + d + ' ' + DSEM[fecha.getDay()] + ': 07:30→15:30 = 8h00'); continue; }
     const tipo = o.tipo || 'laboral';
-    if (tipo === 'vac') { lineas.push(`  Día ${d} ${dstr}: VACACIONES`); continue; }
-    if (tipo === 'fest' || tipo === 'ausencia') { lineas.push(`  Día ${d} ${dstr}: ${tipo.toUpperCase()}`); continue; }
+    if (tipo === 'vac') { lineas.push('Día ' + d + ': VACACIONES'); continue; }
+    if (tipo === 'fest' || tipo === 'ausencia') continue;
+    if (tipo === 'fds' && !o.tramos_txt) continue;
     const tr = parsearTramos(o.tramos_txt || '');
+    if (!tr.length) continue;
     const mins = totalTramos(tr) - (o.pausa_min || 0);
     const ext = mins - 480;
-    const tramoStr = tr.length ? tr.map(t => `${t.inicio}→${t.fin}`).join(' + ') : o.tramos_txt || '';
-    const gastoStr = o.gasto > 0 ? ` | Gasto: ${o.gasto.toFixed(2)}€ (${o.concepto||'varios'})` : '';
-    lineas.push(`  Día ${d} ${dstr}: ${tramoStr} = ${m2str(mins)}${ext!==0?' ('+(ext>0?'+':'')+m2str(ext)+')':''}${gastoStr}`);
+    const gastoStr = o.gasto > 0 ? ' | ' + o.gasto.toFixed(2) + '€ (' + (o.concepto || 'gasto') + ')' : '';
+    lineas.push('Día ' + d + ' ' + DSEM[fecha.getDay()] + ': ' + tr.map(t => t.inicio + '→' + t.fin).join(' + ') + ' = ' + m2hm(mins) + (ext !== 0 ? ' (' + (ext > 0 ? '+' : '') + m2hm(Math.abs(ext)) + ')' : '') + gastoStr);
+  }
+  _verifDetalleHoras = lineas.join('\n');
+
+  document.getElementById('verifResumenHoras').innerHTML =
+    '<div class="verif-data-lbl-top">Mi registro — ' + mesNom + ' ' + y + '</div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Total horas</span><span class="verif-data-val">' + m2hhmm(st.tot) + '</span></div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Extras</span><span class="verif-data-val ' + (st.ext >= 0 ? 'sv-pos' : 'sv-neg') + '">' + (st.ext >= 0 ? '+' : '') + m2hhmm(st.ext) + '</span></div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Días trabajados</span><span class="verif-data-val">' + st.lab + '</span></div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Gastos registrados</span><span class="verif-data-val">' + (st.gas > 0 ? st.gas.toFixed(2) + '€' : '0€') + '</span></div>';
+
+  document.getElementById('verifResumenNomina').innerHTML =
+    '<div class="verif-data-lbl-top">Estimación app — ' + mesNom + ' ' + y + '</div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Líquido estimado</span><span class="verif-data-val" style="font-size:16px;color:var(--purple)">' + c.liquido.toFixed(2) + '€</span></div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Base fija</span><span class="verif-data-val">' + c.baseFija.toFixed(2) + '€</span></div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Variables</span><span class="verif-data-val sv-pos">+' + c.variables.toFixed(2) + '€</span></div>' +
+    '<div class="verif-data-row"><span class="verif-data-lbl">Deducciones</span><span class="verif-data-val sv-neg">−' + c.totalDedu.toFixed(2) + '€</span></div>' +
+    (c.st.guardiasMes > 0 ? '<div class="verif-data-row"><span class="verif-data-lbl">Guardias (' + c.st.guardiasMes + ' sem.)</span><span class="verif-data-val" style="color:var(--purple)">+' + c.st.plusGuardia.toFixed(2) + '€</span></div>' : '');
+
+  // Reset estado
+  document.getElementById('verifResultHoras').innerHTML = '';
+  document.getElementById('verifResultNomina').innerHTML = '';
+  document.getElementById('verifBtnHoras').disabled = !_verifB64Horas;
+  document.getElementById('verifBtnNomina').disabled = !_verifB64Nomina;
+
+  document.getElementById('verifOv').classList.add('open');
+  switchVerifTab('horas');
+}
+
+function cerrarVerificar() {
+  document.getElementById('verifOv').classList.remove('open');
+}
+
+function switchVerifTab(tab) {
+  document.getElementById('verifBodyHoras').style.display = tab === 'horas' ? '' : 'none';
+  document.getElementById('verifBodyNomina').style.display = tab === 'nomina' ? '' : 'none';
+  document.getElementById('verifTabHoras').classList.toggle('active', tab === 'horas');
+  document.getElementById('verifTabNomina').classList.toggle('active', tab === 'nomina');
+}
+
+function _handleVerifFile(file, slot) {
+  // slot = 'Horas' | 'Nomina'
+  const isPdf = file.type === 'application/pdf';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64 = e.target.result.split(',')[1];
+    const tipo = file.type || 'image/jpeg';
+    if (slot === 'Horas') { _verifB64Horas = b64; _verifTypeHoras = tipo; }
+    else                  { _verifB64Nomina = b64; _verifTypeNomina = tipo; }
+
+    const prev    = document.getElementById('verifPreview' + slot);   // puede no existir
+    const pdfTag  = document.getElementById('verifPdfTag' + slot);
+    const icon    = document.getElementById('verifIcon' + slot);
+    const lbl     = document.getElementById('verifUpload' + slot + 'Txt');
+    const btn     = document.getElementById('verifUpload' + slot + 'Btn');
+    const analiza = document.getElementById('verifBtn' + slot);
+
+    if (isPdf) {
+      if (prev) prev.classList.remove('show');
+      if (pdfTag) { pdfTag.style.display = ''; pdfTag.textContent = '\uD83D\uDCC4 ' + file.name; }
+      if (icon) icon.textContent = '\uD83D\uDCC4';
+    } else {
+      if (prev) { prev.src = e.target.result; prev.classList.add('show'); }
+      if (pdfTag) pdfTag.style.display = 'none';
+      if (icon) icon.textContent = file.name.match(/\.(png|gif|bmp|webp)$/i) ? '\uD83D\uDDBC\uFE0F' : '\uD83D\uDCF7';
+    }
+    if (btn) btn.classList.add('loaded');
+    if (lbl) lbl.textContent = '\u2713 Cargado \u00b7 toca para cambiar';
+    if (analiza) analiza.disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function onFotoHoras(input) {
+  const file = input.files[0]; if (!file) return;
+  _handleVerifFile(file, 'Horas');
+}
+
+function onFotoNomina(input) {
+  const file = input.files[0]; if (!file) return;
+  _handleVerifFile(file, 'Nomina');
+}
+
+// ── irAComparar: cierra Verificar y abre Datos → panel 3 ────
+function irAComparar() {
+  cerrarVerificar();
+  showModule('datos');
+  renderMesDatos();
+  renderTablaDatos();
+  setTimeout(() => setVistaDatos(3), 120); // leve delay para que el panel esté visible
+}
+
+// ── Parser local de nómina PDF ───────────────────────────────
+async function _parsearNominaPDFLocal(arrayBuffer) {
+  if (!_initPdfJs()) throw new Error('pdf.js no disponible');
+  const pdf  = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let   text = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page    = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    // Reconstruir texto preservando espacios entre items
+    text += content.items.map(i => i.str).join(' ') + '\n';
   }
 
-  const detalleTexto = lineas.length > 0 ? '\n\nDetalle de días registrados:\n' + lineas.join('\n') : '';
+  // Extraer número decimal español (1.234,56 → 1234.56)
+  const num = (regex) => {
+    const m = text.match(regex);
+    if (!m) return null;
+    return parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
+  };
 
-  const prompt =
-`Necesito comparar mi registro de jornada con la hoja oficial de la empresa antes de firmarla.
+  return {
+    liquido:   num(/L[IÍ]QUIDO\s+A\s+PERCIBIR\s+([\d.,]+)/i),
+    guardias:  num(/\*?GUARDIAS\s+([\d.,]+)/i),
+    extras:    num(/LIQUIDACI[OÓ]N\s+HORAS?\s+EXTRAS?\s+([\d.,]+)/i),
+    irpfPct:   num(/I\.?R\.?P\.?F\.?\s+([\d.,]+)\s+[\d.,]+/i),
+    irpfAmt:   num(/I\.?R\.?P\.?F\.?\s+[\d.,]+\s+([\d.,]+)/i),
+    devengado: num(/T\.?\s*DEVENGADO\s+([\d.,]+)/i),
+    deducir:   num(/T\.?\s*A\s+DEDUCIR\s+([\d.,]+)/i),
+    ssCom:     num(/COTIZACION\s+CONT\.?COMU\s+[\d.,]+\s+([\d.,]+)/i),
+  };
+}
 
-═══ MI REGISTRO — ${mesNom.toUpperCase()} ${y} ═══
+// ── Tab Horas: redirige (sin API) ────────────────────────────
+function analizarHoras() { irAComparar(); }
 
-• Horas trabajadas:   ${m2hhmm(st.tot)}
-• Horas convenio:     ${m2hhmm(conv * 60)}
-• Extras del mes:     ${st.ext >= 0 ? '+' : ''}${m2hhmm(st.ext)}
-• Días trabajados:    ${st.lab}
-• Gastos (mi bolsillo): ${st.gas > 0 ? st.gas.toFixed(2) + '€' : '0€'}${detalleTexto}
+// ── Tab Nómina: comparativa 100% local ───────────────────────
+async function analizarNomina() {
+  if (!_verifB64Nomina) return;
+  const y = _verifY, m = _verifM;
+  const c = calcLiquido(y, m);
+  const resultEl = document.getElementById('verifResultNomina');
+  resultEl.innerHTML = '<div class="verif-loading"><div class="verif-spinner"></div>Leyendo PDF\u2026</div>';
+  document.getElementById('verifBtnNomina').disabled = true;
 
-═══ QUÉ NECESITO ═══
+  try {
+    // Decodificar base64 → ArrayBuffer
+    const bin = atob(_verifB64Nomina);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
 
-Adjunto pantallazo de la hoja de jornada de la empresa para ${mesNom} ${y}.
+    const n = await _parsearNominaPDFLocal(buf.buffer);
 
-Por favor:
-1. Compara el total de horas (columna TOTAL de la hoja vs mis ${m2hhmm(st.tot)})
-2. Compara mis gastos de bolsillo (columna VARIOS/SALDO vs mis ${st.gas > 0 ? st.gas.toFixed(2) + '€' : '0€'})
-3. Señala diferencias día a día si las hay
-4. Veredicto final: ¿puedo firmar o hay algo que revisar?
+    // Función de fila comparativa
+    const fila = (label, appVal, realVal, isEuros=true) => {
+      if (realVal === null) return ''; // no encontrado en el PDF, omitir
+      const diff    = appVal - realVal;
+      const absDiff = Math.abs(diff);
+      const ok      = absDiff < (isEuros ? 0.5 : 0.1);
+      const warn    = !ok && absDiff < (isEuros ? 10 : 1);
+      const cls     = ok ? 'comp-row-ok' : warn ? 'comp-row-warn' : 'comp-row-err';
+      const badge   = ok
+        ? '<span class="comp-badge comp-badge-ok">\u2713</span>'
+        : '<span class="comp-badge ' + (warn ? 'comp-badge-warn' : 'comp-badge-err') + '">'
+          + (diff > 0 ? '+' : '\u2212') + (isEuros ? Math.abs(diff).toFixed(2)+'\u20ac' : Math.abs(diff).toFixed(1)+'%') + '</span>';
+      const fmt = (v) => isEuros ? v.toFixed(2)+'\u20ac' : v.toFixed(1)+'%';
+      return '<div class="comp-row ' + cls + '" style="grid-template-columns:1fr 70px 70px 60px;cursor:default">'
+        + '<div style="font-size:12px;color:var(--text2)">' + label + '</div>'
+        + '<div class="comp-cell" style="text-align:right">' + fmt(appVal) + '</div>'
+        + '<div class="comp-cell" style="text-align:right">' + fmt(realVal) + '</div>'
+        + '<div style="text-align:center">' + badge + '</div>'
+        + '</div>';
+    };
 
-Sé directo y visual.`;
+    // Comparar cada concepto
+    const rows = [
+      fila('L\u00edquido',          c.liquido,                n.liquido),
+      fila('Guardias',              c.st.plusGuardia,          n.guardias),
+      fila('Horas extras',          c.stPrev.extrasEuros,      n.extras),
+      fila('IRPF%',                 nomina.irpf,               n.irpfPct,  false),
+      fila('IRPF \u20ac',          c.deduIRPF,               n.irpfAmt),
+      fila('SS trabajador',         c.deduSS,                  n.ssCom),
+      fila('Total devengado',       c.totalDevengado,          n.devengado),
+      fila('Total deducido',        c.totalDedu,               n.deducir),
+    ].filter(Boolean).join('');
 
-  const url = 'https://claude.ai/new?q=' + encodeURIComponent(prompt);
-  window.open(url, '_blank');
-  showToast('Abriendo Claude con el contexto de ' + mesNom + ' 👩🏼‍💻');
+    // Veredicto
+    const liqDiff   = n.liquido !== null ? Math.abs(c.liquido - n.liquido) : null;
+    const veredicto = liqDiff === null ? ''
+      : liqDiff < 0.5
+        ? '<div style="margin-top:12px;padding:12px;background:rgba(22,163,74,0.08);border-radius:var(--rs);font-size:13px;font-weight:800;color:var(--green);text-align:center">\u2713 La n\u00f3mina cuadra con la estimaci\u00f3n</div>'
+        : '<div style="margin-top:12px;padding:12px;background:rgba(220,38,38,0.07);border-radius:var(--rs);font-size:13px;font-weight:800;color:var(--red);text-align:center">\u26a0 Diferencia de ' + liqDiff.toFixed(2) + '\u20ac en el l\u00edquido</div>';
+
+    const hdr = '<div style="display:grid;grid-template-columns:1fr 70px 70px 60px;padding:6px 14px;background:var(--bg3);border-radius:var(--rs);margin-bottom:6px">'
+      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono)">Concepto</div>'
+      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono);text-align:right">App</div>'
+      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono);text-align:right">N\u00f3mina</div>'
+      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono);text-align:center">Diff</div>'
+      + '</div>';
+
+    resultEl.innerHTML = '<div class="verif-result" style="padding:12px">' + hdr + rows + veredicto + '</div>';
+
+  } catch(e) {
+    resultEl.innerHTML = '<div class="verif-result" style="color:var(--red)">\u26a0 Error al leer el PDF: ' + e.message + '</div>';
+  }
+  document.getElementById('verifBtnNomina').disabled = false;
 }
 
 // ============================================================
@@ -1830,16 +2387,20 @@ function dayInfoDatos(y, m, d) {
     if(fest) return{tipo:'fest',mins:0,inicio:'-',fin:'-',pausa:0,gasto:0,concepto:'',fds,fest,fut};
     return{tipo:'base',mins:480,inicio:'07:30',fin:'15:30',pausa:0,gasto:0,concepto:'',fds,fest,fut};
   }
-  const tipo=o.tipo||'laboral'; let mins=0,inicio='-',fin='-',pausa=o.pausa_min||0;
+  const tipo=o.tipo||'laboral'; let mins=0,inicio='-',fin='-';
+  const pausaMin=o.pausa_min||0;
   if(tipo==='vac') mins=Math.round(cfg.convenio/cfg.vacDias*60);
   else if(tipo==='fest'||tipo==='ausencia') mins=0;
   else {
     const tr=parsearTramos(o.tramos_txt||'');
-    mins=totalTramos(tr)-pausa;
+    const pausaTramos=tr.reduce((s,t)=>s+t.pausa,0); // pausa embebida en -Xmin
+    const pausa=pausaTramos+pausaMin;
+    mins=totalTramos(tr)-pausaMin; // totalTramos ya descuenta pausaTramos; solo restar pausaMin extra
     if(tr.length){inicio=tr[0].inicio;fin=tr[tr.length-1].fin;}
     else{inicio='07:30';fin='15:30';}
+    return{tipo,mins,inicio,fin,pausa,numTramos:tr.length,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
   }
-  return{tipo,mins,inicio,fin,pausa,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
+  return{tipo,mins,inicio,fin,pausa:pausaMin,numTramos:0,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
 }
 
 function guardiaDelMesDatos(y, m) {
@@ -1894,7 +2455,13 @@ function renderMesDatos() {
   h+=gasRows||`<div class="gasto-nodata">Sin gastos este mes</div>`;
   if(gasRows) h+=`<div class="gasto-total-row"><span style="font-size:10px;font-weight:800;font-family:var(--mono);color:var(--text2)">TOTAL</span><span style="font-size:12px;font-weight:900;font-family:var(--mono);color:var(--acc)">${gasT.toFixed(2)}\u20ac</span></div>`;
 
+  h+=`<div style="margin-top:16px;padding-bottom:calc(var(--nav-h)+24px)">
+    <div class="sec-label" style="padding:0 2px 6px;font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;font-family:var(--mono);border-bottom:2px solid var(--border);margin-bottom:10px">Gastos acumulados</div>
+    <div id="saldoCard"></div>
+    <div class="saldo-emp-input-row" style="margin-top:9px"><div class="cfg-left"><div class="sei-lbl">Saldo empresa mes actual</div><div class="sei-sub">Dato del Excel / hoja de firma</div></div><input class="sei-input" id="saldoEmpresa" type="number" min="0" step="0.01" placeholder="0,00" oninput="guardarSaldoEmpresa()"></div>
+  </div>`;
   document.getElementById('mesBody').innerHTML=h;
+  renderSaldo();
 }
 
 function renderTablaDatos() {
@@ -1928,12 +2495,13 @@ function renderTablaDatos() {
       if(Math.abs(ext)>2) extTxt=`<span class="td-ext ${ext>0?'ext-pos':'ext-neg'}">${ext>0?'+':'\u2212'}${m2hm(Math.abs(ext))}</span>`;
     }
 
-    const gastoBadge=inf.gasto>0?`<span class="gasto-badge">${inf.gasto.toFixed(2)}\u20ac</span>`:`<span style="color:var(--text3);font-size:10px;font-family:var(--mono)">\u2014</span>`;
-    const pausaTxt=inf.pausa>0?m2hhmmFmt(inf.pausa):`<span style="color:var(--text3)">\u2014</span>`;
-    const inicioTxt=inf.inicio==='-'?`<span style="color:var(--text3)">\u2014</span>`:inf.inicio;
-    const finTxt=inf.fin==='-'?`<span style="color:var(--text3)">\u2014</span>`:inf.fin;
+    const gastoBadge=inf.gasto>0?`<span class="gasto-badge">${inf.gasto.toFixed(2)}€</span>`:`<span style="color:var(--text3);font-size:10px;font-family:var(--mono)">—</span>`;
+    const pausaTxt=inf.pausa>0?`<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">${m2hhmmFmt(inf.pausa)}</span>`:`<span style="color:var(--text3)">—</span>`;
+    const multiTramo=(inf.numTramos||0)>1;
+    const inicioTxt=inf.inicio==='-'?`<span style="color:var(--text3)">—</span>`:`<span style="font-family:var(--mono);font-size:12px">${inf.inicio}</span>`;
+    const finTxt=inf.fin==='-'?`<span style="color:var(--text3)">—</span>`:`<span style="font-family:var(--mono);font-size:12px">${inf.fin}${multiTramo?`<span style="font-size:8px;color:var(--purple);display:block;font-weight:900">${inf.numTramos}T</span>`:''}</span>`;
 
-    html+=`<div class="t-row ${cls}${hoy?' today':''}" style="${hoy?'box-shadow:inset 0 0 0 1.5px var(--acc)':''}">
+    html+=`<div class="t-row ${cls}${hoy?' today':''}" onclick="openModalJornada(${y},${m},${d})" style="${hoy?'box-shadow:inset 0 0 0 1.5px var(--acc)':''}">
       <div class="td dia">${d}</div>
       <div class="td">${inicioTxt}</div>
       <div class="td">${finTxt}</div>
@@ -1997,15 +2565,13 @@ function renderAnualDatos() {
 
 function setVistaDatos(v) {
   vista=v;
-  document.getElementById('swipeTrackDatos').style.transform=`translateX(${-v*33.333}%)`;
-  for(let i=0;i<3;i++) document.getElementById('dot'+i).className='dot'+(i===v?' active':'');
+  document.getElementById('swipeTrackDatos').style.transform=`translateX(${-v*25}%)`;
+  for(let i=0;i<4;i++) document.getElementById('dot'+i).className='dot'+(i===v?' active':'');
   if(v===1) renderTablaDatos();
   if(v===2) renderAnualDatos();
+  if(v===3) renderComparacion();
 }
 
-function goMesDatos(dir) { cM_datos+=dir; if(cM_datos>11){cM_datos=0;cY_datos++;} if(cM_datos<0){cM_datos=11;cY_datos--;} renderMesDatos(); renderTablaDatos(); }
-function goMesTabla(dir) { cM_datos+=dir; if(cM_datos>11){cM_datos=0;cY_datos++;} if(cM_datos<0){cM_datos=11;cY_datos--;} renderMesDatos(); renderTablaDatos(); }
-function irAMesDatos(m) { cM_datos=m; setVistaDatos(0); renderMesDatos(); renderTablaDatos(); }
 
 let swX0 = 0;
 const sw = document.getElementById('swipeWrapDatos');
@@ -2014,7 +2580,7 @@ if(sw){
   sw.addEventListener('touchend',e=>{
     const dx=e.changedTouches[0].clientX-swX0;
     if(Math.abs(dx)>50){
-      if(dx<0&&vista<2) setVistaDatos(vista+1);
+      if(dx<0&&vista<3) setVistaDatos(vista+1);
       else if(dx>0&&vista>0) setVistaDatos(vista-1);
     }
   },{passive:true});
@@ -3227,10 +3793,76 @@ function aplicarTemaGlobal(n) {
 }
 
 // Nav button wiring
-document.getElementById('navChat').onclick=()=>showModule('chat');
-document.getElementById('navJornada').onclick=()=>{showModule('jornada');renderJornada();};
-document.getElementById('navDatos').onclick=()=>{showModule('datos');renderMesDatos();renderTablaDatos();};
-document.getElementById('navMicuenta').onclick=()=>{showModule('micuenta');renderAll();};
+// ── Estado compartido de mes entre módulos ───────────────────
+let _mesSync = { y: 2026, m: new Date().getMonth() };
+
+function _sincronizarMes(destino) {
+  // Al entrar a un módulo, ajustar su estado de mes al compartido
+  if (destino === 'jornada')  { cY = _mesSync.y; cM = _mesSync.m; }
+  if (destino === 'datos')    { cY_datos = _mesSync.y; cM_datos = _mesSync.m; }
+  if (destino === 'micuenta') { liqYear  = _mesSync.y; liqMes   = _mesSync.m; }
+}
+
+function goMes(dir) {
+  cM += dir; if (cM > 11) { cM = 0; cY++; } if (cM < 0) { cM = 11; cY--; }
+  _mesSync.y = cY; _mesSync.m = cM;
+  renderJornada();
+}
+
+function goLiqMes(dir) {
+  liqMes += dir; if (liqMes > 11) { liqMes = 0; liqYear++; } if (liqMes < 0) { liqMes = 11; liqYear--; }
+  _mesSync.y = liqYear; _mesSync.m = liqMes;
+  renderLiquido();
+}
+
+function goMesDatos(dir) {
+  cM_datos += dir; if(cM_datos>11){cM_datos=0;cY_datos++;} if(cM_datos<0){cM_datos=11;cY_datos--;}
+  _mesSync.y = cY_datos; _mesSync.m = cM_datos;
+  renderMesDatos(); renderTablaDatos();
+}
+
+function goMesTabla(dir) {
+  cM_datos += dir; if(cM_datos>11){cM_datos=0;cY_datos++;} if(cM_datos<0){cM_datos=11;cY_datos--;}
+  _mesSync.y = cY_datos; _mesSync.m = cM_datos;
+  renderMesDatos(); renderTablaDatos();
+}
+
+function irAMesDatos(m) {
+  cM_datos = m; _mesSync.m = m; _mesSync.y = cY_datos;
+  setVistaDatos(0); renderMesDatos(); renderTablaDatos();
+}
+
+// ── Swipe horizontal en el calendario de Jornada ─────────────
+(function() {
+  const panel = document.getElementById('panelJornada');
+  let swX0 = 0, swY0 = 0, swMoving = false;
+  panel.addEventListener('touchstart', e => {
+    swX0 = e.touches[0].clientX;
+    swY0 = e.touches[0].clientY;
+    swMoving = false;
+  }, { passive: true });
+  panel.addEventListener('touchmove', e => { swMoving = true; }, { passive: true });
+  panel.addEventListener('touchend', e => {
+    if (!swMoving) return;
+    const dx = e.changedTouches[0].clientX - swX0;
+    const dy = e.changedTouches[0].clientY - swY0;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 55) {
+      goMes(dx < 0 ? 1 : -1);
+    }
+  }, { passive: true });
+})();
+document.getElementById('navJornada').onclick=()=>{
+  _sincronizarMes('jornada');
+  showModule('jornada'); renderJornada(); renderGuardiaEditor();
+};
+document.getElementById('navDatos').onclick=()=>{
+  _sincronizarMes('datos');
+  showModule('datos'); renderMesDatos(); renderTablaDatos();
+};
+document.getElementById('navMicuenta').onclick=()=>{
+  _sincronizarMes('micuenta');
+  showModule('micuenta'); renderAll();
+};
 
 // Jornada nav arrows
 document.getElementById('prevMesBtn').onclick=()=>goMes(-1);
@@ -3293,6 +3925,409 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
     });
   }
 })();
+
+// ============================================================
+// MÓDULO COMPARAR — Comparativa local app vs empresa
+// ============================================================
+
+let _empresaDays = {};    // { day: { mins, totalStr } }
+let _empresaMes  = null;
+let _empresaImgSrc = null; // dataURL if image loaded
+let _compCargado = false;
+
+// ── Inicializar pdf.js worker ────────────────────────────────
+function _initPdfJs() {
+  if (typeof pdfjsLib === 'undefined') return false;
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  return true;
+}
+
+// ── Normalizar texto OCR: punto→colon en horas, l→1, etc. ───
+function _normalizarOCR(text) {
+  return text
+    // "8.10" → "8:10" solo si parece hora válida
+    .replace(/\b(\d{1,2})\.(\d{2})\b/g, (m, h, mm) =>
+      parseInt(h) <= 23 && parseInt(mm) <= 59 ? h + ':' + mm : m)
+    // "7:3l" → "7:31"  (OCR confunde l con 1 al final de minutos)
+    .replace(/(\d:[0-5])[lI]/g, (_, p) => p + '1')
+    // "B:10" → "8:10"
+    .replace(/\bB:(\d{2})\b/g, '8:$1');
+}
+
+// ── Parser compartido: texto → días/horas ───────────────────
+function _parsearTextoHoras(text) {
+  const days = {};
+  const norm = _normalizarOCR(text);
+  const lines = norm.split('\n');
+  for (const rawLine of lines) {
+    const line = rawLine.trim().replace(/\s+/g, ' ');
+    if (!line) continue;
+    if (/PARCIAL|TOTALE|SALDO\s+INI|VACAC|COMPUTO|^\s*DIA\b/i.test(line)) continue;
+    const m0 = line.match(/^(\d{1,2})[\s,\.]/);
+    if (!m0) continue;
+    const day = parseInt(m0[1]);
+    if (day < 1 || day > 31) continue;
+    const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
+      .map(m => m[1])
+      .filter(t => { const [h,mm]=t.split(':').map(Number); return h<=23&&mm<=59; });
+    if (!times.length) { if (!days[day]) days[day]={mins:0,totalStr:'0:00'}; continue; }
+    const totalStr = times[times.length - 1];
+    const [h, mm] = totalStr.split(':').map(Number);
+    days[day] = { mins: h*60+mm, totalStr,
+      inicio: times[0]||null,
+      fin: times.length>2 ? times[times.length-2] : (times[1]||null) };
+  }
+  return days;
+}
+
+// ── Parser PDF: gap-based rows + column TOTAL detection ──────
+async function _parsearPDFHoras(arrayBuffer) {
+  if (!_initPdfJs()) throw new Error('pdf.js no disponible');
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const allItems = [];
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const vp   = page.getViewport({ scale: 1 });
+    const items = (await page.getTextContent()).items;
+    for (const it of items) {
+      if (!it.str.trim()) continue;
+      allItems.push({
+        str: it.str.trim(),
+        x:   it.transform[4],
+        y:   vp.height - it.transform[5]   // Y from top
+      });
+    }
+  }
+
+  // Sort top→bottom, then left→right
+  allItems.sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x);
+
+  // Detect X position of the TOTAL column from header
+  let totalColX = null;
+  for (const it of allItems) {
+    if (/^TOTAL$/i.test(it.str)) { totalColX = it.x; break; }
+  }
+
+  // Gap-based row clustering (gap > 4pt = new row)
+  const rows = [];
+  let cur = [], lastY = -Infinity;
+  for (const it of allItems) {
+    if (it.y - lastY > 4 && cur.length) { rows.push(cur); cur = []; }
+    cur.push(it); lastY = it.y;
+  }
+  if (cur.length) rows.push(cur);
+
+  const days = {};
+  for (const row of rows) {
+    const sorted = row.sort((a,b) => a.x - b.x);
+    const line   = sorted.map(i => i.str).join(' ');
+    if (/PARCIAL|TOTALE|SALDO\s+INI|VACAC|COMPUTO|DIA\b/i.test(line)) continue;
+    const m0 = line.match(/^(\d{1,2})[\s,\.]/);
+    if (!m0) continue;
+    const day = parseInt(m0[1]);
+    if (day < 1 || day > 31) continue;
+
+    // Strategy A: look for time at TOTAL column X position (±30px)
+    if (totalColX !== null) {
+      const colItem = sorted.find(i =>
+        Math.abs(i.x - totalColX) < 30 && /^\d{1,3}:\d{2}$/.test(i.str));
+      if (colItem) {
+        const [h,mm] = colItem.str.split(':').map(Number);
+        if (h <= 300 && mm <= 59) {
+          days[day] = { mins: h*60+mm, totalStr: colItem.str }; continue;
+        }
+      }
+    }
+
+    // Strategy B: last valid HH:MM in the line
+    const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
+      .map(m => m[1])
+      .filter(t => { const [h,mm]=t.split(':').map(Number); return h<=23&&mm<=59; });
+    if (!times.length) { days[day]={mins:0,totalStr:'0:00'}; continue; }
+    const totalStr = times[times.length-1];
+    const [h,mm]   = totalStr.split(':').map(Number);
+    days[day] = { mins:h*60+mm, totalStr };
+  }
+  return days;
+}
+
+// ── Tesseract.js: carga lazy desde CDN ───────────────────────
+function _loadTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    sc.onload  = () => res(window.Tesseract);
+    sc.onerror = () => rej(new Error('No se pudo cargar Tesseract.js'));
+    document.head.appendChild(sc);
+  });
+}
+
+// ── Parser imagen: OCR con Tesseract.js ──────────────────────
+async function _parsearImagenHoras(file, onPct) {
+  const Tesseract = await _loadTesseract();
+  const { data: { text } } = await Tesseract.recognize(file, 'spa', {
+    logger: m => { if (m.status==='recognizing text' && onPct) onPct(Math.round(m.progress*100)); }
+  });
+  return _parsearTextoHoras(text);
+}
+
+// ── Cargar hoja empresa: PDF o imagen ────────────────────────
+async function cargarHojaEmpresa(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const isImg = file.type.startsWith('image/');
+  const compBody = document.getElementById('compBody');
+
+  const setMsg = txt => { compBody.innerHTML = '<div id="cmpMsg" style="padding:44px 20px;text-align:center;color:var(--text3);font-family:var(--mono);font-size:13px">' + txt + '</div>'; };
+  setMsg(isImg ? '\u23f3 Cargando OCR\u2026 (primera vez descarga el paquete de idioma)' : '\u23f3 Leyendo PDF\u2026');
+  document.getElementById('compStickyHdr').style.display = 'none';
+
+  try {
+    let days;
+    if (isImg) {
+      days = await _parsearImagenHoras(file, pct => {
+        const el = document.getElementById('cmpMsg');
+        if (el) el.textContent = 'Reconociendo texto: ' + pct + '%\u2026';
+      });
+    } else {
+      days = await _parsearPDFHoras(await file.arrayBuffer());
+    }
+    const n = Object.keys(days).length;
+    if (!n) throw new Error('No se encontraron d\u00edas en el archivo. Prueba con otro formato.');
+    _empresaDays = days; _empresaMes = file.name; _compCargado = true;
+    if (isImg) { const r2=new FileReader(); r2.onload=e=>{_empresaImgSrc=e.target.result;}; r2.readAsDataURL(file); } else { _empresaImgSrc=null; }
+    renderComparacion();
+    showToast('\u2713 ' + n + ' d\u00edas le\u00eddos \u00b7 ' + (isImg ? 'OCR' : 'PDF'));
+  } catch(e) {
+    compBody.innerHTML = '<div style="padding:32px 20px;text-align:center"><div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px">\u26a0 Error al leer</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono)">' + e.message + '</div></div>';
+  }
+  input.value = '';
+}
+
+// ── Renderizar tabla comparativa ─────────────────────────────
+function renderComparacion() {
+  const compBody    = document.getElementById('compBody');
+  const compSummary = document.getElementById('compSummary');
+  const compStatus  = document.getElementById('compStatus');
+  const stickyHdr   = document.getElementById('compStickyHdr');
+
+  // Sin datos cargados → empty state con upload
+  if (!_compCargado || !Object.keys(_empresaDays).length) {
+    stickyHdr.style.display = 'none';
+    compBody.innerHTML = `
+      <div class="comp-upload-area">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        <div style="font-size:14px;font-weight:700;color:var(--text2)">Carga la hoja de la empresa</div>
+        <div class="comp-upload-hint">PDF de jornada mensual &middot; procesado en local</div>
+        <label class="comp-upload-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Seleccionar PDF
+          <input type="file" accept="application/pdf,image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
+        </label>
+      </div>`;
+    return;
+  }
+
+  const y  = cY_datos, m = cM_datos;
+  const dm = new Date(y, m + 1, 0).getDate();
+
+  let totApp = 0, totEmp = 0;
+  let nOk = 0, nWarn = 0, nErr = 0, nMissing = 0;
+  let rows = '';
+
+  for (let d = 1; d <= dm; d++) {
+    const inf    = dayInfoDatos(y, m, d);
+    const emp    = _empresaDays[d];
+    const appMin = inf.mins;
+    const empMin = emp ? emp.mins : null;
+
+    const isFds  = inf.tipo === 'fds'  || inf.fds;
+    const isFest = inf.tipo === 'fest' || inf.fest;
+    const isVac  = inf.tipo === 'vac';
+    const isBase = !gD(y, m, d) && !isFds && !isFest; // día sin editar = valor base 8h
+
+    if (!isFds && !isFest) totApp += appMin;
+    if (empMin !== null && !isFds && !isFest) totEmp += empMin;
+
+    const diff    = empMin !== null ? appMin - empMin : null;
+    const absDiff = diff !== null ? Math.abs(diff) : null;
+
+    let rowCls, badge;
+    if (isFds || isFest) {
+      rowCls = 'comp-row-fds';
+      badge  = '<span class="comp-badge comp-badge-none">\u2014</span>';
+    } else if (empMin === null) {
+      rowCls = 'comp-row-none'; nMissing++;
+      badge  = '<span class="comp-badge comp-badge-none">\u2014</span>';
+    } else if (absDiff <= 2) {
+      rowCls = 'comp-row-ok'; nOk++;
+      badge  = '<span class="comp-badge comp-badge-ok">\u2713</span>';
+    } else if (absDiff <= 15) {
+      rowCls = 'comp-row-warn'; nWarn++;
+      const sign = diff > 0 ? '+' : '\u2212';
+      badge  = '<span class="comp-badge comp-badge-warn">' + sign + m2hm(absDiff) + '</span>';
+    } else {
+      rowCls = 'comp-row-err'; nErr++;
+      const sign = diff > 0 ? '+' : '\u2212';
+      badge  = '<span class="comp-badge comp-badge-err">' + sign + m2hm(absDiff) + '</span>';
+    }
+
+    if (isBase && rowCls !== 'comp-row-ok' && rowCls !== 'comp-row-fds') rowCls += ' comp-row-base';
+
+    // Celda APP
+    let appCell;
+    if (isFds)       appCell = '<span class="comp-tag comp-tag-fds">FDS</span>';
+    else if (isFest) appCell = '<span class="comp-tag comp-tag-fest">FEST</span>';
+    else if (isVac)  appCell = '<span class="comp-tag comp-tag-vac">VAC</span>';
+    else if (isBase) appCell = '<span class="comp-tag comp-tag-base">' + m2hhmmFmt(appMin) + '</span>';
+    else             appCell = m2hhmmFmt(appMin);
+
+    // Celda EMPRESA
+    let empCell;
+    if (empMin === null) empCell = '<span class="comp-cell muted">\u2014</span>';
+    else if (empMin === 0) empCell = '<span class="comp-cell muted">0:00</span>';
+    else empCell = (emp.totalStr || m2hhmmFmt(empMin));
+
+    rows += `<div class="comp-row ${rowCls}" onclick="openModalJornada(${y},${m},${d})">
+      <div class="comp-day">${d}</div>
+      <div class="comp-cell" style="text-align:center">${appCell}</div>
+      <div class="comp-cell" style="text-align:center">${empCell}</div>
+      <div style="text-align:center">${badge}</div>
+    </div>`;
+  }
+
+  // ── Resumen discrepancias al final ──────────────────────────
+  const discDays = [];
+  for (let dd = 1; dd <= dm; dd++) {
+    const dinf = dayInfoDatos(y, m, dd);
+    if (dinf.fds || dinf.fest || dinf.tipo==='fds' || dinf.tipo==='fest') continue;
+    const demp = _empresaDays[dd];
+    if (!demp) continue;
+    const ddiff = dinf.mins - demp.mins;
+    if (Math.abs(ddiff) > 2) discDays.push({ d:dd, diff:ddiff, appMins:dinf.mins, empStr:demp.totalStr||'—' });
+  }
+  if (discDays.length) {
+    discDays.sort((a,b) => Math.abs(b.diff)-Math.abs(a.diff));
+    rows += '<div class="comp-disc-section"><div class="comp-disc-hdr">' +
+      '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+      discDays.length + ' diferencia' + (discDays.length>1?'s':'') + ' a revisar</div>';
+    for (const {d:dd, diff:ddiff, appMins:dapp, empStr:deStr} of discDays) {
+      const isNeg = ddiff < 0;
+      const absd  = Math.abs(ddiff);
+      const dcol  = absd > 15 ? '#dc2626' : '#B45309';
+      const dbg   = absd > 15 ? 'rgba(220,38,38,0.1)' : 'rgba(251,191,36,0.15)';
+      rows += '<div class="comp-disc-row" onclick="verDiscrepancia(' + y + ',' + m + ',' + dd + ')">' +
+        '<span class="comp-disc-day">' + dd + '</span>' +
+        '<span class="comp-disc-vals">App\u00a0' + m2hhmmFmt(dapp) + '\u00a0\u00b7\u00a0Empresa\u00a0' + deStr + '</span>' +
+        '<span class="comp-disc-diff" style="color:' + dcol + ';background:' + dbg + '">' +
+          (isNeg ? '\u2212' : '+') + m2hm(absd) + '</span>' +
+        '<span class="comp-disc-arrow">\u203a</span>' +
+        '</div>';
+    }
+    rows += '</div>';
+  }
+  rows += '<div class="comp-footer"></div>';
+
+  // Summary card
+  const totalDiff = totApp - totEmp;
+  const diffSign  = totalDiff >= 0 ? '+' : '\u2212';
+  const diffCol   = Math.abs(totalDiff) <= 2 ? 'var(--green)' : totalDiff < 0 ? 'var(--red)' : 'var(--acc)';
+  const veredicto = Math.abs(totalDiff) <= 2 ? '\u2713 Cuadra'
+    : (nErr ? '\u26a0 ' + nErr + ' d\u00edas' : nWarn ? '\u26a0 ' + nWarn + ' avisos' : '\u2713');
+
+  compSummary.innerHTML =
+    '<div class="comp-sum-mes">Comparativa \u00b7 <span>' + MESES[m] + ' ' + y + '</span></div>' +
+    '<div class="comp-sum-grid">' +
+      '<div class="comp-sum-item">' +
+        '<div class="comp-sum-lbl">Mi registro</div>' +
+        '<div class="comp-sum-val" style="color:var(--acc)">' + m2hm(totApp) + '</div>' +
+        '<div class="comp-sum-sub">app</div>' +
+      '</div>' +
+      '<div class="comp-sum-item">' +
+        '<div class="comp-sum-lbl">Empresa</div>' +
+        '<div class="comp-sum-val">' + (totEmp ? m2hm(totEmp) : '\u2014') + '</div>' +
+        '<div class="comp-sum-sub">hoja oficial</div>' +
+      '</div>' +
+      '<div class="comp-sum-item">' +
+        '<div class="comp-sum-lbl">Diferencia</div>' +
+        '<div class="comp-sum-val" style="color:' + diffCol + '">' +
+          (Math.abs(totalDiff) <= 2 ? '\u2713' : diffSign + m2hm(Math.abs(totalDiff))) +
+        '</div>' +
+        '<div class="comp-sum-sub" style="color:' + diffCol + '">' + veredicto + '</div>' +
+      '</div>' +
+    '</div>';
+
+  // Status line + cambiar archivo
+  compStatus.innerHTML =
+    '<div class="comp-status-dot" style="background:' + (nErr ? 'var(--red)' : nWarn ? '#FBBF24' : 'var(--green)') + '"></div>' +
+    '<span style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">' + (_empresaMes || 'Hoja cargada') + '</span>' +
+    '<span style="margin-left:auto;cursor:pointer;color:var(--acc);font-size:10px;font-weight:700;white-space:nowrap" onclick="document.getElementById(\'compPdfInput\').click()">' +
+      '\u21ba Cambiar<input type="file" accept="application/pdf,image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)"></span>';
+
+  stickyHdr.style.display = '';
+  compBody.innerHTML = rows;
+}
+
+function cerrarDiscDetail(e) {
+  if (e && e.target !== document.getElementById('discDetailOv')) return;
+  document.getElementById('discDetailOv').classList.remove('open');
+}
+
+function verDiscrepancia(y, m, d) {
+  const emp  = _empresaDays[d];
+  const inf  = dayInfoDatos(y, m, d);
+  const diff = inf.mins - (emp ? emp.mins : 0);
+  const isNeg = diff < 0;
+  const absd  = Math.abs(diff);
+  const dcol  = absd > 15 ? '#dc2626' : '#B45309';
+  const dbg   = absd > 15 ? 'rgba(220,38,38,0.08)' : 'rgba(251,191,36,0.1)';
+
+  document.getElementById('discDetailTitle').textContent =
+    'D\u00eda ' + d + ' \u00b7 ' + MESES[m] + ' ' + y;
+
+  let html = '';
+
+  // Imagen de referencia (si fue cargada como imagen)
+  if (_empresaImgSrc) {
+    html += '<div class="disc-img-wrap">' +
+      '<div class="disc-img-lbl">Busca el d\u00eda ' + d + ' en la hoja de la empresa</div>' +
+      '<img class="disc-img" src="' + _empresaImgSrc + '" alt="Hoja empresa">' +
+      '</div>';
+  }
+
+  // Tarjeta comparativa
+  html += '<div class="disc-cmp-card">' +
+    '<div class="disc-cmp-grid">' +
+      '<div class="disc-cmp-cell">' +
+        '<div class="disc-cmp-lbl">Mi registro</div>' +
+        '<div class="disc-cmp-val" style="color:var(--acc)">' + m2hhmmFmt(inf.mins) + '</div>' +
+      '</div>' +
+      '<div class="disc-cmp-cell">' +
+        '<div class="disc-cmp-lbl">Empresa</div>' +
+        '<div class="disc-cmp-val">' + (emp ? (emp.totalStr||m2hhmmFmt(emp.mins)) : '\u2014') + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="disc-diff-row" style="color:' + dcol + ';background:' + dbg + '">' +
+      (isNeg ? '\u2212' : '+') + m2hm(absd) + '\u00a0\u00b7\u00a0' +
+      (isNeg ? 'la empresa registra m\u00e1s' : 'registras m\u00e1s que la empresa') +
+    '</div>' +
+    '</div>';
+
+  // Botón editar
+  html += '<button class="disc-edit-btn" onclick="cerrarDiscDetail();setTimeout(()=>openModalJornada(' + y + ',' + m + ',' + d + '),200)">' +
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">' +
+    '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>' +
+    '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+    'Editar jornada del d\u00eda ' + d + '</button>';
+
+  document.getElementById('discDetailBody').innerHTML = html;
+  document.getElementById('discDetailOv').classList.add('open');
+}
 </script>
 </body>
 </html>
