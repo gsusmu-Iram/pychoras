@@ -3944,14 +3944,16 @@ function _initPdfJs() {
   return true;
 }
 
-// ── Normalizar texto OCR: punto→colon en horas, l→1, etc. ───
+// ── Normalizar texto OCR ──────────────────────────────────────
 function _normalizarOCR(text) {
   return text
-    // "8.10" → "8:10" solo si parece hora válida
-    .replace(/\b(\d{1,2})\.(\d{2})\b/g, (m, h, mm) =>
-      parseInt(h) <= 23 && parseInt(mm) <= 59 ? h + ':' + mm : m)
-    // "7:3l" → "7:31"  (OCR confunde l con 1 al final de minutos)
-    .replace(/(\d:[0-5])[lI]/g, (_, p) => p + '1')
+    // Normalizar saltos de línea (Windows \r\n, Mac \r)
+    .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    // Solo convertir X.XX → X:XX si h está entre 6 y 23 (hora laboral)
+    // Evita convertir valores monetarios como 1.35, 0.00, 14.91
+    .replace(/\b([6-9]|1\d|2[0-3])\.([0-5]\d)\b/g, '$1:$2')
+    // OCR confunde l/I con 1 al final de minutos
+    .replace(/(\d:[0-5])[lI]\b/g, (_, p) => p + '1')
     // "B:10" → "8:10"
     .replace(/\bB:(\d{2})\b/g, '8:$1');
 }
@@ -3960,15 +3962,18 @@ function _normalizarOCR(text) {
 function _parsearTextoHoras(text) {
   const days = {};
   const norm = _normalizarOCR(text);
+  // Dividir en líneas, limpiar ruido por carácter
   const lines = norm.split('\n');
   for (const rawLine of lines) {
     const line = rawLine.trim().replace(/\s+/g, ' ');
     if (!line) continue;
-    if (/PARCIAL|TOTALE|SALDO\s+INI|VACAC|COMPUTO|^\s*DIA\b/i.test(line)) continue;
-    const m0 = line.match(/^(\d{1,2})[\s,\.]/);
+    if (/PARCIAL|TOTALE|SALDO\s+INI|VACAC|COMPUTO/i.test(line)) continue;
+    // Día al inicio — acepta 1-31 seguido de espacio, coma, punto o ":"
+    const m0 = line.match(/^(\d{1,2})[\s,\.:]/);
     if (!m0) continue;
     const day = parseInt(m0[1]);
     if (day < 1 || day > 31) continue;
+    // Extraer tokens HH:MM válidos
     const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
       .map(m => m[1])
       .filter(t => { const [h,mm]=t.split(':').map(Number); return h<=23&&mm<=59; });
@@ -4107,12 +4112,23 @@ async function cargarHojaEmpresa(input) {
       if (el) el.textContent = 'Leyendo imagen: ' + pct + '%\u2026';
     }, txt => { rawText = txt; });
     const n = Object.keys(days).length;
-    if (!n) throw new Error('No se detectaron días. Asegúrate de que la imagen muestra la tabla de horas.');
     _empresaDays = days; _empresaMes = file.name; _compCargado = true;
-    _empresaImgSrc = null; // no almacenamos la imagen
+    _empresaImgSrc = null;
     _empresaMesDetectado = _detectarMesTexto(rawText);
     renderComparacion();
-    showToast('\u2713 ' + n + ' días leídos');
+    if (n > 0) {
+      showToast('\u2713 ' + n + ' d\u00edas le\u00eddos');
+    } else {
+      // OCR corrió pero no encontró días — mostrar fragmento del texto capturado
+      const preview = rawText.slice(0, 120).replace(/\n/g, ' ').trim();
+      compBody.innerHTML = '<div style="padding:24px 16px">' +
+        '<div style="font-size:14px;font-weight:800;color:var(--acc);margin-bottom:8px">\u26a0 No se detectaron d\u00edas</div>' +
+        '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">El OCR ley\u00f3 el archivo pero no encontr\u00f3 la tabla de horas. Prueba con una imagen m\u00e1s n\u00edtida o en horizontal.</div>' +
+        (preview ? '<div style="font-size:10px;font-family:var(--mono);color:var(--text3);background:var(--bg2);padding:10px;border-radius:var(--rs);border:1px solid var(--border)">Texto detectado: ' + preview + '\u2026</div>' : '') +
+        '<label class="comp-upload-btn" style="margin-top:14px">Intentar con otra imagen<input type="file" accept="image/*" onchange="cargarHojaEmpresa(this)" style="display:none"></label>' +
+        '</div>';
+      _compCargado = false;
+    }
   } catch(e) {
     compBody.innerHTML = '<div style="padding:32px 20px;text-align:center"><div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px">\u26a0 Error al leer</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono)">' + e.message + '</div></div>';
   }
