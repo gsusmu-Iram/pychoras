@@ -28,7 +28,7 @@
   /* Bordes */
   --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.13);
   /* Texto */
-  --text:#111827;--text2:#4B5563;--text3:#9CA3AF;
+  --text:#0D1117;--text2:#374151;--text3:#6B7280;
   /* Semánticos */
   --green:#16A34A;--red:#DC2626;--purple:#7C3AED;--blue:#2563EB;
   /* Tipografía */
@@ -793,6 +793,24 @@ body{
 .disc-diff-row{padding:12px 14px;text-align:center;font-size:14px;font-weight:900;font-family:var(--mono);}
 .disc-edit-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 28px);margin:8px 14px 16px;padding:14px;background:var(--acc);border:none;border-radius:var(--r);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);}
 .disc-edit-btn:active{opacity:.85;}
+
+/* ── FILA IMITADA DE EMPRESA ── */
+.disc-hoja-wrap{padding:0 16px 4px;}
+.disc-hoja-lbl{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.14em;font-family:var(--mono);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.disc-hoja-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.disc-hoja-tag{font-size:9px;font-weight:900;padding:4px 10px;background:var(--bg3);border-bottom:1px solid var(--border);color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;display:flex;justify-content:space-between;}
+.disc-hoja-cells{display:flex;border-bottom:1px solid var(--border);}
+.disc-hoja-cell{flex:1;padding:10px 8px;text-align:center;border-right:1px solid var(--border);}
+.disc-hoja-cell:last-child{border-right:none;}
+.disc-hoja-cell-lbl{font-size:8px;font-weight:700;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:5px;}
+.disc-hoja-cell-val{font-size:14px;font-weight:900;font-family:var(--mono);color:var(--text);}
+.disc-hoja-pausa{text-align:center;padding:7px;font-size:11px;font-weight:700;color:var(--text2);font-family:var(--mono);background:rgba(249,115,22,0.05);}
+/* ── VEREDICTO EXTRAS ── */
+.comp-veredicto{margin:0;padding:12px 16px;border-bottom:1px solid var(--border);}
+.comp-veredicto-inner{border-radius:var(--rs);padding:12px 14px;display:flex;align-items:flex-start;gap:10px;}
+.comp-veredicto-icon{font-size:20px;flex-shrink:0;margin-top:1px;}
+.comp-veredicto-txt{font-size:12px;font-weight:700;color:var(--text);line-height:1.55;}
+.comp-veredicto-sub{font-size:11px;font-weight:500;color:var(--text2);margin-top:3px;}
 </style>
 </head>
 <body>
@@ -4280,11 +4298,32 @@ function renderComparacion() {
   rows += '<div class="comp-footer"></div>';
 
   // Summary card
-  const totalDiff = totApp - totEmp;
-  const diffSign  = totalDiff >= 0 ? '+' : '\u2212';
-  const diffCol   = Math.abs(totalDiff) <= 2 ? 'var(--green)' : totalDiff < 0 ? 'var(--red)' : 'var(--acc)';
-  const veredicto = Math.abs(totalDiff) <= 2 ? '\u2713 Cuadra'
-    : (nErr ? '\u26a0 ' + nErr + ' d\u00edas' : nWarn ? '\u26a0 ' + nWarn + ' avisos' : '\u2713');
+  const totalDiff  = totApp - totEmp;
+  const diffSign   = totalDiff >= 0 ? '+' : '\u2212';
+  const diffCol    = Math.abs(totalDiff) <= 2 ? 'var(--green)' : totalDiff < 0 ? 'var(--red)' : 'var(--acc)';
+  // Extras de cada lado
+  const convMin    = cfg.convenio * 60;
+  const extApp     = totApp - convMin;
+  const extEmp     = totEmp > 0 ? totEmp - convMin : null;
+  const extDiff    = extEmp !== null ? extApp - extEmp : null;
+  const extEuros   = extDiff !== null ? Math.abs(extDiff) / 60 * cfg.precioH : 0;
+  // Veredicto texto
+  let vTxt = '', vSub = '', vBg = '', vIcon = '';
+  if (Math.abs(totalDiff) <= 2) {
+    vTxt = 'Las horas cuadran con la empresa'; vSub = 'Sin diferencias significativas';
+    vBg = 'rgba(22,163,74,0.07)'; vIcon = '\u2713';
+  } else if (extDiff !== null && Math.abs(extDiff) > 2) {
+    const quien = extDiff < 0 ? 'La empresa registra ' : 'La app registra ';
+    const quem  = extDiff < 0 ? 'podr\u00edas tener extras sin cobrar' : 'revisa si hay horas de m\u00e1s';
+    vTxt = quien + m2hm(Math.abs(extDiff)) + ' m\u00e1s de extras';
+    vSub = '\u2248\u202f' + extEuros.toFixed(2) + '\u20ac \u00b7 ' + quem;
+    vBg  = extDiff < 0 ? 'rgba(220,38,38,0.06)' : 'rgba(249,115,22,0.06)';
+    vIcon = extDiff < 0 ? '\u26a0' : '\u2139';
+  } else {
+    vTxt = (nErr ? nErr + ' d\u00edas con diferencia' : nWarn + ' d\u00edas con peque\u00f1a diferencia');
+    vSub = 'Revisa las filas en rojo';
+    vBg  = 'rgba(251,191,36,0.08)'; vIcon = '\u26a0';
+  }
 
   compSummary.innerHTML =
     '<div class="comp-sum-mes">Comparativa \u00b7 <span>' + MESES[m] + ' ' + y + '</span></div>' +
@@ -4292,19 +4331,28 @@ function renderComparacion() {
       '<div class="comp-sum-item">' +
         '<div class="comp-sum-lbl">Mi registro</div>' +
         '<div class="comp-sum-val" style="color:var(--acc)">' + m2hm(totApp) + '</div>' +
-        '<div class="comp-sum-sub">app</div>' +
+        '<div class="comp-sum-sub" style="color:var(--text2)">' + (extApp >= 0 ? '+' : '') + m2hm(extApp) + ' extras</div>' +
       '</div>' +
       '<div class="comp-sum-item">' +
         '<div class="comp-sum-lbl">Empresa</div>' +
         '<div class="comp-sum-val">' + (totEmp ? m2hm(totEmp) : '\u2014') + '</div>' +
-        '<div class="comp-sum-sub">hoja oficial</div>' +
+        '<div class="comp-sum-sub" style="color:var(--text2)">' + (extEmp !== null ? (extEmp >= 0 ? '+' : '') + m2hm(extEmp) + ' extras' : 'hoja oficial') + '</div>' +
       '</div>' +
       '<div class="comp-sum-item">' +
         '<div class="comp-sum-lbl">Diferencia</div>' +
         '<div class="comp-sum-val" style="color:' + diffCol + '">' +
           (Math.abs(totalDiff) <= 2 ? '\u2713' : diffSign + m2hm(Math.abs(totalDiff))) +
         '</div>' +
-        '<div class="comp-sum-sub" style="color:' + diffCol + '">' + veredicto + '</div>' +
+        '<div class="comp-sum-sub" style="color:' + diffCol + '">' +
+          (nErr ? nErr + ' d\u00edas \u26a0' : nWarn ? nWarn + ' avisos' : 'todo OK') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="comp-veredicto">' +
+      '<div class="comp-veredicto-inner" style="background:' + vBg + '">' +
+        '<div class="comp-veredicto-icon">' + vIcon + '</div>' +
+        '<div><div class="comp-veredicto-txt">' + vTxt + '</div>' +
+        '<div class="comp-veredicto-sub">' + vSub + '</div></div>' +
       '</div>' +
     '</div>';
 
@@ -4346,34 +4394,40 @@ function verDiscrepancia(y, m, d) {
   else if (!isNeg && absd > 20) motivo = 'La app tiene más horas — revisa si hay pausa no registrada';
   else motivo = 'Diferencia de minutos al fichar';
 
-  let html = '<div style="padding:14px 16px 4px">' +
+  // Construir fila visual de la app
+  const appTramos = parsearTramos(gD(y,m,d) ? (gD(y,m,d).tramos_txt||'') : '');
+  function _filaHoja(tag, colorTag, inicio, fin, pausa, total, tramos) {
+    const tramosHtml = tramos && tramos.length > 1
+      ? tramos.map(t => '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)">' + t.inicio + '&#x202F;\u2192&#x202F;' + t.fin + '</span>').join('<span style="color:var(--text3);margin:0 4px">\u00b7</span>')
+      : (inicio && inicio !== '-' ? '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)">' + inicio + '&#x202F;\u2192&#x202F;' + fin + '</span>' : '<span style="color:var(--text3)">—</span>');
+    return '<div class="disc-hoja-row" style="margin-bottom:8px">' +
+      '<div class="disc-hoja-tag"><span style="color:' + colorTag + '">' + tag + '</span>' +
+        (pausa ? '<span>Pausa\u00a0' + m2hhmm(pausa) + '</span>' : '') +
+      '</div>' +
+      '<div class="disc-hoja-cells">' +
+        '<div class="disc-hoja-cell"><div class="disc-hoja-cell-lbl">Tramos</div><div style="padding-top:2px">' + tramosHtml + '</div></div>' +
+        '<div class="disc-hoja-cell" style="flex:0 0 72px"><div class="disc-hoja-cell-lbl">Total</div><div class="disc-hoja-cell-val" style="color:' + colorTag + '">' + (total || '—') + '</div></div>' +
+      '</div>' +
+    '</div>';
+  }
+  const appPausa = gD(y,m,d) ? (gD(y,m,d).pausa_min||0) + appTramos.reduce((a,t)=>a+t.pausa,0) : 0;
+  const empPausa = emp && emp.inicio && emp.fin
+    ? Math.max(0, (()=>{const [eh,em]=emp.fin.split(':').map(Number);const[ih,im]=emp.inicio.split(':').map(Number);return (eh*60+em)-(ih*60+im)-emp.mins;})())
+    : 0;
 
-    // Tarjeta comparativa
-    '<div class="disc-cmp-card">' +
-      '<div class="disc-cmp-grid">' +
-        '<div class="disc-cmp-cell">' +
-          '<div class="disc-cmp-lbl">Mi registro (app)</div>' +
-          '<div class="disc-cmp-val" style="color:var(--acc)">' + m2hhmmFmt(inf.mins) + '</div>' +
-          (inf.inicio && inf.inicio !== '-' ? '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px">' + inf.inicio + ' \u2192 ' + inf.fin + '</div>' : '') +
-        '</div>' +
-        '<div class="disc-cmp-cell">' +
-          '<div class="disc-cmp-lbl">Empresa (hoja)</div>' +
-          '<div class="disc-cmp-val">' + (emp ? (emp.totalStr || m2hhmmFmt(emp.mins)) : '\u2014') + '</div>' +
-          (emp && emp.inicio ? '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px">' + emp.inicio + ' \u2192 ' + (emp.fin||'?') + '</div>' : '') +
-        '</div>' +
-      '</div>' +
-      '<div class="disc-diff-row" style="color:' + dcol + ';background:' + dbg + '">' +
-        (isNeg ? '\u2212' : '+') + m2hm(absd) +
-        ' \u00b7 \u2248\u202f' + euros.toFixed(2) + '\u20ac en extras' +
-      '</div>' +
+  let html = '<div style="padding:12px 16px 4px">' +
+    '<div class="disc-hoja-lbl"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Hoja empresa</div>' +
+    _filaHoja('EMPRESA', 'var(--text)', emp ? (emp.inicio||'?') : '—', emp ? (emp.fin||'?') : '—', empPausa > 2 ? empPausa : 0, emp ? (emp.totalStr||m2hhmmFmt(emp.mins)) : '—', null) +
+    '<div class="disc-hoja-lbl" style="margin-top:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Mi registro (app)</div>' +
+    _filaHoja('APP', 'var(--acc)', inf.inicio !== '-' ? inf.inicio : '—', inf.fin !== '-' ? inf.fin : '—', appPausa, m2hhmmFmt(inf.mins), appTramos.length > 1 ? appTramos : null) +
+    '<div class="disc-diff-row" style="color:' + dcol + ';background:' + dbg + ';border-radius:var(--rs);margin-bottom:8px">' +
+      (isNeg ? '\u2212' : '+') + m2hm(absd) + '\u00a0\u00b7\u00a0\u2248\u202f' + euros.toFixed(2) + '\u20ac\u00a0\u00b7\u00a0' +
+      (isNeg ? 'empresa registra m\u00e1s' : 'app registra m\u00e1s') +
     '</div>' +
-
-    // Motivo
-    '<div style="margin-top:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);font-size:12px;color:var(--text2);line-height:1.5">' +
-      '<span style="font-size:10px;font-weight:900;color:var(--text3);font-family:var(--mono);display:block;margin-bottom:4px">POSIBLE CAUSA</span>' +
+    '<div style="padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:4px">' +
+      '<span style="font-size:9px;font-weight:900;color:var(--text3);font-family:var(--mono);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.1em">Posible causa</span>' +
       motivo +
     '</div>' +
-
   '</div>';
 
   // Botón editar
