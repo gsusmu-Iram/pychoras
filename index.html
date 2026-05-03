@@ -1192,6 +1192,8 @@ const KN = 'pyc_nomina_v1';
 const KG = 'pyc_guardias_v1';
 const KSE = 'pyc_saldo_emp_v1';
 const KB = 'pyc_backup_ts';
+const KCH = 'pyc_comp_horas'; // prefix: KCH_2026_03
+const KCN = 'pyc_comp_nom';   // prefix: KCN_2026_03
 
 let dat = {};
 let cfg = { precioH: 13.53, guardia: 180, festivo: 70, convenio: 162, vacDias: 31 };
@@ -1845,6 +1847,62 @@ function exportarExcel() {
   wsG['!cols'] = [{wch:12},{wch:12},{wch:10},{wch:8},{wch:12}];
   XLSX.utils.book_append_sheet(wb, wsG, 'Guardias 2026');
 
+  // ── Hojas de comparativas guardadas ───────────────────────
+  for (let mi = 0; mi < 12; mi++) {
+    const chRaw = localStorage.getItem(KCH + '_2026_' + String(mi+1).padStart(2,'0'));
+    if (!chRaw) continue;
+    try {
+      const { days } = JSON.parse(chRaw);
+      const dm2 = new Date(2026, mi+1, 0).getDate();
+      const chAoa = [['COMPARATIVA HORAS · ' + MESES[mi].toUpperCase() + ' 2026','','','','']];
+      chAoa.push(['DÍA','MI REGISTRO','EMPRESA','DIFERENCIA','ESTADO']);
+      for (let d = 1; d <= dm2; d++) {
+        const inf = dayInfoDatos(2026, mi, d);
+        const emp = days[d];
+        if (inf.fds || inf.fest) continue;
+        const empMin = emp ? emp.mins : null;
+        const diff = empMin !== null ? inf.mins - empMin : null;
+        const estado = diff === null ? 'Sin dato empresa' : Math.abs(diff) <= 2 ? '✓' : Math.abs(diff) <= 15 ? '~' : '⚠';
+        chAoa.push([d, minsToHHMM(inf.mins), empMin !== null ? (emp.totalStr||minsToHHMM(empMin)) : '—', diff !== null ? (diff >= 0 ? '+' : '') + minsToHHMM(diff) : '—', estado]);
+      }
+      const wsCH = XLSX.utils.aoa_to_sheet(chAoa);
+      wsCH['!cols'] = [{wch:5},{wch:13},{wch:13},{wch:12},{wch:8}];
+      XLSX.utils.book_append_sheet(wb, wsCH, 'Comp.Horas ' + MESES[mi].slice(0,3));
+    } catch(e) {}
+  }
+  // ── Hoja comparativa nóminas ────────────────────────────────
+  const cnAoa = [['COMPARATIVA NÓMINAS 2026','','','','']];
+  cnAoa.push(['MES NÓMINA','CONCEPTO','APP ESTIMA','NÓMINA REAL','DIFERENCIA']);
+  let hasCN = false;
+  for (let mi = 0; mi < 12; mi++) {
+    const cnRaw = localStorage.getItem(KCN + '_2026_' + String(mi+1).padStart(2,'0'));
+    if (!cnRaw) continue;
+    try {
+      const { data: n } = JSON.parse(cnRaw);
+      const c = calcLiquido(2026, mi);
+      const pairs = [
+        ['Líquido', c.liquido, n.liquido],
+        ['Guardias', c.st.plusGuardia, n.guardias],
+        ['Horas extras', c.stPrev.extrasEuros, n.extras],
+        ['IRPF %', nomina.irpf, n.irpfPct],
+        ['IRPF €', c.deduIRPF, n.irpfAmt],
+        ['SS trabajador', c.deduSS, n.ssCom],
+      ];
+      pairs.forEach(([lbl, app, real]) => {
+        if (real === null) return;
+        const diff = parseFloat((app - real).toFixed(2));
+        cnAoa.push([MESES[mi], lbl, parseFloat(app.toFixed(2)), parseFloat(real.toFixed(2)), diff]);
+        hasCN = true;
+      });
+      cnAoa.push(['','','','','']);
+    } catch(e) {}
+  }
+  if (hasCN) {
+    const wsCN = XLSX.utils.aoa_to_sheet(cnAoa);
+    wsCN['!cols'] = [{wch:10},{wch:16},{wch:12},{wch:12},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, wsCN, 'Comp.Nóminas');
+  }
+
   const fecha = new Date().toISOString().split('T')[0];
   XLSX.writeFile(wb, `RegistroAnual_2026_${fecha}.xlsx`);
   localStorage.setItem(KB, new Date().toISOString());
@@ -2379,7 +2437,14 @@ async function analizarNomina() {
       + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono);text-align:center">Diff</div>'
       + '</div>';
 
-    resultEl.innerHTML = '<div class="verif-result" style="padding:12px">' + hdr + rows + veredicto + '</div>';
+    // Guardar datos en localStorage para Excel backup
+    guardarCompNomina(y, m, n);
+    // Nota sobre mes de extras
+    const mesPrevNom = MESES[m > 0 ? m-1 : 11];
+    const notaMes = '<div style="margin-top:8px;padding:8px 12px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:var(--rs);font-size:11px;color:var(--text2)">' +
+      'ℹ Esta nómina paga las horas extras de <strong>' + mesPrevNom + '</strong>. La columna App usa los registros de ese mes.' +
+      '</div>';
+    resultEl.innerHTML = '<div class="verif-result" style="padding:12px">' + hdr + rows + veredicto + notaMes + '</div>';
 
   } catch(e) {
     resultEl.innerHTML = '<div class="verif-result" style="color:var(--red)">\u26a0 Error al leer el PDF: ' + e.message + '</div>';
@@ -4101,6 +4166,53 @@ async function _parsearImagenHoras(file, onPct, onRaw) {
 
 // ── Detectar mes/año del texto OCR ───────────────────────────
 let _empresaMesDetectado = null; // { y, m } si se detectó
+let _compGuardada = false; // true si viene de localStorage (no de imagen recién cargada)
+let _compNominaData = null; // datos extraídos de la nómina { liquido, guardias, extras... }
+
+function _compHorasKey(y, m) { return KCH + '_' + y + '_' + String(m+1).padStart(2,'0'); }
+function _compNomKey(y, m)   { return KCN + '_' + y + '_' + String(m+1).padStart(2,'0'); }
+
+function guardarCompHoras(y, m) {
+  if (!_compCargado || !Object.keys(_empresaDays).length) return;
+  const data = { days: _empresaDays, nombre: _empresaMes, guardada: new Date().toISOString() };
+  localStorage.setItem(_compHorasKey(y, m), JSON.stringify(data));
+}
+
+function cargarCompHoras(y, m) {
+  try {
+    const raw = localStorage.getItem(_compHorasKey(y, m));
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data.days || !Object.keys(data.days).length) return false;
+    _empresaDays = data.days;
+    _empresaMes  = data.nombre || 'Guardado';
+    _empresaMesDetectado = { y, m };
+    _compCargado = true;
+    _compGuardada = true;
+    return true;
+  } catch(e) { return false; }
+}
+
+function borrarCompHoras(y, m) {
+  localStorage.removeItem(_compHorasKey(y, m));
+  _empresaDays = {}; _empresaMes = null; _empresaImgSrc = null;
+  _compCargado = false; _compGuardada = false; _empresaMesDetectado = null;
+  document.getElementById('compStickyHdr').style.display = 'none';
+  renderComparacion();
+  showToast('Comparativa eliminada');
+}
+
+function guardarCompNomina(y, m, data) {
+  localStorage.setItem(_compNomKey(y, m), JSON.stringify({ data, guardada: new Date().toISOString() }));
+}
+
+function cargarCompNomina(y, m) {
+  try {
+    const raw = localStorage.getItem(_compNomKey(y, m));
+    if (!raw) return null;
+    return JSON.parse(raw).data;
+  } catch(e) { return null; }
+}
 
 function _detectarMesTexto(text) {
   const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -4131,11 +4243,14 @@ async function cargarHojaEmpresa(input) {
     }, txt => { rawText = txt; });
     const n = Object.keys(days).length;
     _empresaDays = days; _empresaMes = file.name; _compCargado = true;
-    _empresaImgSrc = null;
+    _empresaImgSrc = null; _compGuardada = false;
     _empresaMesDetectado = _detectarMesTexto(rawText);
+    const gy = _empresaMesDetectado ? _empresaMesDetectado.y : cY_datos;
+    const gm = _empresaMesDetectado ? _empresaMesDetectado.m : cM_datos;
+    guardarCompHoras(gy, gm);
     renderComparacion();
     if (n > 0) {
-      showToast('\u2713 ' + n + ' d\u00edas le\u00eddos');
+      showToast('\u2713 ' + n + ' d\u00edas le\u00eddos \u00b7 guardado');
     } else {
       // OCR corrió pero no encontró días — mostrar fragmento del texto capturado
       const preview = rawText.slice(0, 120).replace(/\n/g, ' ').trim();
@@ -4154,13 +4269,7 @@ async function cargarHojaEmpresa(input) {
 }
 
 // ── Eliminar hoja cargada ─────────────────────────────────────
-function eliminarHojaEmpresa() {
-  _empresaDays = {}; _empresaMes = null; _empresaImgSrc = null;
-  _compCargado = false; _empresaMesDetectado = null;
-  document.getElementById('compStickyHdr').style.display = 'none';
-  renderComparacion();
-  showToast('Hoja eliminada');
-}
+function eliminarHojaEmpresa() { borrarCompHoras(cY_datos, cM_datos); }
 
 // ── Ir al mes detectado ───────────────────────────────────────
 function irAMesComparacion() {
@@ -4180,21 +4289,26 @@ function renderComparacion() {
   const compStatus  = document.getElementById('compStatus');
   const stickyHdr   = document.getElementById('compStickyHdr');
 
-  // Sin datos cargados → empty state con upload
+  // Auto-cargar desde localStorage si hay datos guardados
+  const y0 = cY_datos, m0 = cM_datos;
   if (!_compCargado || !Object.keys(_empresaDays).length) {
-    stickyHdr.style.display = 'none';
-    compBody.innerHTML = `
-      <div class="comp-upload-area">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        <div style="font-size:14px;font-weight:700;color:var(--text2)">Carga la hoja de la empresa</div>
-        <div class="comp-upload-hint">PDF de jornada mensual &middot; procesado en local</div>
-        <label class="comp-upload-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Seleccionar PDF
-          <input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
-        </label>
-      </div>`;
-    return;
+    const loaded = cargarCompHoras(y0, m0);
+    if (!loaded) {
+      stickyHdr.style.display = 'none';
+      compBody.innerHTML = `
+        <div class="comp-upload-area">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <div style="font-size:14px;font-weight:700;color:var(--text2)">Carga la hoja de la empresa</div>
+          <div class="comp-upload-hint">Foto o pantallazo &middot; 100% local &middot; se guarda automáticamente</div>
+          <label class="comp-upload-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Seleccionar imagen
+            <input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
+          </label>
+        </div>`;
+      return;
+    }
+    // Datos cargados desde localStorage, seguir con renderizado
   }
 
   const y  = cY_datos, m = cM_datos;
@@ -4356,12 +4470,18 @@ function renderComparacion() {
       '</div>' +
     '</div>';
 
-  // Status line + cambiar archivo
+  // Status line — indicador guardado + acciones
+  const savedTag = _compGuardada
+    ? '<span style="font-size:9px;background:rgba(22,163,74,0.1);color:var(--green);border-radius:4px;padding:2px 5px;font-weight:700;font-family:var(--mono)">guardado</span>'
+    : '<span style="font-size:9px;background:rgba(249,115,22,0.1);color:var(--acc);border-radius:4px;padding:2px 5px;font-weight:700;font-family:var(--mono)">reci\u00e9n cargado</span>';
   compStatus.innerHTML =
     '<div class="comp-status-dot" style="background:' + (nErr ? 'var(--red)' : nWarn ? '#FBBF24' : 'var(--green)') + '"></div>' +
-    '<span style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">' + (_empresaMes || 'Hoja cargada') + '</span>' +
-    '<span style="margin-left:auto;cursor:pointer;color:var(--acc);font-size:10px;font-weight:700;white-space:nowrap" onclick="document.getElementById(\'compPdfInput\').click()">' +
-      '\u21ba Cambiar<input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)"></span>';
+    savedTag +
+    '<span style="margin-left:auto;display:flex;align-items:center;gap:10px">' +
+      '<span style="cursor:pointer;color:var(--acc);font-size:10px;font-weight:700" onclick="renderComparacion()">\u21bb Actualizar</span>' +
+      '<label style="cursor:pointer;color:var(--acc);font-size:10px;font-weight:700">\u21ba Nueva imagen<input type="file" accept="image/*" style="display:none" onchange="cargarHojaEmpresa(this)"></label>' +
+      '<span style="cursor:pointer;color:var(--red);font-size:10px;font-weight:700" onclick="eliminarHojaEmpresa()">\u00d7 Borrar</span>' +
+    '</span>';
 
   stickyHdr.style.display = '';
   compBody.innerHTML = rows;
