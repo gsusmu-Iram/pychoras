@@ -811,6 +811,42 @@ body{
 .comp-veredicto-icon{font-size:20px;flex-shrink:0;margin-top:1px;}
 .comp-veredicto-txt{font-size:12px;font-weight:700;color:var(--text);line-height:1.55;}
 .comp-veredicto-sub{font-size:11px;font-weight:500;color:var(--text2);margin-top:3px;}
+
+/* ── NÓMINA VERIF FORM ── */
+.nomv-wrap{padding:14px 16px calc(env(safe-area-inset-bottom)+80px);}
+.nomv-mes-note{font-size:11px;color:var(--text2);background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:var(--rs);padding:9px 12px;margin-bottom:14px;line-height:1.5;}
+.nomv-mes-note strong{color:var(--purple);}
+.nomv-section-lbl{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.14em;font-family:var(--mono);padding-bottom:7px;border-bottom:2px solid var(--border);margin-bottom:8px;margin-top:16px;}
+.nomv-section-lbl:first-child{margin-top:0;}
+.nomv-field{display:flex;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:11px 14px;margin-bottom:6px;gap:10px;transition:border-color .15s;}
+.nomv-field:focus-within{border-color:var(--acc);}
+.nomv-field-left{flex:1;}
+.nomv-field-lbl{font-size:12px;font-weight:700;color:var(--text);}
+.nomv-field-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--mono);}
+.nomv-field-app{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px;}
+.nomv-field-right{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.nomv-input{width:80px;text-align:right;font-size:15px;font-weight:900;font-family:var(--mono);border:none;background:transparent;color:var(--text);outline:none;-moz-appearance:textfield;}
+.nomv-input::-webkit-inner-spin-button,.nomv-input::-webkit-outer-spin-button{-webkit-appearance:none;}
+.nomv-unit{font-size:13px;font-weight:700;color:var(--text3);}
+.nomv-badge{font-size:11px;font-weight:900;font-family:var(--mono);padding:3px 7px;border-radius:6px;min-width:44px;text-align:center;}
+.nomv-badge-ok{color:var(--green);background:rgba(22,163,74,0.1);}
+.nomv-badge-warn{color:#B45309;background:rgba(251,191,36,0.15);}
+.nomv-badge-err{color:var(--red);background:rgba(220,38,38,0.1);}
+.nomv-badge-na{color:var(--text3);}
+.nomv-veredicto{margin-top:14px;border-radius:var(--r);padding:14px;display:flex;align-items:flex-start;gap:10px;}
+.nomv-veredicto-icon{font-size:22px;flex-shrink:0;}
+.nomv-veredicto-title{font-size:14px;font-weight:900;color:var(--text);}
+.nomv-veredicto-sub{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5;}
+.nomv-save-btn{width:100%;margin-top:14px;padding:14px;background:var(--acc);border:none;border-radius:var(--r);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:8px;}
+.nomv-save-btn:active{opacity:.85;}
+.nomv-saved-tag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--green);background:rgba(22,163,74,0.08);border-radius:6px;padding:3px 8px;margin-top:8px;font-family:var(--mono);}
+.nomv-fixed-toggle{width:100%;text-align:center;padding:10px;background:none;border:none;font-size:11px;font-weight:700;color:var(--text3);cursor:pointer;font-family:var(--sans);margin-top:4px;}
+.nomv-fixed-body{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+.nomv-fixed-body.open{max-height:400px;}
+.nomv-fixed-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.nomv-fixed-row:last-child{border-bottom:none;}
+.nomv-fixed-lbl{color:var(--text2);}
+.nomv-fixed-val{font-family:var(--mono);font-weight:700;color:var(--text);}
 </style>
 </head>
 <body>
@@ -1105,23 +1141,10 @@ body{
     </div>
   </div>
 
-  <!-- TAB NÓMINA: parsing local con pdf.js -->
+  <!-- TAB NÓMINA: formulario manual + comparativa local -->
   <div class="verif-body" id="verifBodyNomina" style="display:none">
     <div class="verif-data-card" id="verifResumenNomina"></div>
-    <label class="verif-upload-btn" id="verifUploadNominaBtn">
-      <span id="verifIconNomina" style="font-size:22px">📄</span>
-      <div>
-        <div id="verifUploadNominaTxt" style="font-weight:700">PDF de la nómina</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Procesado en local · sin conexión</div>
-      </div>
-      <input type="file" accept="application/pdf" id="verifFotoNomina" style="display:none" onchange="onFotoNomina(this)">
-    </label>
-    <div id="verifPdfTagNomina" style="display:none;padding:10px 14px;background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.2);border-radius:var(--rs);font-size:12px;color:var(--blue);font-family:var(--mono);font-weight:700;margin-bottom:12px"></div>
-    <button class="verif-btn-analizar" id="verifBtnNomina" onclick="analizarNomina()" disabled>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      Comparar nómina
-    </button>
-    <div id="verifResultNomina"></div>
+    <div class="nomv-wrap" id="nomvWrap"></div>
   </div>
 </div>
 
@@ -2285,6 +2308,7 @@ function switchVerifTab(tab) {
   document.getElementById('verifBodyNomina').style.display = tab === 'nomina' ? '' : 'none';
   document.getElementById('verifTabHoras').classList.toggle('active', tab === 'horas');
   document.getElementById('verifTabNomina').classList.toggle('active', tab === 'nomina');
+  if (tab === 'nomina') renderVerifNomina();
 }
 
 function _handleVerifFile(file, slot) {
@@ -2374,83 +2398,153 @@ async function _parsearNominaPDFLocal(arrayBuffer) {
 function analizarHoras() { irAComparar(); }
 
 // ── Tab Nómina: comparativa 100% local ───────────────────────
-async function analizarNomina() {
-  if (!_verifB64Nomina) return;
+// ── Renderizar tab nómina (formulario manual + comparativa) ──
+function renderVerifNomina() {
   const y = _verifY, m = _verifM;
   const c = calcLiquido(y, m);
-  const resultEl = document.getElementById('verifResultNomina');
-  resultEl.innerHTML = '<div class="verif-loading"><div class="verif-spinner"></div>Leyendo PDF\u2026</div>';
-  document.getElementById('verifBtnNomina').disabled = true;
+  const mesPrev = MESES[m > 0 ? m-1 : 11];
+  const yprev   = m > 0 ? y : y - 1;
+  const wrap    = document.getElementById('nomvWrap');
+  if (!wrap) return;
 
-  try {
-    // Decodificar base64 → ArrayBuffer
-    const bin = atob(_verifB64Nomina);
-    const buf = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  // Cargar datos guardados o usar valores de app como prefill
+  const saved = cargarCompNomina(y, m);
+  const vals = {
+    guardias:  saved ? saved.guardias  : c.st.plusGuardia,
+    festivo:   saved ? saved.festivo   : c.st.plusFest,
+    extras:    saved ? saved.extras    : c.stPrev.extrasEuros,
+    liquido:   saved ? saved.liquido   : c.liquido,
+  };
 
-    const n = await _parsearNominaPDFLocal(buf.buffer);
+  const savedDate = saved ? saved._guardada : null;
 
-    // Función de fila comparativa
-    const fila = (label, appVal, realVal, isEuros=true) => {
-      if (realVal === null) return ''; // no encontrado en el PDF, omitir
-      const diff    = appVal - realVal;
-      const absDiff = Math.abs(diff);
-      const ok      = absDiff < (isEuros ? 0.5 : 0.1);
-      const warn    = !ok && absDiff < (isEuros ? 10 : 1);
-      const cls     = ok ? 'comp-row-ok' : warn ? 'comp-row-warn' : 'comp-row-err';
-      const badge   = ok
-        ? '<span class="comp-badge comp-badge-ok">\u2713</span>'
-        : '<span class="comp-badge ' + (warn ? 'comp-badge-warn' : 'comp-badge-err') + '">'
-          + (diff > 0 ? '+' : '\u2212') + (isEuros ? Math.abs(diff).toFixed(2)+'\u20ac' : Math.abs(diff).toFixed(1)+'%') + '</span>';
-      const fmt = (v) => isEuros ? v.toFixed(2)+'\u20ac' : v.toFixed(1)+'%';
-      return '<div class="comp-row ' + cls + '" style="grid-template-columns:1fr 70px 70px 60px;cursor:default">'
-        + '<div style="font-size:12px;color:var(--text2)">' + label + '</div>'
-        + '<div class="comp-cell" style="text-align:right">' + fmt(appVal) + '</div>'
-        + '<div class="comp-cell" style="text-align:right">' + fmt(realVal) + '</div>'
-        + '<div style="text-align:center">' + badge + '</div>'
-        + '</div>';
-    };
-
-    // Comparar cada concepto
-    const rows = [
-      fila('L\u00edquido',          c.liquido,                n.liquido),
-      fila('Guardias',              c.st.plusGuardia,          n.guardias),
-      fila('Horas extras',          c.stPrev.extrasEuros,      n.extras),
-      fila('IRPF%',                 nomina.irpf,               n.irpfPct,  false),
-      fila('IRPF \u20ac',          c.deduIRPF,               n.irpfAmt),
-      fila('SS trabajador',         c.deduSS,                  n.ssCom),
-      fila('Total devengado',       c.totalDevengado,          n.devengado),
-      fila('Total deducido',        c.totalDedu,               n.deducir),
-    ].filter(Boolean).join('');
-
-    // Veredicto
-    const liqDiff   = n.liquido !== null ? Math.abs(c.liquido - n.liquido) : null;
-    const veredicto = liqDiff === null ? ''
-      : liqDiff < 0.5
-        ? '<div style="margin-top:12px;padding:12px;background:rgba(22,163,74,0.08);border-radius:var(--rs);font-size:13px;font-weight:800;color:var(--green);text-align:center">\u2713 La n\u00f3mina cuadra con la estimaci\u00f3n</div>'
-        : '<div style="margin-top:12px;padding:12px;background:rgba(220,38,38,0.07);border-radius:var(--rs);font-size:13px;font-weight:800;color:var(--red);text-align:center">\u26a0 Diferencia de ' + liqDiff.toFixed(2) + '\u20ac en el l\u00edquido</div>';
-
-    const hdr = '<div style="display:grid;grid-template-columns:1fr 70px 70px 60px;padding:6px 14px;background:var(--bg3);border-radius:var(--rs);margin-bottom:6px">'
-      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono)">Concepto</div>'
-      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono);text-align:right">App</div>'
-      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono);text-align:right">N\u00f3mina</div>'
-      + '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;font-family:var(--mono);text-align:center">Diff</div>'
-      + '</div>';
-
-    // Guardar datos en localStorage para Excel backup
-    guardarCompNomina(y, m, n);
-    // Nota sobre mes de extras
-    const mesPrevNom = MESES[m > 0 ? m-1 : 11];
-    const notaMes = '<div style="margin-top:8px;padding:8px 12px;background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:var(--rs);font-size:11px;color:var(--text2)">' +
-      'ℹ Esta nómina paga las horas extras de <strong>' + mesPrevNom + '</strong>. La columna App usa los registros de ese mes.' +
-      '</div>';
-    resultEl.innerHTML = '<div class="verif-result" style="padding:12px">' + hdr + rows + veredicto + notaMes + '</div>';
-
-  } catch(e) {
-    resultEl.innerHTML = '<div class="verif-result" style="color:var(--red)">\u26a0 Error al leer el PDF: ' + e.message + '</div>';
+  function _badge(app, real) {
+    if (real === null || real === '' || isNaN(real)) return '<span class="nomv-badge nomv-badge-na">\u2014</span>';
+    const d = Math.abs(app - real);
+    if (d < 0.5) return '<span class="nomv-badge nomv-badge-ok">\u2713</span>';
+    const sign = real > app ? '+' : '\u2212';
+    const cls  = d < 10 ? 'nomv-badge-warn' : 'nomv-badge-err';
+    return '<span class="nomv-badge ' + cls + '">' + sign + d.toFixed(2) + '\u20ac</span>';
   }
-  document.getElementById('verifBtnNomina').disabled = false;
+
+  function _field(id, label, sub, appVal, realVal) {
+    const subTxt = sub ? '<div class="nomv-field-sub">' + sub + '</div>' : '';
+    const appTxt = '<div class="nomv-field-app">App: ' + appVal.toFixed(2) + '\u20ac</div>';
+    return '<div class="nomv-field" id="nomvField_' + id + '">' +
+      '<div class="nomv-field-left"><div class="nomv-field-lbl">' + label + '</div>' + subTxt + appTxt + '</div>' +
+      '<div class="nomv-field-right">' +
+        '<input class="nomv-input" id="nomvIn_' + id + '" type="number" step="0.01" min="0" value="' + (realVal !== null ? realVal.toFixed(2) : '') + '" placeholder="—" oninput="recalcVerifNomina(' + y + ',' + m + ')">' +
+        '<span class="nomv-unit">\u20ac</span>' +
+        '<span id="nomvBadge_' + id + '">' + _badge(appVal, realVal) + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // Conceptos fijos (colapsable)
+  const fixedRows = [
+    ['Salario base', nomina.salario],
+    ['Antig\u00fcedad', nomina.antiguedad],
+    ['Beneficios', nomina.beneficios],
+    ['Plus transporte', nomina.transporte],
+    ['Plus vestuario', nomina.vestuario],
+    ['Complemento personal', nomina.complemento],
+    ['Prima seguro AT', nomina.prima],
+    ['IRPF', nomina.irpf + '%'],
+  ].map(([l,v]) => '<div class="nomv-fixed-row"><span class="nomv-fixed-lbl">' + l + '</span><span class="nomv-fixed-val">' + (typeof v === 'number' ? v.toFixed(2) + '\u20ac' : v) + '</span></div>').join('');
+
+  wrap.innerHTML =
+    '<div class="nomv-mes-note">\u2139 Esta n\u00f3mina paga las extras de <strong>' + mesPrev + ' ' + yprev + '</strong>. Introduce los valores reales que figura en tu n\u00f3mina.</div>' +
+
+    '<div class="nomv-section-lbl">Variables del mes</div>' +
+    _field('guardias', 'Guardias', c.st.guardiasMes + ' sem. \u00d7 ' + cfg.guardia + '\u20ac', c.st.plusGuardia, vals.guardias) +
+    _field('festivo',  'Plus festivo guardia', c.st.plusFest > 0 ? Math.round(c.st.plusFest/cfg.festivo) + ' d\u00eda(s) \u00d7 ' + cfg.festivo + '\u20ac' : 'Sin festivos en guardia este mes', c.st.plusFest, vals.festivo) +
+    _field('extras',   'Horas extras', 'De ' + mesPrev + ' \u00d7 ' + cfg.precioH + '\u20ac/h', c.stPrev.extrasEuros, vals.extras) +
+
+    '<div class="nomv-section-lbl" style="margin-top:18px">Resultado</div>' +
+    _field('liquido',  'L\u00edquido a percibir', 'Total despu\u00e9s de deducciones', c.liquido, vals.liquido) +
+
+    '<div id="nomvVeredicto"></div>' +
+
+    '<button class="nomv-save-btn" onclick="guardarVerifNomina(' + y + ',' + m + ')">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>' +
+      'Guardar comparativa' +
+    '</button>' +
+
+    (savedDate ? '<div style="text-align:center"><span class="nomv-saved-tag">\u2713 Guardado el ' + new Date(savedDate).toLocaleDateString('es-ES') + '</span></div>' : '') +
+
+    '<button class="nomv-fixed-toggle" onclick="this.nextSibling.classList.toggle(\'open\');this.textContent=this.nextSibling.classList.contains(\'open\')?\'Ocultar conceptos fijos \u25b2\':\'Ver conceptos fijos \u25bc\'">' +
+      'Ver conceptos fijos \u25bc' +
+    '</button>' +
+    '<div class="nomv-fixed-body"><div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px">' + fixedRows + '</div></div>';
+
+  recalcVerifNomina(y, m);
 }
+
+function recalcVerifNomina(y, m) {
+  const c = calcLiquido(y, m);
+  const fields = ['guardias','festivo','extras','liquido'];
+  const appVals = {
+    guardias: c.st.plusGuardia,
+    festivo:  c.st.plusFest,
+    extras:   c.stPrev.extrasEuros,
+    liquido:  c.liquido,
+  };
+
+  let allOk = true, bigDiff = null;
+  for (const id of fields) {
+    const inp = document.getElementById('nomvIn_' + id);
+    const bdg = document.getElementById('nomvBadge_' + id);
+    if (!inp || !bdg) continue;
+    const real = parseFloat(inp.value);
+    const app  = appVals[id];
+    const d    = isNaN(real) ? null : Math.abs(app - real);
+    if (d === null) { bdg.innerHTML = '<span class="nomv-badge nomv-badge-na">\u2014</span>'; allOk = false; continue; }
+    if (d >= 0.5) { allOk = false; if (id === 'liquido') bigDiff = app - real; }
+    const ok   = d < 0.5;
+    const warn = !ok && d < 10;
+    const sign = real > app ? '+' : '\u2212';
+    bdg.innerHTML = ok
+      ? '<span class="nomv-badge nomv-badge-ok">\u2713</span>'
+      : '<span class="nomv-badge ' + (warn ? 'nomv-badge-warn' : 'nomv-badge-err') + '">' + sign + d.toFixed(2) + '\u20ac</span>';
+  }
+
+  const vd = document.getElementById('nomvVeredicto');
+  if (!vd) return;
+  if (allOk) {
+    vd.innerHTML = '<div class="nomv-veredicto" style="background:rgba(22,163,74,0.08)">' +
+      '<div class="nomv-veredicto-icon">\u2713</div>' +
+      '<div><div class="nomv-veredicto-title">La n\u00f3mina cuadra</div>' +
+      '<div class="nomv-veredicto-sub">Todos los conceptos variables coinciden con la estimaci\u00f3n</div></div></div>';
+  } else if (bigDiff !== null) {
+    const quien = bigDiff > 0 ? 'cobras menos de lo estimado' : 'cobras m\u00e1s de lo estimado';
+    const col   = bigDiff > 0 ? 'rgba(220,38,38,0.07)' : 'rgba(249,115,22,0.07)';
+    const icon  = bigDiff > 0 ? '\u26a0' : '\u2139';
+    vd.innerHTML = '<div class="nomv-veredicto" style="background:' + col + '">' +
+      '<div class="nomv-veredicto-icon">' + icon + '</div>' +
+      '<div><div class="nomv-veredicto-title">Diferencia de ' + Math.abs(bigDiff).toFixed(2) + '\u20ac en el l\u00edquido</div>' +
+      '<div class="nomv-veredicto-sub">' + quien.charAt(0).toUpperCase() + quien.slice(1) + '. Revisa las filas marcadas.</div></div></div>';
+  } else {
+    vd.innerHTML = '<div class="nomv-veredicto" style="background:rgba(251,191,36,0.08)">' +
+      '<div class="nomv-veredicto-icon">\u2139</div>' +
+      '<div><div class="nomv-veredicto-title">Hay diferencias menores</div>' +
+      '<div class="nomv-veredicto-sub">Revisa los campos marcados en naranja.</div></div></div>';
+  }
+}
+
+function guardarVerifNomina(y, m) {
+  const ids = ['guardias','festivo','extras','liquido'];
+  const data = { _guardada: new Date().toISOString() };
+  for (const id of ids) {
+    const inp = document.getElementById('nomvIn_' + id);
+    data[id] = inp ? (parseFloat(inp.value) || 0) : 0;
+  }
+  guardarCompNomina(y, m, data);
+  showToast('\u2713 Comparativa de n\u00f3mina guardada');
+  renderVerifNomina(); // refresh saved date
+}
+
+function analizarNomina() { renderVerifNomina(); }
+
 
 // ============================================================
 // MÓDULO DATOS (completo)
