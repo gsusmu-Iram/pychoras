@@ -2291,9 +2291,9 @@ function abrirClaudeAnalisis() {
 
   // Reset estado
   document.getElementById('verifResultHoras').innerHTML = '';
-  document.getElementById('verifResultNomina').innerHTML = '';
   document.getElementById('verifBtnHoras').disabled = !_verifB64Horas;
-  document.getElementById('verifBtnNomina').disabled = !_verifB64Nomina;
+  // Tab nómina: se rellena al abrir con renderVerifNomina
+  document.getElementById('nomvWrap').innerHTML = '';
 
   document.getElementById('verifOv').classList.add('open');
   switchVerifTab('horas');
