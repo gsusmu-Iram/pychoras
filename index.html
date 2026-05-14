@@ -161,10 +161,6 @@ body{
 .mnav{display:flex;align-items:center;gap:6px;}
 .mnav-arrow{width:34px;height:34px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rs);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;color:var(--text2);user-select:none;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
 .mnav-arrow:active{background:var(--bg3);}
-.btn-claude-analisis{display:flex;align-items:center;gap:5px;padding:6px 11px;background:var(--bg2);border:1px solid rgba(124,58,237,0.2);border-radius:var(--rs);color:var(--purple);font-size:10px;font-weight:700;font-family:var(--sans);cursor:pointer;letter-spacing:.02em;box-shadow:0 1px 4px rgba(124,58,237,0.1);transition:all .15s;white-space:nowrap;}
-.btn-claude-analisis:active{transform:scale(.95);}
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid var(--border);padding-top:9px;margin-top:2px;}
-.sc{text-align:center;padding:0 2px;}
 .sc+.sc{border-left:1px solid var(--border);}
 .sv{font-size:15px;font-weight:800;font-family:var(--mono);color:var(--text);line-height:1.1;}
 .sl{font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-top:3px;font-family:var(--mono);font-weight:700;}
@@ -350,7 +346,17 @@ body{
 .tt-item{text-align:center;}
 .tt-val{font-size:13px;font-weight:900;font-family:var(--mono);color:var(--text);}
 .tt-lbl{font-size:7px;color:var(--text3);text-transform:uppercase;font-family:var(--mono);font-weight:700;margin-top:2px;}
-.anual-scroll{flex:1;overflow-y:auto;padding:11px 15px calc(var(--nav-h)+28px);}
+#mesDetallePanel{display:none;}
+#mesDetallePanel.open{display:flex;}
+.mdt-tab{flex:1;padding:10px 4px;font-size:11px;font-weight:700;border:none;cursor:pointer;background:transparent;color:rgba(255,255,255,0.35);border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;font-family:var(--font);}
+.mdt-tab.active{color:white;border-bottom-color:var(--acc);}
+.mdt-col-hdr{display:flex;align-items:center;padding:8px 14px;background:#f8fafc;border-bottom:2px solid #e2e8f0;position:sticky;top:0;z-index:1;}
+.mdt-col-lbl{font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;}
+.mdt-row{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid #f1f5f9;border-left:3px solid transparent;}
+.mdt-row.ok{border-left-color:#22c55e;background:rgba(34,197,94,0.03);}
+.mdt-row.over{border-left-color:#f97316;background:rgba(249,115,22,0.04);}
+.mdt-row.under{border-left-color:#ef4444;background:rgba(239,68,68,0.04);}
+.mdt-row.skip{opacity:.35;border-left-color:transparent;}
 .anual-scroll::-webkit-scrollbar{width:2px;}
 .anual-scroll::-webkit-scrollbar-thumb{background:var(--border2);}
 .anual-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
@@ -683,37 +689,6 @@ body{
 .desglose-collapsible.expanded{max-height:1200px;}
 
 /* ── MODAL VERIFICAR ── */
-.verif-ov{position:fixed;inset:0;z-index:400;background:var(--bg);transform:translateX(105%);transition:transform .35s cubic-bezier(.4,0,.2,1);}
-.verif-ov.open{transform:translateX(0);}
-.verif-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px 12px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:1;}
-.verif-back{background:none;border:none;font-size:22px;color:var(--text3);cursor:pointer;padding:2px 8px 2px 0;line-height:1;}
-.verif-back:active{color:var(--text);}
-.verif-hdr-title{font-size:16px;font-weight:800;color:var(--text);flex:1;font-family:var(--sans);}
-.verif-tabs{display:flex;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:53px;z-index:1;}
-.verif-tab{flex:1;padding:11px 8px;font-size:12px;font-weight:700;border:none;background:none;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;font-family:var(--sans);}
-.verif-tab.active{color:var(--purple);border-bottom-color:var(--purple);}
-.verif-body{padding:16px 16px calc(env(safe-area-inset-bottom)+24px);overflow-y:auto;}
-.verif-data-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 15px;margin-bottom:14px;box-shadow:var(--sh-card);}
-.verif-data-lbl-top{font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.14em;font-family:var(--mono);margin-bottom:10px;}
-.verif-data-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(0,0,0,0.04);}
-.verif-data-row:last-child{border-bottom:none;}
-.verif-data-lbl{font-size:12px;color:var(--text2);}
-.verif-data-val{font-size:13px;font-weight:800;font-family:var(--mono);color:var(--text);}
-.verif-upload-area{position:relative;margin-bottom:12px;}
-.verif-upload-btn{display:flex;align-items:center;gap:10px;width:100%;padding:16px;background:var(--bg3);border:2px dashed var(--border2);border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--text2);font-weight:600;box-sizing:border-box;transition:all .2s;}
-.verif-upload-btn.loaded{background:rgba(22,163,74,0.06);border-color:rgba(22,163,74,0.3);color:var(--green);}
-.verif-preview{width:100%;max-height:180px;object-fit:cover;border-radius:var(--rs);margin-bottom:12px;display:none;border:1px solid var(--border);}
-.verif-preview.show{display:block;}
-.verif-btn-analizar{width:100%;padding:14px;background:var(--purple);border:none;border-radius:var(--r);color:white;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--sans);transition:opacity .15s;}
-.verif-btn-analizar:disabled{opacity:.45;pointer-events:none;}
-.verif-btn-analizar:active{opacity:.8;}
-.verif-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:28px;color:var(--text3);font-size:13px;}
-.verif-spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite;}
-.verif-result{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-top:14px;font-size:13px;line-height:1.65;color:var(--text);box-shadow:var(--sh-card);}
-.verif-result-veredicto{display:inline-block;font-size:13px;font-weight:900;padding:8px 14px;border-radius:var(--rs);margin-bottom:10px;}
-.verif-result-ok{background:rgba(22,163,74,0.1);color:var(--green);}
-.verif-result-warn{background:rgba(249,115,22,0.1);color:var(--acc);}
-.verif-result-err{background:rgba(220,38,38,0.1);color:var(--red);}
 
 /* ── PANEL COMPARAR ── */
 .comp-wrap{flex:1;overflow-y:auto;padding:0;}
@@ -912,9 +887,6 @@ body{
       <div class="cal-top">
         <div><div class="cal-title" id="cTitle">&mdash;</div><div class="cal-sub" id="cSub">&mdash;</div></div>
         <div style="display:flex;align-items:center;gap:6px">
-          <button class="btn-claude-analisis" id="btnClaudeAnalisis" onclick="abrirClaudeAnalisis()" title="Analizar mes con Claude">
-            <span style="font-size:14px">👩🏼‍💻</span>
-            <span>Analizar</span>
           </button>
           <div class="mnav"><button class="mnav-arrow" id="prevMesBtn">‹</button><button class="mnav-arrow" id="nextMesBtn">›</button></div>
         </div>
@@ -942,6 +914,31 @@ body{
 
   <!-- PANEL DATOS -->
   <div id="panelDatos" class="module-panel hidden">
+    <!-- Panel detalle mes (overlay sobre swipe) -->
+    <div id="mesDetallePanel" style="display:none;position:absolute;inset:0;z-index:10;background:#f8fafc;flex-direction:column;overflow:hidden;">
+      <!-- Header oscuro -->
+      <div id="mesDetalleHdr" style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:14px 16px 0;flex-shrink:0;">
+        <div style="display:flex;align-items:center;margin-bottom:14px;">
+          <button onclick="cerrarMesDetalle()" style="background:rgba(255,255,255,0.12);border:none;color:white;border-radius:10px;padding:6px 13px;font-size:13px;font-weight:700;cursor:pointer;margin-right:12px;">‹ 2026</button>
+          <div>
+            <div id="mesDetalleTitulo" style="color:white;font-size:17px;font-weight:800;"></div>
+            <div id="mesDetalleSub" style="color:rgba(255,255,255,0.4);font-size:11px;margin-top:1px;"></div>
+          </div>
+        </div>
+        <!-- Cards resumen -->
+        <div id="mesDetalleCards" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;"></div>
+        <!-- Veredicto comp -->
+        <div id="mesDetalleVeredicto" style="margin-bottom:12px;"></div>
+        <!-- Tabs -->
+        <div style="display:flex;">
+          <button class="mdt-tab active" id="mdtTabTabla"  onclick="setMesDetalleTab('tabla')" >📋 Tabla</button>
+          <button class="mdt-tab"        id="mdtTabComp"   onclick="setMesDetalleTab('comp')"  >⚡ Comparar</button>
+          <button class="mdt-tab"        id="mdtTabGastos" onclick="setMesDetalleTab('gastos')">💰 Gastos</button>
+        </div>
+      </div>
+      <!-- Cuerpo scrollable -->
+      <div id="mesDetalleBody" style="flex:1;overflow-y:auto;"></div>
+    </div>
     <div class="swipe-wrap" id="swipeWrapDatos">
       <div class="swipe-track" id="swipeTrackDatos">
         <div class="swipe-panel">
@@ -978,11 +975,16 @@ body{
             <div class="comp-upload-area">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
               <div style="font-size:14px;font-weight:700;color:var(--text2)">Carga la hoja de la empresa</div>
-              <div class="comp-upload-hint">Foto o pantallazo de la hoja · 100% local</div>
+              <div class="comp-upload-hint">Excel de la app o foto de la hoja · 100% local</div>
+              <label class="comp-upload-btn" style="background:rgba(22,163,74,0.06);border-color:rgba(22,163,74,0.3);color:var(--green)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                Cargar Excel de la app
+                <input type="file" accept=".xlsx,.xls" id="compExcelInput" style="display:none" onchange="cargarExcelApp(this)">
+              </label>
               <label class="comp-upload-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Seleccionar imagen
-                <input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
+                Seleccionar imagen o PDF
+                <input type="file" accept="image/*,.pdf,application/pdf" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
               </label>
             </div>
           </div>
@@ -1013,7 +1015,7 @@ body{
         <div class="liq-breakdown">
           <div class="liq-item"><div class="liq-item-val" id="liqBase">&mdash;</div><div class="liq-item-lbl">Base fija</div></div>
           <div class="liq-item"><div class="liq-item-val pos" id="liqExtras">&mdash;</div><div class="liq-item-lbl">Variables</div></div>
-          <div class="liq-item"><div class="liq-item-val neg" id="liqDedu">&mdash;</div><div class="liq-item-lbl">Deducciones</div></div>
+          <div class="liq-item"><div class="liq-item-val" id="liqGuardiaHero">&mdash;</div><div class="liq-item-lbl">Guardia</div></div>
         </div>
         <div class="liq-guardia-badge" id="liqGuardiaBadge" style="display:none">
           <div class="liq-guardia-dot"></div>
@@ -1156,32 +1158,6 @@ body{
 </div>
 
 <!-- MODAL VERIFICAR — IN-APP ANALYSIS -->
-<div class="verif-ov" id="verifOv">
-  <div class="verif-hdr">
-    <button class="verif-back" onclick="cerrarVerificar()">‹</button>
-    <div class="verif-hdr-title" id="verifTitle">Verificar mes</div>
-  </div>
-  <div class="verif-tabs">
-    <button class="verif-tab active" id="verifTabHoras" style="flex:none;border-bottom:2px solid var(--purple);color:var(--purple);font-weight:800;pointer-events:none">📋 Hoja de horas · comparar con empresa</button>
-  </div>
-
-  <!-- TAB HORAS -->
-  <!-- TAB HORAS: redirige a Datos → Comparar (100% local) -->
-  <div class="verif-body" id="verifBodyHoras">
-    <div class="verif-data-card" id="verifResumenHoras"></div>
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px 16px;text-align:center;margin-bottom:12px">
-      <div style="font-size:32px;margin-bottom:10px">📊</div>
-      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:6px">Comparativa día a día</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.5">La comparativa detallada con la hoja de la empresa está en <strong>Datos → panel Comparar</strong>.<br>Carga el PDF allí y verás cada día lado a lado en local.</div>
-      <button class="verif-btn-analizar" style="background:var(--acc)" onclick="irAComparar()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
-        Ir a Datos → Comparar
-      </button>
-    </div>
-  </div>
-
-
-</div>
 
 <!-- DISCREPANCY DETAIL SHEET -->
 <div class="disc-detail-ov" id="discDetailOv" onclick="cerrarDiscDetail(event)">
@@ -1255,7 +1231,7 @@ const KCN = 'pyc_comp_nom';   // prefix: KCN_2026_03
 
 let dat = {};
 let cfg = { precioH: 13.53, guardia: 180, festivo: 70, convenio: 162, vacDias: 31 };
-let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0.53 };
+let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0 };
 let guardiasCambios = {};
 let frasesCustom = {};
 let frasesOcultas = {};
@@ -1354,7 +1330,7 @@ function m2hm(m) { const a = Math.abs(m), h = Math.floor(a / 60), mi = a % 60; r
 function m2hhmm(m) { const a = Math.abs(m), h = Math.floor(a / 60), mi = a % 60; return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0'); }
 
 function t2m(s) { const m = String(s).match(/(\d{1,2})[:.](\d{2})/); if (m) return parseInt(m[1]) * 60 + parseInt(m[2]); return 0; }
-function parsearTramos(txt) { if (!txt) return []; const tr = []; String(txt).split(/[,\n]+/).forEach(l => { const mm = l.match(/(\d{1,2}[:.]?\d{2})\s*[-\u2013]\s*(\d{1,2}[:.]?\d{2})/); if (!mm) return; const i = t2m(mm[1]), o = t2m(mm[2]); if (i >= 0 && o > i) { let p = 0; const pm = l.match(/-\s*(\d+)\s*min/i); if (pm) p = +pm[1]; tr.push({ inicio: mm[1], fin: mm[2], pausa: p, mins: Math.max(0, o - i - p), iMin: i, oMin: o }); } }); return tr; }
+function parsearTramos(txt) { if (!txt) return []; const tr = []; String(txt).split(/[,\n]+/).forEach(l => { const mm = l.match(/(\d{1,2}[:.]?\d{2})\s*[-\u2013]\s*(\d{1,2}[:.]?\d{2})/); if (!mm) return; const i = t2m(mm[1]), o = t2m(mm[2]); if (i >= 0 && o > i) { let p = 0; const pm = l.match(/-\s*(\d+)\s*(?:min|m\b)?(?:\s|$)/i); if (pm) p = +pm[1]; tr.push({ inicio: mm[1], fin: mm[2], pausa: p, mins: Math.max(0, o - i - p), iMin: i, oMin: o }); } }); return tr; }
 function totalTramos(tr) { return tr.reduce((s, t) => s + t.mins, 0); }
 function isHoy(y, m, d) { const h = new Date(); return y === h.getFullYear() && m === h.getMonth() && d === h.getDate(); }
 function isFut(y, m, d) { const t = new Date(y, m, d).setHours(0,0,0,0); const n = new Date().setHours(0,0,0,0); return t > n; }
@@ -1465,7 +1441,13 @@ function renderLiquido() {
   _updateNominaToggle();
   if (document.getElementById('ncVeredicto')) renderNomComp();
   document.getElementById('liqExtras').textContent = '+' + (c.variables).toFixed(2) + '€';
-  document.getElementById('liqDedu').textContent = '\u2212' + c.totalDedu.toFixed(2) + '€';
+  // Guardia hero: 180€ si hay guardia este mes, 0€ si no
+  const guardiaHeroEl = document.getElementById('liqGuardiaHero');
+  if (guardiaHeroEl) {
+    const gVal = c.st.plusGuardia;
+    guardiaHeroEl.textContent = (gVal > 0 ? '+' : '') + gVal.toFixed(0) + '€';
+    guardiaHeroEl.style.color = gVal > 0 ? 'var(--purple, #7C3AED)' : 'var(--text3)';
+  }
 
   document.getElementById('deduCard').innerHTML = `<div class="dedu-row"><div class="dedu-lbl">Cotiz. S.S. (6,50%)<small>Conting. comunes + MEI + paro + form.</small></div><div class="dedu-val">\u2212${c.deduSS.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Cotiz. horas extras (4,70%)<small>Solo sobre horas extras</small></div><div class="dedu-val">\u2212${c.deduExtSS.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.03)"><div class="dedu-lbl">IRPF (${nomina.irpf}%)<small>Variable · actualiza si cambia</small></div><div class="dedu-val" style="font-size:15px">\u2212${c.deduIRPF.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.06)"><div class="dedu-lbl" style="font-weight:800;color:var(--text)">Total deducciones</div><div class="dedu-val" style="font-size:15px">\u2212${c.totalDedu.toFixed(2)}€</div></div>`;
 
@@ -1665,37 +1647,144 @@ function cargarPDF(input) {
 }
 
 function parsearNominaPDF(txt, nombre) {
-  const extraerNum = (regex) => { const m = txt.match(regex); return m ? parseFloat(m[1].replace(',', '.')) : null; };
-  const sal = extraerNum(/SALARIO BASE\s+([\d.,]+)/i) || extraerNum(/49[,.]862[^0-9]+([\d.,]+)/i);
-  const ant = extraerNum(/ANTIG[^0-9]+([\d.,]+)/i);
-  const ben = extraerNum(/BENEFICIOS\s+([\d.,]+)/i);
-  const tra = extraerNum(/TRANSPORTE\s+([\d.,]+)/i);
-  const ves = extraerNum(/VESTUARIO\s+([\d.,]+)/i);
-  const com = extraerNum(/COMPLEMENTO PERSONAL[^0-9]+([\d.,]+)/i);
-  const pri = extraerNum(/PRIMA SEGURO[^0-9]+([\d.,]+)/i);
-  const irpf = extraerNum(/I\.R\.P\.F\.\s+([\d.,]+)/i) || extraerNum(/IRPF\s+([\d.,]+)/i);
-  const noct = extraerNum(/NOCTURNIDAD[^0-9]+([\d.,]+)/i);
+  // Parser específico para nómina Pycseca — formato real Abril 2026
+  const num = (regex) => { const m = txt.match(regex); return m ? parseFloat(m[1].replace('.','').replace(',','.')) : null; };
 
+  // ── DEVENGOS ──────────────────────────────────────────────────
+  const sal  = num(/\*SALARIO BASE\s+([\d.,]+)/i);
+  const ant  = num(/\*ANTIG[ÜU]EDAD\s+([\d.,]+)/i);
+  const ben  = num(/\*BENEFICIOS\s+([\d.,]+)/i);
+  const com  = num(/\*COMPLEMENTO PERSONAL[^0-9]+([\d.,]+)/i);
+  const gua  = num(/\*GUARDIAS\s+([\d.,]+)/i);
+  const tra  = num(/\*PLUS TRANSPORTE\s+([\d.,]+)/i);
+  const ves  = num(/\*PLUS VESTUARIO\s+([\d.,]+)/i);
+  const pri  = num(/\*PRIMA SEGURO[^0-9]+([\d.,]+)/i);
+  const ext  = num(/LIQUIDACI[OÓ]N HORAS EXTRAS\s+([\d.,]+)/i) || num(/HORAS EXTRAS\s+([\d.,]+)/i);
+  const noct = num(/NOCTURNIDAD[^0-9]+([\d.,]+)/i);
+
+  // ── DEDUCCIONES ───────────────────────────────────────────────
+  const irpfPct = num(/COTIZACI[OÓ]N I\.?R\.?P\.?F\.?\s+([\d.,]+)/i) || num(/I\.R\.P\.F\.\s+([\d.,]+)/i);
+  const irpfAmt = num(/COTIZACI[OÓ]N I\.?R\.?P\.?F\.?\s+[\d.,]+\s+([\d.,]+)/i);
+  const ssCom   = num(/COTIZACI[OÓ]N CONT\.?COMU[^0-9]+[\d.,]+\s+([\d.,]+)/i);
+  const ssMEI   = num(/COTIZACI[OÓ]N MEI[^0-9]+[\d.,]+\s+([\d.,]+)/i);
+  const ssForm  = num(/COTIZACI[OÓ]N FORMACION[^0-9]+[\d.,]+\s+([\d.,]+)/i);
+  const ssDes   = num(/COTIZACI[OÓ]N DESEMPLEO[^0-9]+[\d.,]+\s+([\d.,]+)/i);
+  const ssExt   = num(/COTIZACI[OÓ]N HORAS EXT[^0-9]+[\d.,]+\s+([\d.,]+)/i);
+
+  // ── TOTALES ───────────────────────────────────────────────────
+  const liquido  = num(/L[IÍ]QUIDO A PERCIBIR\s+([\d.,]+)/i);
+  const devTotal = num(/T\.?\s*DEVENGADO\s+([\d{.,]+)/i);
+  const deduTotal= num(/T\.?\s*A DEDUCIR\s+([\d.,]+)/i);
+
+  // ── Actualizar campos de nómina fijos ─────────────────────────
   let actualizados = 0;
-  if (sal) { document.getElementById('nSalario').value = sal; nomina.salario = sal; actualizados++; }
-  if (ant) { document.getElementById('nAntiguedad').value = ant; nomina.antiguedad = ant; actualizados++; }
-  if (ben) { document.getElementById('nBeneficios').value = ben; nomina.beneficios = ben; actualizados++; }
-  if (tra) { document.getElementById('nTransporte').value = tra; nomina.transporte = tra; actualizados++; }
-  if (ves) { document.getElementById('nVestuario').value = ves; nomina.vestuario = ves; actualizados++; }
-  if (com) { document.getElementById('nComplemento').value = com; nomina.complemento = com; actualizados++; }
-  if (pri) { document.getElementById('nPrima').value = pri; nomina.prima = pri; actualizados++; }
-  if (irpf) { document.getElementById('nIRPF').value = irpf; nomina.irpf = irpf; actualizados++; }
-  if (noct) { document.getElementById('nNocturnidad').value = noct; nomina.nocturnidad = noct; actualizados++; }
+  const _set = (id, val, field) => { if (val !== null) { document.getElementById(id).value = val; nomina[field] = val; actualizados++; } };
+  _set('nSalario',     sal,  'salario');
+  _set('nAntiguedad',  ant,  'antiguedad');
+  _set('nBeneficios',  ben,  'beneficios');
+  _set('nTransporte',  tra,  'transporte');
+  _set('nVestuario',   ves,  'vestuario');
+  _set('nComplemento', com,  'complemento');
+  _set('nPrima',       pri,  'prima');
+  _set('nIRPF',        irpfPct, 'irpf');
+  _set('nNocturnidad', noct, 'nocturnidad');
 
   document.getElementById('pdfLoaded').classList.add('show');
   document.getElementById('pdfUploadArea').style.display = 'none';
   document.getElementById('pdfLoadedTxt').textContent = '✓ ' + nombre + (actualizados > 0 ? ' · ' + actualizados + ' datos leídos' : ' · Revisa los campos');
   saveNomina(); renderLiquido();
-  showToast(actualizados > 0 ? '✓ ' + actualizados + ' datos leídos del PDF' : 'PDF cargado · revisa los campos');
+
+  // ── Comparativa visual PDF vs App ─────────────────────────────
+  const c = calcLiquido(liqYear, liqMes);
+  const totalDeduPDF = [ssCom, ssMEI, ssForm, ssDes, ssExt, irpfAmt].filter(v=>v!==null).reduce((a,b)=>a+b, 0);
+
+  function _fila(lbl, pdfVal, appVal, unit) {
+    if (pdfVal === null) return '';
+    unit = unit || '€';
+    const diff = Math.abs((pdfVal||0) - (appVal||0));
+    const ok = diff < 0.5;
+    const badge = ok
+      ? '<span style="color:var(--green);font-weight:900;font-size:13px">✓</span>'
+      : '<span style="color:' + (pdfVal > appVal ? 'var(--green)' : 'var(--red)') + ';font-weight:900;font-family:var(--mono);font-size:11px">' + (pdfVal > appVal ? '+' : '−') + diff.toFixed(2) + unit + '</span>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">' +
+      '<div><span style="font-size:12px;color:var(--text2)">' + lbl + '</span>' +
+      (appVal !== undefined ? '<div style="font-size:10px;color:var(--text3);font-family:var(--mono)">App: ' + (appVal||0).toFixed(2) + unit + '</div>' : '') +
+      '</div>' +
+      '<span style="display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:13px;font-weight:800;font-family:var(--mono);color:var(--text)">' + (pdfVal||0).toFixed(2) + unit + '</span>' +
+        badge +
+      '</span></div>';
+  }
+
+  function _sec(titulo) {
+    return '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono);padding:10px 0 4px;margin-top:4px;border-bottom:2px solid var(--border)">' + titulo + '</div>';
+  }
+
+  let html = '';
+  // Devengos fijos
+  html += _sec('Conceptos fijos');
+  html += _fila('Salario base', sal, nomina.salario);
+  html += _fila('Antigüedad', ant, nomina.antiguedad);
+  html += _fila('Beneficios', ben, nomina.beneficios);
+  html += _fila('Complemento personal', com, nomina.complemento);
+  html += _fila('Plus transporte', tra, nomina.transporte);
+  html += _fila('Plus vestuario', ves, nomina.vestuario);
+  html += _fila('Prima seguro AT', pri, nomina.prima);
+  if (noct !== null) html += _fila('Nocturnidad', noct, nomina.nocturnidad);
+
+  // Variables del mes
+  html += _sec('Variables del mes');
+  html += _fila('Guardias', gua, c.st.plusGuardia);
+  html += _fila('Horas extras', ext, c.stPrev.extrasEuros);
+
+  // Deducciones
+  html += _sec('Deducciones');
+  html += _fila('IRPF %', irpfPct, nomina.irpf, '%');
+  html += _fila('IRPF €', irpfAmt, c.deduIRPF);
+  html += _fila('SS Cont. comunes', ssCom, undefined);
+  html += _fila('SS MEI', ssMEI, undefined);
+  html += _fila('SS Formación', ssForm, undefined);
+  html += _fila('SS Desempleo', ssDes, undefined);
+  html += _fila('SS Horas extras', ssExt, c.deduExtSS);
+  if (totalDeduPDF > 0) html += _fila('Total deducciones', totalDeduPDF, c.totalDedu);
+
+  // Líquido
+  html += _sec('Resultado');
+  html += _fila('Líquido a percibir', liquido, c.liquido);
+
+  // Veredicto
+  const difLiq = liquido !== null ? Math.abs(liquido - c.liquido) : null;
+  let veredicto = '';
+  if (difLiq !== null) {
+    if (difLiq < 1) {
+      veredicto = '<div style="margin-top:10px;padding:10px 12px;background:rgba(22,163,74,0.08);border-radius:var(--rs);font-size:12px;color:var(--green);font-weight:700">✓ El líquido coincide con la estimación</div>';
+    } else if (liquido > c.liquido) {
+      veredicto = '<div style="margin-top:10px;padding:10px 12px;background:rgba(22,163,74,0.06);border-radius:var(--rs);font-size:12px;font-weight:700;color:var(--green)">↑ Cobras ' + difLiq.toFixed(2) + '€ más de lo estimado</div>';
+    } else {
+      veredicto = '<div style="margin-top:10px;padding:10px 12px;background:rgba(220,38,38,0.07);border-radius:var(--rs);font-size:12px;font-weight:700;color:var(--red)">↓ Cobras ' + difLiq.toFixed(2) + '€ menos de lo estimado · Revisa horas extras</div>';
+    }
+  }
+
+  const resHtml = '<div style="margin:12px 14px 0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px">' +
+    '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono);margin-bottom:4px">Nómina PDF · Comparativa vs app</div>' +
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:8px">Los datos del PDF han actualizado los campos editables</div>' +
+    html + veredicto + '</div>';
+
+  let resEl = document.getElementById('pdfCompResumen');
+  if (!resEl) {
+    resEl = document.createElement('div');
+    resEl.id = 'pdfCompResumen';
+    document.getElementById('pdfLoaded').insertAdjacentElement('afterend', resEl);
+  }
+  resEl.innerHTML = resHtml;
+
+  showToast(actualizados > 0 ? '✓ ' + actualizados + ' conceptos leídos del PDF' : 'PDF cargado · revisa los campos');
 }
 function nuevoPDF() {
   document.getElementById('pdfLoaded').classList.remove('show');
   document.getElementById('pdfUploadArea').style.display = '';
+  const resEl = document.getElementById('pdfCompResumen');
+  if (resEl) resEl.innerHTML = '';
 }
 
 function guardarNomina() {
@@ -1821,8 +1910,13 @@ function exportarExcel() {
             const tr = parsearTramos(o.tramos_txt);
             if (tr.length) {
               inicio=tr[0].inicio; fin=tr[tr.length-1].fin;
+              const pausaInline = tr.reduce((a,t)=>a+t.pausa,0);
               mins=totalTramos(tr);
-              if (o.pausa_min) { comida=minsToHHMM(o.pausa_min); mins-=o.pausa_min; }
+              if (pausaInline) {
+                comida=minsToHHMM(pausaInline); // pausa inline (-30min en tramos_txt)
+              } else if (o.pausa_min) {
+                comida=minsToHHMM(o.pausa_min); mins-=o.pausa_min;
+              }
               total=minsToHHMM(mins);
             }
           }
@@ -2282,304 +2376,6 @@ function borrarJornada() {
 
 let _verifB64Horas = null, _verifTypeHoras = null;
 let _verifB64Nomina = null, _verifTypeNomina = null;
-let _verifY = 2026, _verifM = 0, _verifDetalleHoras = '';
-
-function abrirClaudeAnalisis() {
-  const y = cY, m = cM;
-  _verifY = y; _verifM = m;
-  const st = mesStats(y, m);
-  const c = calcLiquido(y, m);
-  const mesNom = MESES[m];
-
-  document.getElementById('verifTitle').textContent = 'Verificar · ' + mesNom + ' ' + y;
-
-  // Resumen horas
-  const dm = new Date(y, m+1, 0).getDate();
-  const lineas = [];
-  for (let d = 1; d <= dm; d++) {
-    const fecha = new Date(y, m, d);
-    const o = gD(y, m, d);
-    if (!o) { if (!isFDS(fecha) && !isFest(ds(y,m,d))) lineas.push('Día ' + d + ' ' + DSEM[fecha.getDay()] + ': 07:30→15:30 = 8h00'); continue; }
-    const tipo = o.tipo || 'laboral';
-    if (tipo === 'vac') { lineas.push('Día ' + d + ': VACACIONES'); continue; }
-    if (tipo === 'fest' || tipo === 'ausencia') continue;
-    if (tipo === 'fds' && !o.tramos_txt) continue;
-    const tr = parsearTramos(o.tramos_txt || '');
-    if (!tr.length) continue;
-    const pausaInline = tr.reduce((a,t)=>a+t.pausa,0);
-    const mins = totalTramos(tr) - (o.pausa_min && !pausaInline ? o.pausa_min : 0);
-    const ext = mins - 480;
-    const gastoStr = o.gasto > 0 ? ' | ' + o.gasto.toFixed(2) + '€ (' + (o.concepto || 'gasto') + ')' : '';
-    lineas.push('Día ' + d + ' ' + DSEM[fecha.getDay()] + ': ' + tr.map(t => t.inicio + '→' + t.fin).join(' + ') + ' = ' + m2hm(mins) + (ext !== 0 ? ' (' + (ext > 0 ? '+' : '') + m2hm(Math.abs(ext)) + ')' : '') + gastoStr);
-  }
-  _verifDetalleHoras = lineas.join('\n');
-
-  document.getElementById('verifResumenHoras').innerHTML =
-    '<div class="verif-data-lbl-top">Mi registro — ' + mesNom + ' ' + y + '</div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Total horas</span><span class="verif-data-val">' + m2hhmm(st.tot) + '</span></div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Extras</span><span class="verif-data-val ' + (st.ext >= 0 ? 'sv-pos' : 'sv-neg') + '">' + (st.ext >= 0 ? '+' : '') + m2hhmm(st.ext) + '</span></div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Días trabajados</span><span class="verif-data-val">' + st.lab + '</span></div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Gastos registrados</span><span class="verif-data-val">' + (st.gas > 0 ? st.gas.toFixed(2) + '€' : '0€') + '</span></div>';
-
-  document.getElementById('verifResumenNomina').innerHTML =
-    '<div class="verif-data-lbl-top">Estimación app — ' + mesNom + ' ' + y + '</div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Líquido estimado</span><span class="verif-data-val" style="font-size:16px;color:var(--purple)">' + c.liquido.toFixed(2) + '€</span></div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Base fija</span><span class="verif-data-val">' + c.baseFija.toFixed(2) + '€</span></div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Variables</span><span class="verif-data-val sv-pos">+' + c.variables.toFixed(2) + '€</span></div>' +
-    '<div class="verif-data-row"><span class="verif-data-lbl">Deducciones</span><span class="verif-data-val sv-neg">−' + c.totalDedu.toFixed(2) + '€</span></div>' +
-    (c.st.guardiasMes > 0 ? '<div class="verif-data-row"><span class="verif-data-lbl">Guardias (' + c.st.guardiasMes + ' sem.)</span><span class="verif-data-val" style="color:var(--purple)">+' + c.st.plusGuardia.toFixed(2) + '€</span></div>' : '');
-
-  // Reset estado
-  document.getElementById('verifResultHoras').innerHTML = '';
-  document.getElementById('verifBtnHoras').disabled = !_verifB64Horas;
-  // Tab nómina: se rellena al abrir con renderVerifNomina
-  document.getElementById('nomvWrap').innerHTML = '';
-
-  document.getElementById('verifOv').classList.add('open');
-  switchVerifTab('horas');
-}
-
-function cerrarVerificar() {
-  document.getElementById('verifOv').classList.remove('open');
-}
-
-function switchVerifTab(tab) {
-  document.getElementById('verifBodyHoras').style.display = '';
-}
-
-function _handleVerifFile(file, slot) {
-  // slot = 'Horas' | 'Nomina'
-  const isPdf = file.type === 'application/pdf';
-  const reader = new FileReader();
-  reader.onload = e => {
-    const b64 = e.target.result.split(',')[1];
-    const tipo = file.type || 'image/jpeg';
-    if (slot === 'Horas') { _verifB64Horas = b64; _verifTypeHoras = tipo; }
-    else                  { _verifB64Nomina = b64; _verifTypeNomina = tipo; }
-
-    const prev    = document.getElementById('verifPreview' + slot);   // puede no existir
-    const pdfTag  = document.getElementById('verifPdfTag' + slot);
-    const icon    = document.getElementById('verifIcon' + slot);
-    const lbl     = document.getElementById('verifUpload' + slot + 'Txt');
-    const btn     = document.getElementById('verifUpload' + slot + 'Btn');
-    const analiza = document.getElementById('verifBtn' + slot);
-
-    if (isPdf) {
-      if (prev) prev.classList.remove('show');
-      if (pdfTag) { pdfTag.style.display = ''; pdfTag.textContent = '\uD83D\uDCC4 ' + file.name; }
-      if (icon) icon.textContent = '\uD83D\uDCC4';
-    } else {
-      if (prev) { prev.src = e.target.result; prev.classList.add('show'); }
-      if (pdfTag) pdfTag.style.display = 'none';
-      if (icon) icon.textContent = file.name.match(/\.(png|gif|bmp|webp)$/i) ? '\uD83D\uDDBC\uFE0F' : '\uD83D\uDCF7';
-    }
-    if (btn) btn.classList.add('loaded');
-    if (lbl) lbl.textContent = '\u2713 Cargado \u00b7 toca para cambiar';
-    if (analiza) analiza.disabled = false;
-  };
-  reader.readAsDataURL(file);
-}
-
-function onFotoHoras(input) {
-  const file = input.files[0]; if (!file) return;
-  _handleVerifFile(file, 'Horas');
-}
-
-function onFotoNomina(input) {
-  const file = input.files[0]; if (!file) return;
-  _handleVerifFile(file, 'Nomina');
-}
-
-// ── irAComparar: cierra Verificar y abre Datos → panel 3 ────
-function irAComparar() {
-  cerrarVerificar();
-  showModule('datos');
-  renderMesDatos();
-  renderTablaDatos();
-  setTimeout(() => setVistaDatos(3), 120); // leve delay para que el panel esté visible
-}
-
-// ── Parser local de nómina PDF ───────────────────────────────
-async function _parsearNominaPDFLocal(arrayBuffer) {
-  if (!_initPdfJs()) throw new Error('pdf.js no disponible');
-  const pdf  = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let   text = '';
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page    = await pdf.getPage(p);
-    const content = await page.getTextContent();
-    // Reconstruir texto preservando espacios entre items
-    text += content.items.map(i => i.str).join(' ') + '\n';
-  }
-
-  // Extraer número decimal español (1.234,56 → 1234.56)
-  const num = (regex) => {
-    const m = text.match(regex);
-    if (!m) return null;
-    return parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
-  };
-
-  return {
-    liquido:   num(/L[IÍ]QUIDO\s+A\s+PERCIBIR\s+([\d.,]+)/i),
-    guardias:  num(/\*?GUARDIAS\s+([\d.,]+)/i),
-    extras:    num(/LIQUIDACI[OÓ]N\s+HORAS?\s+EXTRAS?\s+([\d.,]+)/i),
-    irpfPct:   num(/I\.?R\.?P\.?F\.?\s+([\d.,]+)\s+[\d.,]+/i),
-    irpfAmt:   num(/I\.?R\.?P\.?F\.?\s+[\d.,]+\s+([\d.,]+)/i),
-    devengado: num(/T\.?\s*DEVENGADO\s+([\d.,]+)/i),
-    deducir:   num(/T\.?\s*A\s+DEDUCIR\s+([\d.,]+)/i),
-    ssCom:     num(/COTIZACION\s+CONT\.?COMU\s+[\d.,]+\s+([\d.,]+)/i),
-  };
-}
-
-// ── Tab Horas: redirige (sin API) ────────────────────────────
-function analizarHoras() { irAComparar(); }
-
-// ── Tab Nómina: comparativa 100% local ───────────────────────
-// ── Renderizar tab nómina (formulario manual + comparativa) ──
-function renderVerifNomina() {
-  const y = _verifY, m = _verifM;
-  const c = calcLiquido(y, m);
-  const mesPrev = MESES[m > 0 ? m-1 : 11];
-  const yprev   = m > 0 ? y : y - 1;
-  const wrap    = document.getElementById('nomvWrap');
-  if (!wrap) return;
-
-  // Cargar datos guardados o usar valores de app como prefill
-  const saved = cargarCompNomina(y, m);
-  const vals = {
-    guardias:  saved ? saved.guardias  : c.st.plusGuardia,
-    festivo:   saved ? saved.festivo   : c.st.plusFest,
-    extras:    saved ? saved.extras    : c.stPrev.extrasEuros,
-    liquido:   saved ? saved.liquido   : c.liquido,
-  };
-
-  const savedDate = saved ? saved._guardada : null;
-
-  function _badge(app, real) {
-    if (real === null || real === '' || isNaN(real)) return '<span class="nomv-badge nomv-badge-na">\u2014</span>';
-    const d = Math.abs(app - real);
-    if (d < 0.5) return '<span class="nomv-badge nomv-badge-ok">\u2713</span>';
-    const sign = real > app ? '+' : '\u2212';
-    const cls  = d < 10 ? 'nomv-badge-warn' : 'nomv-badge-err';
-    return '<span class="nomv-badge ' + cls + '">' + sign + d.toFixed(2) + '\u20ac</span>';
-  }
-
-  function _field(id, label, sub, appVal, realVal) {
-    const subTxt = sub ? '<div class="nomv-field-sub">' + sub + '</div>' : '';
-    const appTxt = '<div class="nomv-field-app">App: ' + appVal.toFixed(2) + '\u20ac</div>';
-    return '<div class="nomv-field" id="nomvField_' + id + '">' +
-      '<div class="nomv-field-left"><div class="nomv-field-lbl">' + label + '</div>' + subTxt + appTxt + '</div>' +
-      '<div class="nomv-field-right">' +
-        '<input class="nomv-input" id="nomvIn_' + id + '" type="number" step="0.01" min="0" value="' + (realVal !== null ? realVal.toFixed(2) : '') + '" placeholder="—" oninput="recalcVerifNomina(' + y + ',' + m + ')">' +
-        '<span class="nomv-unit">\u20ac</span>' +
-        '<span id="nomvBadge_' + id + '">' + _badge(appVal, realVal) + '</span>' +
-      '</div>' +
-    '</div>';
-  }
-
-  // Conceptos fijos (colapsable)
-  const fixedRows = [
-    ['Salario base', nomina.salario],
-    ['Antig\u00fcedad', nomina.antiguedad],
-    ['Beneficios', nomina.beneficios],
-    ['Plus transporte', nomina.transporte],
-    ['Plus vestuario', nomina.vestuario],
-    ['Complemento personal', nomina.complemento],
-    ['Prima seguro AT', nomina.prima],
-    ['IRPF', nomina.irpf + '%'],
-  ].map(([l,v]) => '<div class="nomv-fixed-row"><span class="nomv-fixed-lbl">' + l + '</span><span class="nomv-fixed-val">' + (typeof v === 'number' ? v.toFixed(2) + '\u20ac' : v) + '</span></div>').join('');
-
-  wrap.innerHTML =
-    '<div class="nomv-mes-note">\u2139 Esta n\u00f3mina paga las extras de <strong>' + mesPrev + ' ' + yprev + '</strong>. Introduce los valores reales que figura en tu n\u00f3mina.</div>' +
-
-    '<div class="nomv-section-lbl">Variables del mes</div>' +
-    _field('guardias', 'Guardias', c.st.guardiasMes + ' sem. \u00d7 ' + cfg.guardia + '\u20ac', c.st.plusGuardia, vals.guardias) +
-    _field('festivo',  'Plus festivo guardia', c.st.plusFest > 0 ? Math.round(c.st.plusFest/cfg.festivo) + ' d\u00eda(s) \u00d7 ' + cfg.festivo + '\u20ac' : 'Sin festivos en guardia este mes', c.st.plusFest, vals.festivo) +
-    _field('extras',   'Horas extras', 'De ' + mesPrev + ' \u00d7 ' + cfg.precioH + '\u20ac/h', c.stPrev.extrasEuros, vals.extras) +
-
-    '<div class="nomv-section-lbl" style="margin-top:18px">Resultado</div>' +
-    _field('liquido',  'L\u00edquido a percibir', 'Total despu\u00e9s de deducciones', c.liquido, vals.liquido) +
-
-    '<div id="nomvVeredicto"></div>' +
-
-    '<button class="nomv-save-btn" onclick="guardarVerifNomina(' + y + ',' + m + ')">' +
-      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>' +
-      'Guardar comparativa' +
-    '</button>' +
-
-    (savedDate ? '<div style="text-align:center"><span class="nomv-saved-tag">\u2713 Guardado el ' + new Date(savedDate).toLocaleDateString('es-ES') + '</span></div>' : '') +
-
-    '<button class="nomv-fixed-toggle" onclick="this.nextSibling.classList.toggle(\'open\');this.textContent=this.nextSibling.classList.contains(\'open\')?\'Ocultar conceptos fijos \u25b2\':\'Ver conceptos fijos \u25bc\'">' +
-      'Ver conceptos fijos \u25bc' +
-    '</button>' +
-    '<div class="nomv-fixed-body"><div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px">' + fixedRows + '</div></div>';
-
-  recalcVerifNomina(y, m);
-}
-
-function recalcVerifNomina(y, m) {
-  const c = calcLiquido(y, m);
-  const fields = ['guardias','festivo','extras','liquido'];
-  const appVals = {
-    guardias: c.st.plusGuardia,
-    festivo:  c.st.plusFest,
-    extras:   c.stPrev.extrasEuros,
-    liquido:  c.liquido,
-  };
-
-  let allOk = true, bigDiff = null;
-  for (const id of fields) {
-    const inp = document.getElementById('nomvIn_' + id);
-    const bdg = document.getElementById('nomvBadge_' + id);
-    if (!inp || !bdg) continue;
-    const real = parseFloat(inp.value);
-    const app  = appVals[id];
-    const d    = isNaN(real) ? null : Math.abs(app - real);
-    if (d === null) { bdg.innerHTML = '<span class="nomv-badge nomv-badge-na">\u2014</span>'; allOk = false; continue; }
-    if (d >= 0.5) { allOk = false; if (id === 'liquido') bigDiff = app - real; }
-    const ok   = d < 0.5;
-    const warn = !ok && d < 10;
-    const sign = real > app ? '+' : '\u2212';
-    bdg.innerHTML = ok
-      ? '<span class="nomv-badge nomv-badge-ok">\u2713</span>'
-      : '<span class="nomv-badge ' + (warn ? 'nomv-badge-warn' : 'nomv-badge-err') + '">' + sign + d.toFixed(2) + '\u20ac</span>';
-  }
-
-  const vd = document.getElementById('nomvVeredicto');
-  if (!vd) return;
-  if (allOk) {
-    vd.innerHTML = '<div class="nomv-veredicto" style="background:rgba(22,163,74,0.08)">' +
-      '<div class="nomv-veredicto-icon">\u2713</div>' +
-      '<div><div class="nomv-veredicto-title">La n\u00f3mina cuadra</div>' +
-      '<div class="nomv-veredicto-sub">Todos los conceptos variables coinciden con la estimaci\u00f3n</div></div></div>';
-  } else if (bigDiff !== null) {
-    const quien = bigDiff > 0 ? 'cobras menos de lo estimado' : 'cobras m\u00e1s de lo estimado';
-    const col   = bigDiff > 0 ? 'rgba(220,38,38,0.07)' : 'rgba(249,115,22,0.07)';
-    const icon  = bigDiff > 0 ? '\u26a0' : '\u2139';
-    vd.innerHTML = '<div class="nomv-veredicto" style="background:' + col + '">' +
-      '<div class="nomv-veredicto-icon">' + icon + '</div>' +
-      '<div><div class="nomv-veredicto-title">Diferencia de ' + Math.abs(bigDiff).toFixed(2) + '\u20ac en el l\u00edquido</div>' +
-      '<div class="nomv-veredicto-sub">' + quien.charAt(0).toUpperCase() + quien.slice(1) + '. Revisa las filas marcadas.</div></div></div>';
-  } else {
-    vd.innerHTML = '<div class="nomv-veredicto" style="background:rgba(251,191,36,0.08)">' +
-      '<div class="nomv-veredicto-icon">\u2139</div>' +
-      '<div><div class="nomv-veredicto-title">Hay diferencias menores</div>' +
-      '<div class="nomv-veredicto-sub">Revisa los campos marcados en naranja.</div></div></div>';
-  }
-}
-
-function guardarVerifNomina(y, m) {
-  const ids = ['guardias','festivo','extras','liquido'];
-  const data = { _guardada: new Date().toISOString() };
-  for (const id of ids) {
-    const inp = document.getElementById('nomvIn_' + id);
-    data[id] = inp ? (parseFloat(inp.value) || 0) : 0;
-  }
-  guardarCompNomina(y, m, data);
-  showToast('\u2713 Comparativa de n\u00f3mina guardada');
-  renderVerifNomina(); // refresh saved date
-}
-
-function analizarNomina() { renderVerifNomina(); }
 
 
 // ============================================================
@@ -2607,7 +2403,7 @@ function dayInfoDatos(y, m, d) {
     const tr=parsearTramos(o.tramos_txt||'');
     const pausaTramos=tr.reduce((s,t)=>s+t.pausa,0); // pausa embebida en -Xmin
     const pausa=pausaTramos+pausaMin;
-    mins=totalTramos(tr)-pausaMin; // totalTramos ya descuenta pausaTramos; solo restar pausaMin extra
+    mins=totalTramos(tr)-(pausaTramos ? 0 : pausaMin); // si ya hay pausa inline no restar pausaMin encima
     if(tr.length){inicio=tr[0].inicio;fin=tr[tr.length-1].fin;}
     else{inicio='07:30';fin='15:30';}
     return{tipo,mins,inicio,fin,pausa,numTramos:tr.length,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
@@ -2733,45 +2529,80 @@ function renderTablaDatos() {
 }
 
 function renderAnualDatos() {
-  const y=cY_datos, hoy=new Date();
-  let totY=0, extY=0, labY=0, impY=0;
+  const y=cY_datos, hoy=new Date(), mesHoy=hoy.getMonth(), anioHoy=hoy.getFullYear();
+  let totY=0,extY=0,labY=0,gasY=0;
   const stats=[];
-  for(let m=0;m<12;m++){const st=mesStats(y,m);stats.push(st);totY+=st.tot;extY+=st.ext;labY+=st.lab;impY+=st.tot/60*cfg.precioH+st.plusFest;}
-
-  let h=`<div class="sec-label">Balance anual</div><div class="anual-stats">
-    <div class="stat-card"><div class="stat-val sv-acc" style="font-size:15px">${m2hm(totY)}</div><div class="stat-lbl">Total horas</div></div>
-    <div class="stat-card"><div class="stat-val ${extY>=0?'sv-pos':'sv-neg'}">${extY>=0?'+':'\u2212'}${m2hm(Math.abs(extY))}</div><div class="stat-lbl">Extras</div></div>
-    <div class="stat-card"><div class="stat-val">${labY}</div><div class="stat-lbl">D\u00edas trab.</div></div>
-    <div class="stat-card"><div class="stat-val sv-acc" style="font-size:12px">${impY.toFixed(0)}\u20ac</div><div class="stat-lbl">Importe est.</div></div>
-  </div>`;
-
-  const maxAbs=Math.max(...stats.map(s=>Math.abs(s.ext)))||1;
-  h+=`<div class="sec-label">Extras por mes</div><div class="mes-bars">`;
   for(let m=0;m<12;m++){
-    const st=stats[m], pct=Math.round(Math.abs(st.ext)/maxAbs*100);
-    const clr=st.ext>=0?'var(--green)':'var(--red)';
-    const esMes=m===cM_datos;
-    h+=`<div class="mes-bar-row${esMes?' today-mes':''}" onclick="irAMesDatos(${m})" style="${esMes?'background:rgba(194,65,12,0.06);border-radius:5px;padding:4px;':''}">
-      <span class="mbl" style="${esMes?'color:var(--acc);font-weight:900':''}">${MESES_C[m]}</span>
-      <div class="mbt"><div class="mbf" style="width:${pct}%;background:${clr}"></div></div>
-      <span class="mbv" style="color:${clr}">${st.ext>=0?'+':'\u2212'}${m2hm(Math.abs(st.ext))}</span>
+    const st=mesStats(y,m); stats.push(st);
+    totY+=st.tot; extY+=st.ext; labY+=st.lab; gasY+=st.gas||0;
+  }
+  const maxAbs=Math.max(...stats.map(s=>Math.abs(s.ext)),1);
+
+  let h=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 14px 10px">`;
+  const cards=[
+    {lbl:'Total horas',val:m2hm(totY),col:'var(--acc)'},
+    {lbl:'Extras año',val:(extY>=0?'+':'\u2212')+m2hm(Math.abs(extY)),col:extY>=0?'var(--green)':'var(--red)'},
+    {lbl:'Días trabajados',val:labY,col:'var(--text)'},
+    {lbl:'Gastos año',val:gasY.toFixed(2)+'\u20ac',col:'#7c3aed'},
+  ];
+  cards.forEach(c=>{
+    h+=`<div style="background:white;border-radius:14px;padding:12px 14px;box-shadow:0 1px 6px rgba(0,0,0,0.06)">
+      <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">${c.lbl}</div>
+      <div style="font-size:20px;font-weight:900;font-family:var(--mono);color:${c.col}">${c.val}</div>
+    </div>`;
+  });
+  h+=`</div>`;
+
+  h+=`<div style="padding:0 14px 8px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em">Extras por mes · toca para ver detalle</div>`;
+  h+=`<div style="background:white;border-radius:16px;margin:0 14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);overflow:hidden">`;
+
+  for(let m=0;m<12;m++){
+    const st=stats[m];
+    const esFuturo = (y===anioHoy && m>mesHoy) || y>anioHoy;
+    const esMesAct = m===mesHoy && y===anioHoy;
+    const pct=Math.round(Math.abs(st.ext)/maxAbs*100);
+    const clr=st.ext>=0?'#22c55e':'#ef4444';
+    const compKey=KCH+'_'+y+'_'+String(m+1).padStart(2,'0');
+    const tieneComp=!!localStorage.getItem(compKey);
+    const borderLeft=esMesAct?'3px solid var(--acc)':'3px solid transparent';
+    const bg=esMesAct?'rgba(249,115,22,0.04)':'white';
+    const barOpacity=esFuturo?'.35':'1';
+    const chevron=`<span style="font-size:18px;color:#cbd5e1;margin-left:2px">›</span>`;
+    const badges=tieneComp
+      ?`<span style="font-size:8px;font-weight:800;background:rgba(34,197,94,0.12);color:#16a34a;border-radius:4px;padding:2px 5px;font-family:var(--mono)">PDF ✓</span>`
+      :esFuturo?''
+      :`<span style="font-size:8px;font-weight:800;background:rgba(249,115,22,0.10);color:var(--acc);border-radius:4px;padding:2px 5px;font-family:var(--mono)">Sin PDF</span>`;
+
+    h+=`<div onclick="irAMesDatos(${m})" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:${m<11?'1px solid #f1f5f9':'none'};cursor:pointer;background:${bg};border-left:${borderLeft};transition:background .15s;-webkit-tap-highlight-color:rgba(0,0,0,0.05)">
+      <span style="width:30px;font-size:12px;font-weight:800;color:${esMesAct?'var(--acc)':'#374151'};font-family:var(--mono)">${MESES_C[m]}</span>
+      <div style="flex:1;height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${clr};border-radius:3px;opacity:${barOpacity};${esFuturo?'background:repeating-linear-gradient(90deg,'+clr+' 0px,'+clr+' 4px,transparent 4px,transparent 8px)':''}"></div>
+      </div>
+      <span style="width:50px;text-align:right;font-size:12px;font-weight:800;font-family:var(--mono);color:${esFuturo?'#94a3b8':clr}">${st.ext>=0?'+':'\u2212'}${m2hm(Math.abs(st.ext))}</span>
+      <div style="display:flex;gap:4px;width:52px;justify-content:flex-end;align-items:center">${badges}</div>
+      ${chevron}
     </div>`;
   }
   h+=`</div>`;
 
-  h+=`<div class="sec-label">Guardias 2026</div><div class="guard-anual">`;
-  GUARDIAS_2026.forEach(g=>{
-    const fin=new Date(g);fin.setDate(fin.getDate()+6);
-    const key=g.toISOString().split('T')[0];
-    const cambio=guardiasCambios[key];
-    let bCls,bTxt;
-    if(cambio==='cancelada'){bCls='b-cambio';bTxt='Cambiada';}
-    else if(fin<hoy){bCls='b-ok';bTxt='Completada';}
-    else if(g<=hoy&&fin>=hoy){bCls='b-next';bTxt='En curso';}
-    else{bCls='b-pend';bTxt='Pendiente';}
-    h+=`<div class="gar-row"><span class="gar-fecha" style="color:${bCls==='b-ok'?'var(--green)':bCls==='b-next'?'var(--purple)':bCls==='b-cambio'?'var(--red)':'var(--text3)'}">${g.getDate()}/${g.getMonth()+1}</span><span class="gar-rango">\u2192 ${fin.getDate()}/${fin.getMonth()+1}</span><span class="gar-badge ${bCls}">${bTxt}</span></div>`;
-  });
-  h+=`</div>`;
+  // Guardias
+  if(GUARDIAS_2026.length){
+    h+=`<div style="padding:14px 14px 4px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em">Guardias ${y}</div>`;
+    h+=`<div style="background:white;border-radius:14px;margin:0 14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);overflow:hidden">`;
+    GUARDIAS_2026.forEach(g=>{
+      const fin=new Date(g);fin.setDate(fin.getDate()+6);
+      const key=g.toISOString().split('T')[0];
+      const cambio=guardiasCambios[key];
+      let col,bTxt;
+      if(cambio==='cancelada'){col='var(--red)';bTxt='Cambiada';}
+      else if(fin<hoy){col='var(--green)';bTxt='Completada';}
+      else if(g<=hoy&&fin>=hoy){col='var(--purple)';bTxt='En curso';}
+      else{col:'var(--text3)';bTxt='Pendiente';}
+      h+=`<div class="gar-row"><span class="gar-fecha" style="color:${col}">${g.getDate()}/${g.getMonth()+1}</span><span class="gar-rango">\u2192 ${fin.getDate()}/${fin.getMonth()+1}</span><span class="gar-badge" style="background:${col}22;color:${col}">${bTxt}</span></div>`;
+    });
+    h+=`</div>`;
+  }
+  h+=`<div style="height:80px"></div>`;
   document.getElementById('anualBody').innerHTML=h;
 }
 
@@ -3738,10 +3569,29 @@ function responder(int_){
   if(accion==='pausa'){
     const {fecha,mins,desc}=int_;
     const o=gD(fecha.y,fecha.m,fecha.d)||{tipo:'laboral',tramos_txt:'07:30-15:30'};
-    sD(fecha.y,fecha.m,fecha.d,{...o,pausa_min:(o.pausa_min||0)+mins});
+    // Si ya hay tramos_txt, añadir pausa inline en el texto para que Excel la vea
+    const trActual=parsearTramos(o.tramos_txt||'');
+    const pausaYaInline=trActual.reduce((a,t)=>a+t.pausa,0);
+    let nuevoTxt=o.tramos_txt||'07:30-15:30';
+    let nuevoPausaMin=o.pausa_min||0;
+    if(trActual.length===1&&!pausaYaInline){
+      // Insertar pausa inline en el único tramo
+      nuevoTxt=trActual[0].inicio+'-'+trActual[0].fin+' -'+mins+'min';
+      nuevoPausaMin=0; // ya está en el texto
+    } else if(trActual.length===1&&pausaYaInline){
+      // Actualizar pausa inline existente
+      nuevoTxt=trActual[0].inicio+'-'+trActual[0].fin+' -'+(pausaYaInline+mins)+'min';
+      nuevoPausaMin=0;
+    } else {
+      // Múltiples tramos o sin tramos: usar pausa_min separado
+      nuevoPausaMin=(o.pausa_min||0)+mins;
+    }
+    sD(fecha.y,fecha.m,fecha.d,{...o,tramos_txt:nuevoTxt,pausa_min:nuevoPausaMin||undefined});
     ctxConv.ultimaFecha=fecha;
+    const totalMinsDia=totalTramos(parsearTramos(nuevoTxt))-(nuevoPausaMin||0);
+    const ext=totalMinsDia-BASE_MIN;
     const f=frase('pausa',{pausaStr:m2str(mins)})||`Pausa ${desc} apuntada \u2705`;
-    const card=`<div class="res-card"><div class="res-row"><span class="res-lbl">Pausa comida</span><span class="res-val">${desc} = ${m2str(mins)}</span></div><div class="res-row"><span class="res-lbl">Se resta del total</span><span class="res-val neg">\u2212${m2str(mins)}</span></div></div>`;
+    const card=`<div class="res-card"><div class="res-row"><span class="res-lbl">Pausa comida</span><span class="res-val">${desc} = ${m2str(mins)}</span></div><div class="res-row"><span class="res-lbl">Se resta del total</span><span class="res-val neg">\u2212${m2str(mins)}</span></div><div class="res-row"><span class="res-lbl">Total hoy</span><span class="res-val">${m2str(totalMinsDia)}</span></div><div class="res-row"><span class="res-lbl">vs 8h</span><span class="res-val ${ext>=0?'pos':'neg'}">${ext>=0?'+':'\u2212'}${m2str(Math.abs(ext))}</span></div></div>`;
     ctxConv.ultimaBotCat='pausa';ctxConv.ultimaBotMsg=f;
     return f+card;
   }
@@ -4045,7 +3895,252 @@ function goMesTabla(dir) {
 
 function irAMesDatos(m) {
   cM_datos = m; _mesSync.m = m; _mesSync.y = cY_datos;
-  setVistaDatos(0); renderMesDatos(); renderTablaDatos();
+  renderMesDatos(); renderTablaDatos();
+  abrirMesDetalle(m);
+}
+
+function abrirMesDetalle(m) {
+  const y=cY_datos, st=mesStats(y,m), hoy=new Date();
+  const esFuturo=(y===hoy.getFullYear()&&m>hoy.getMonth())||y>hoy.getFullYear();
+  const compKey=KCH+'_'+y+'_'+String(m+1).padStart(2,'0');
+  const compData=cargarCompHoras(y,m);
+  const tieneComp=!!compData && Object.keys(compData).length>0;
+
+  // Título y subtítulo
+  document.getElementById('mesDetalleTitulo').textContent=MESES[m]+' '+y;
+  document.getElementById('mesDetalleSub').textContent=st.lab+' días · '+m2hm(st.tot)+' horas'+(esFuturo?' · previsión':'');
+
+  // Cards resumen
+  let cards='';
+  const empTotal=tieneComp?_calcEmpresaTotal(compData):null;
+  const diff=empTotal!==null?st.tot-empTotal:null;
+  cards+=_mdCard('Mi registro',m2hm(st.tot),(st.ext>=0?'+':'\u2212')+m2hm(Math.abs(st.ext))+' extras','#f97316');
+  cards+=_mdCard('Empresa PDF',empTotal!==null?m2hm(empTotal):'Sin PDF',empTotal!==null?'PDF cargado':'Sube el PDF','white');
+  cards+=_mdCard('Diferencia',diff!==null?(diff>=0?'+':'\u2212')+m2hm(Math.abs(diff)):'—',diff!==null?_discDias(compData,st,m,y)+' días':'','#fb923c');
+  document.getElementById('mesDetalleCards').innerHTML=cards;
+
+  // Veredicto
+  let ver='';
+  if(tieneComp&&diff!==null){
+    const nDisc=_discDias(compData,st,m,y);
+    if(Math.abs(diff)<5){
+      ver=`<div style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">✓</span><span style="font-size:11px;color:#bbf7d0;font-weight:700">Registros coinciden con la empresa</span></div>`;
+    } else {
+      const causa=nDisc>0?nDisc+' días con diferencia':'';
+      ver=`<div style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">⚠</span><div><div style="font-size:11px;color:#fed7aa;font-weight:700">App registra ${(diff>=0?'+':'\u2212')+m2hm(Math.abs(diff))} vs empresa</div>${causa?'<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px">'+causa+'</div>':''}</div></div>`;
+    }
+  } else if(!tieneComp) {
+    ver=`<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">📄</span><span style="font-size:11px;color:rgba(255,255,255,0.45);font-weight:600">Sin PDF de empresa · sube la hoja para comparar</span></div>`;
+  }
+  document.getElementById('mesDetalleVeredicto').innerHTML=ver;
+
+  // Actualizar badge tab comparar
+  const nDisc=tieneComp?_discDias(compData,st,m,y):0;
+  document.getElementById('mdtTabComp').textContent='⚡ Comparar'+(nDisc>0?' ('+nDisc+')':'');
+
+  // Mostrar panel
+  const panel=document.getElementById('mesDetallePanel');
+  panel.classList.add('open');
+
+  // Cargar tab por defecto
+  setMesDetalleTab(tieneComp?'comp':'tabla');
+}
+
+function cerrarMesDetalle() {
+  document.getElementById('mesDetallePanel').classList.remove('open');
+}
+
+function _mdCard(lbl,val,sub,col) {
+  return `<div style="background:rgba(255,255,255,0.07);border-radius:12px;padding:10px 8px 12px;text-align:center">
+    <div style="font-size:9px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:5px">${lbl}</div>
+    <div style="font-size:17px;font-weight:900;color:${col};font-family:var(--mono);line-height:1">${val}</div>
+    <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:3px;font-family:var(--mono)">${sub}</div>
+  </div>`;
+}
+
+function _calcEmpresaTotal(compData) {
+  return Object.values(compData).reduce((a,v)=>a+(v.mins||0),0);
+}
+
+function _discDias(compData,st,m,y) {
+  let n=0;
+  const dim=new Date(y,m+1,0).getDate();
+  for(let d=1;d<=dim;d++){
+    const o=gD(y,m,d); if(!o||o.tipo==='fds'||o.tipo==='fest') continue;
+    const empDay=compData[d];
+    if(!empDay) continue;
+    const appMin=totalTramos(parsearTramos(o.tramos_txt||''))-(o.pausa_min&&!parsearTramos(o.tramos_txt||'').reduce((a,t)=>a+t.pausa,0)?o.pausa_min:0);
+    const diff=appMin-(empDay.mins||0);
+    if(Math.abs(diff)>5) n++;
+  }
+  return n;
+}
+
+let _mdTab='tabla';
+function setMesDetalleTab(tab) {
+  _mdTab=tab;
+  ['tabla','comp','gastos'].forEach(t=>{
+    document.getElementById('mdtTab'+t.charAt(0).toUpperCase()+t.slice(1)).className='mdt-tab'+(t===tab?' active':'');
+  });
+  renderMesDetalleBody();
+}
+
+function renderMesDetalleBody() {
+  const y=cY_datos, m=cM_datos, body=document.getElementById('mesDetalleBody');
+  const st=mesStats(y,m);
+  const compData=cargarCompHoras(y,m)||{};
+  const tieneComp=Object.keys(compData).length>0;
+  const dim=new Date(y,m+1,0).getDate();
+
+  if(_mdTab==='tabla') {
+    // Tabla de días del mes
+    let h=`<div class="mdt-col-hdr">
+      <span class="mdt-col-lbl" style="width:52px">Día</span>
+      <span class="mdt-col-lbl" style="flex:1">Inicio</span>
+      <span class="mdt-col-lbl" style="flex:1">Fin</span>
+      <span class="mdt-col-lbl" style="width:60px;text-align:right">Total</span>
+    </div>`;
+    let totMin=0;
+    for(let d=1;d<=dim;d++){
+      const o=gD(y,m,d);
+      const fecha=new Date(y,m,d);
+      const dow=['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'][fecha.getDay()];
+      const tipo=o?o.tipo||'laboral':'laboral';
+      if(tipo==='fds'&&!o?.tramos_txt){
+        h+=`<div class="mdt-row skip" style="padding:7px 14px"><span style="width:52px;font-size:13px;font-weight:800;color:#94a3b8">${d} <span style="font-size:10px">${dow}</span></span><span style="font-size:11px;color:#cbd5e1;font-family:var(--mono)">FDS</span></div>`;
+        continue;
+      }
+      if(tipo==='fest'){
+        h+=`<div class="mdt-row skip" style="padding:7px 14px"><span style="width:52px;font-size:13px;font-weight:800;color:#94a3b8">${d} <span style="font-size:10px">${dow}</span></span><span style="font-size:11px;color:#cbd5e1;font-family:var(--mono)">FEST</span></div>`;
+        continue;
+      }
+      const tr=parsearTramos(o?.tramos_txt||'');
+      const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
+      const mins=totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0);
+      const ext=mins-BASE_MIN;
+      const cls=ext>10?'over':ext<-10?'under':'ok';
+      const inicio=tr.length?tr[0].inicio:'—';
+      const fin=tr.length?tr[tr.length-1].fin:'—';
+      totMin+=mins;
+      h+=`<div class="mdt-row ${cls}">
+        <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
+        <span style="flex:1;font-size:12px;font-family:var(--mono);color:#374151">${inicio}</span>
+        <span style="flex:1;font-size:12px;font-family:var(--mono);color:#374151">${fin}</span>
+        <span style="width:60px;text-align:right;font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${mins>0?m2hm(mins):'—'}</span>
+      </div>`;
+    }
+    h+=`<div style="display:flex;align-items:center;padding:12px 14px;background:#f8fafc;border-top:2px solid #e2e8f0;border-left:3px solid var(--acc)">
+      <span style="width:52px;font-size:11px;font-weight:900;color:#374151;text-transform:uppercase;letter-spacing:.05em">Total</span>
+      <span style="flex:2"></span>
+      <span style="width:60px;text-align:right;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--acc)">${m2hm(totMin)}</span>
+    </div><div style="height:60px"></div>`;
+    body.innerHTML=h;
+
+  } else if(_mdTab==='comp') {
+    if(!tieneComp){
+      body.innerHTML=`<div style="padding:32px 20px;text-align:center">
+        <div style="font-size:40px;margin-bottom:12px">📄</div>
+        <div style="font-size:15px;font-weight:800;color:#374151;margin-bottom:8px">Sin datos de empresa</div>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">Sube el PDF o imagen de la hoja de Pycseca para comparar</div>
+        <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
+          📄 Subir PDF empresa
+          <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
+        </label>
+      </div>`;
+      return;
+    }
+
+    // Tabla comparativa
+    let h=`<div class="mdt-col-hdr">
+      <span class="mdt-col-lbl" style="width:52px">Día</span>
+      <span class="mdt-col-lbl" style="flex:1;color:var(--acc)">App</span>
+      <span class="mdt-col-lbl" style="flex:1">Empresa</span>
+      <span class="mdt-col-lbl" style="width:64px;text-align:right">Diff</span>
+    </div>`;
+
+    let totApp=0,totEmp=0;
+    for(let d=1;d<=dim;d++){
+      const o=gD(y,m,d);
+      const fecha=new Date(y,m,d);
+      const dow=['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'][fecha.getDay()];
+      const tipo=o?o.tipo||'laboral':'laboral';
+      const empDay=compData[d];
+
+      if((tipo==='fds'&&!o?.tramos_txt)&&!empDay){
+        h+=`<div class="mdt-row skip" style="padding:6px 14px"><span style="width:52px;font-size:12px;font-weight:700;color:#94a3b8">${d} ${dow}</span><span style="font-size:11px;color:#cbd5e1;font-family:var(--mono);flex:1">${tipo==='fest'?'FEST':'FDS'}</span></div>`;
+        continue;
+      }
+      const tr=parsearTramos(o?.tramos_txt||'');
+      const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
+      const appMin=totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0);
+      const empMin=empDay?empDay.mins:0;
+      const diff=appMin-empMin;
+      const cls=Math.abs(diff)<=5?'ok':diff>0?'over':'under';
+      totApp+=appMin; totEmp+=empMin;
+
+      const diffStr=Math.abs(diff)<=5?'\u2713':(diff>0?'+':'\u2212')+m2hm(Math.abs(diff));
+      const diffCol=Math.abs(diff)<=5?'#22c55e':diff>0?'#f97316':'#ef4444';
+
+      h+=`<div class="mdt-row ${cls}">
+        <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
+        <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${appMin>0?m2hm(appMin):tipo==='fest'?'FEST':'FDS'}</span>
+        <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:#374151">${empMin>0?m2hm(empMin):empDay?'0:00':'—'}</span>
+        <span style="width:64px;text-align:right;font-size:12px;font-weight:900;font-family:var(--mono);color:${diffCol}">${diffStr}</span>
+      </div>`;
+    }
+    const diffTot=totApp-totEmp;
+    h+=`<div style="display:flex;align-items:center;padding:12px 14px;background:#f8fafc;border-top:2px solid #e2e8f0;border-left:3px solid var(--acc)">
+      <span style="width:52px;font-size:11px;font-weight:900;color:#374151;text-transform:uppercase;letter-spacing:.05em">Total</span>
+      <span style="flex:1;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--acc)">${m2hm(totApp)}</span>
+      <span style="flex:1;font-size:15px;font-weight:900;font-family:var(--mono);color:#374151">${m2hm(totEmp)}</span>
+      <span style="width:64px;text-align:right;font-size:13px;font-weight:900;font-family:var(--mono);color:${diffTot>5?'#f97316':diffTot<-5?'#ef4444':'#22c55e'}">${diffTot>0?'+':diffTot<0?'\u2212':''}${m2hm(Math.abs(diffTot))}</span>
+    </div>`;
+    // Leyenda
+    h+=`<div style="padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px">
+      ${[['#22c55e','Sin diferencia'],['#f97316','App &gt; Empresa'],['#ef4444','Empresa &gt; App']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#64748b"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div>${l}</div>`).join('')}
+    </div>`;
+    h+=`<div style="height:60px"></div>`;
+    body.innerHTML=h;
+
+  } else { // gastos
+    let h='', totG=0;
+    const gasRows=[];
+    for(let d=1;d<=dim;d++){
+      const o=gD(y,m,d);
+      if(o&&o.gasto>0) gasRows.push({d,gasto:o.gasto,concepto:o.concepto||''});
+      totG+=o?.gasto||0;
+    }
+    if(!gasRows.length){
+      h=`<div style="padding:40px 20px;text-align:center;color:#94a3b8;font-size:13px">Sin gastos registrados este mes</div>`;
+    } else {
+      h=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 14px 10px">
+        <div style="background:white;border-radius:12px;padding:12px;box-shadow:0 1px 6px rgba(0,0,0,0.06);text-align:center">
+          <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Total gastos</div>
+          <div style="font-size:22px;font-weight:900;font-family:var(--mono);color:var(--acc)">${totG.toFixed(2)}\u20ac</div>
+        </div>
+        <div style="background:white;border-radius:12px;padding:12px;box-shadow:0 1px 6px rgba(0,0,0,0.06);text-align:center">
+          <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Conceptos</div>
+          <div style="font-size:22px;font-weight:900;font-family:var(--mono);color:#374151">${gasRows.length}</div>
+        </div>
+      </div>`;
+      gasRows.forEach(g=>{
+        h+=`<div style="display:flex;align-items:center;padding:11px 14px;background:white;border-radius:10px;margin:0 14px 6px;box-shadow:0 1px 4px rgba(0,0,0,0.05);border-left:3px solid #22c55e">
+          <span style="width:28px;font-size:13px;font-weight:800;color:#1e293b">${g.d}</span>
+          <span style="flex:1;font-size:12px;color:#374151">${g.concepto||'\u2014'}</span>
+          <span style="font-size:14px;font-weight:800;font-family:var(--mono);color:var(--acc)">${g.gasto.toFixed(2)}\u20ac</span>
+        </div>`;
+      });
+    }
+    h+=`<div style="height:60px"></div>`;
+    body.innerHTML=h;
+  }
+}
+
+// Subir PDF directamente desde el detalle de mes
+function cargarHojaEmpresaDetalle(input) {
+  cargarHojaEmpresa(input);
+  // Refresh detalle tras carga (con pequeño delay para que guarde)
+  setTimeout(()=>{ renderMesDetalleBody(); abrirMesDetalle(cM_datos); }, 800);
 }
 
 // ── Swipe horizontal en el calendario de Jornada ─────────────
@@ -4067,21 +4162,23 @@ function irAMesDatos(m) {
     }
   }, { passive: true });
 })();
-document.getElementById('navChat').onclick=()=>{
-  showModule('chat');
-};
+document.getElementById('navChat').onclick=()=>{ showModule('chat'); };
+document.getElementById('navChat').ontouchend=function(e){ e.preventDefault(); showModule('chat'); };
 document.getElementById('navJornada').onclick=()=>{
   _sincronizarMes('jornada');
   showModule('jornada'); renderJornada(); renderGuardiaEditor();
 };
+document.getElementById('navJornada').ontouchend=function(e){ e.preventDefault(); _sincronizarMes('jornada'); showModule('jornada'); renderJornada(); renderGuardiaEditor(); };
 document.getElementById('navDatos').onclick=()=>{
   _sincronizarMes('datos');
-  showModule('datos'); renderMesDatos(); renderTablaDatos();
+  showModule('datos'); setVistaDatos(2); renderAnualDatos();
 };
+document.getElementById('navDatos').ontouchend=function(e){ e.preventDefault(); _sincronizarMes('datos'); showModule('datos'); setVistaDatos(2); renderAnualDatos(); };
 document.getElementById('navMicuenta').onclick=()=>{
   _sincronizarMes('micuenta');
   showModule('micuenta'); renderAll();
 };
+document.getElementById('navMicuenta').ontouchend=function(e){ e.preventDefault(); _sincronizarMes('micuenta'); showModule('micuenta'); renderAll(); };
 
 // Jornada nav arrows
 document.getElementById('prevMesBtn').onclick=()=>goMes(-1);
@@ -4207,7 +4304,7 @@ function _parsearTextoHoras(text) {
   return days;
 }
 
-// ── Parser PDF: gap-based rows + column TOTAL detection ──────
+// ── Parser PDF Pycseca: formato hoja jornada empresa ─────────
 async function _parsearPDFHoras(arrayBuffer) {
   if (!_initPdfJs()) throw new Error('pdf.js no disponible');
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -4219,24 +4316,13 @@ async function _parsearPDFHoras(arrayBuffer) {
     const items = (await page.getTextContent()).items;
     for (const it of items) {
       if (!it.str.trim()) continue;
-      allItems.push({
-        str: it.str.trim(),
-        x:   it.transform[4],
-        y:   vp.height - it.transform[5]   // Y from top
-      });
+      allItems.push({ str: it.str.trim(), x: it.transform[4], y: vp.height - it.transform[5] });
     }
   }
 
-  // Sort top→bottom, then left→right
   allItems.sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x);
 
-  // Detect X position of the TOTAL column from header
-  let totalColX = null;
-  for (const it of allItems) {
-    if (/^TOTAL$/i.test(it.str)) { totalColX = it.x; break; }
-  }
-
-  // Gap-based row clustering (gap > 4pt = new row)
+  // Gap-based row clustering
   const rows = [];
   let cur = [], lastY = -Infinity;
   for (const it of allItems) {
@@ -4246,40 +4332,84 @@ async function _parsearPDFHoras(arrayBuffer) {
   if (cur.length) rows.push(cur);
 
   const days = {};
+
   for (const row of rows) {
     const sorted = row.sort((a,b) => a.x - b.x);
     const line   = sorted.map(i => i.str).join(' ');
-    if (/PARCIAL|TOTALE|SALDO\s+INI|VACAC|COMPUTO|DIA\b/i.test(line)) continue;
-    const m0 = line.match(/^(\d{1,2})[\s,\.]/);
-    if (!m0) continue;
-    const day = parseInt(m0[1]);
-    if (day < 1 || day > 31) continue;
 
-    // Strategy A: look for time at TOTAL column X position (±30px)
-    if (totalColX !== null) {
-      const colItem = sorted.find(i =>
-        Math.abs(i.x - totalColX) < 30 && /^\d{1,3}:\d{2}$/.test(i.str));
-      if (colItem) {
-        const [h,mm] = colItem.str.split(':').map(Number);
-        if (h <= 300 && mm <= 59) {
-          days[day] = { mins: h*60+mm, totalStr: colItem.str }; continue;
-        }
+    // Ignorar cabeceras y parciales
+    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\b|DIETAS|GASOIL|INICIO|TARJETA/i.test(line)) continue;
+
+    // Día al inicio (puede venir precedido por número de guardia: "14 15 ..." o "15 14 ...")
+    // Pycseca pone el número de guardia antes del día en algunos casos
+    const m0 = line.match(/^(\d{1,2})\b/);
+    if (!m0) continue;
+    let day = parseInt(m0[1]);
+
+    // Si el primer número es 12-15 (nº guardia) y hay otro número inmediatamente después, el día puede ser el segundo
+    // Detectar patrón: "14 15 ..." → guardia 14, día 15 o viceversa
+    const m1 = line.match(/^(\d{1,2})\s+(\d{1,2})\s/);
+    if (m1) {
+      const n1 = parseInt(m1[1]), n2 = parseInt(m1[2]);
+      // Si n1 parece número de guardia (10-20) y n2 es un día diferente, usar n2
+      // Heurística: el más pequeño que sea <= 31 y el otro no
+      if (n1 <= 31 && n2 <= 31) {
+        // Ambos podrían ser días — usar el contexto: si n1 ya existe como día, usar n2
+        if (days[n1] !== undefined) day = n2;
+        else day = n1; // por defecto el primero
       }
     }
 
-    // Strategy B: last valid HH:MM in the line
-    const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
+    if (day < 1 || day > 31) continue;
+
+    // Extraer todos los tokens HH:MM de la línea (formato hora laboral)
+    const allTimes = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
       .map(m => m[1])
-      .filter(t => { const [h,mm]=t.split(':').map(Number); return h<=23&&mm<=59; });
-    if (!times.length) { days[day]={mins:0,totalStr:'0:00'}; continue; }
-    const totalStr = times[times.length-1];
-    const [h,mm]   = totalStr.split(':').map(Number);
-    days[day] = { mins:h*60+mm, totalStr };
+      .filter(t => { const [h,mm] = t.split(':').map(Number); return h <= 23 && mm <= 59; });
+
+    if (!allTimes.length) {
+      // Día sin jornada (0:00 o festivo) — verificar si hay "0,00" o "0:00"
+      if (/\b0[,:.]00\b/.test(line) && !days[day]) days[day] = { mins: 0, totalStr: '0:00' };
+      continue;
+    }
+
+    // El último token es el TOTAL de horas trabajadas
+    const totalStr = allTimes[allTimes.length - 1];
+    const [th, tm] = totalStr.split(':').map(Number);
+
+    // Si el total es 0:00, ignorar (día sin jornada)
+    if (th === 0 && tm === 0) {
+      if (!days[day]) days[day] = { mins: 0, totalStr: '0:00' };
+      continue;
+    }
+
+    const mins = th * 60 + tm;
+
+    // inicio = primer token, fin = penúltimo (o segundo si solo hay 3 tokens)
+    const inicio = allTimes[0];
+    const fin    = allTimes.length >= 3 ? allTimes[allTimes.length - 2] : (allTimes[1] || null);
+
+    days[day] = { mins, totalStr, inicio, fin };
   }
+
   return days;
 }
 
-// ── Tesseract.js: carga lazy desde CDN ───────────────────────
+// ── Detectar mes desde nombre de fichero PDF ──────────────────
+function _detectarMesPDF(nombre) {
+  const n = nombre.toLowerCase();
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  for (let i = 0; i < meses.length; i++) {
+    if (n.includes(meses[i])) return { y: 2026, m: i };
+  }
+  // Buscar patrón _MMYYYY_ o _042026_
+  const mNum = nombre.match(/_(\d{2})(\d{4})_/) || nombre.match(/(\d{2})(\d{4})/);
+  if (mNum) {
+    const mes = parseInt(mNum[1]) - 1, anyo = parseInt(mNum[2]);
+    if (mes >= 0 && mes <= 11 && anyo >= 2024) return { y: anyo, m: mes };
+  }
+  return null;
+}
 function _loadTesseract() {
   if (window.Tesseract) return Promise.resolve(window.Tesseract);
   return new Promise((res, rej) => {
@@ -4370,42 +4500,159 @@ async function cargarHojaEmpresa(input) {
   if (!file) return;
   const compBody = document.getElementById('compBody');
   const setMsg = txt => { compBody.innerHTML = '<div id="cmpMsg" style="padding:44px 20px;text-align:center;color:var(--text3);font-family:var(--mono);font-size:13px">' + txt + '</div>'; };
-  setMsg('\u23f3 Reconociendo texto\u2026 (primera vez puede tardar)');
   document.getElementById('compStickyHdr').style.display = 'none';
+
+  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
   try {
-    let rawText = '';
-    const days = await _parsearImagenHoras(file, pct => {
-      const el = document.getElementById('cmpMsg');
-      if (el) el.textContent = 'Leyendo imagen: ' + pct + '%\u2026';
-    }, txt => { rawText = txt; });
-    const n = Object.keys(days).length;
+    let days = {}, rawText = '';
+
+    if (isPDF) {
+      setMsg('⏳ Leyendo PDF de la empresa…');
+      const buf = await file.arrayBuffer();
+      days = await _parsearPDFHoras(buf);
+    } else {
+      setMsg('⏳ Reconociendo texto… (primera vez puede tardar)');
+      days = await _parsearImagenHoras(file, pct => {
+        const el = document.getElementById('cmpMsg');
+        if (el) el.textContent = 'Leyendo imagen: ' + pct + '%…';
+      }, txt => { rawText = txt; });
+    }
+
+    const n = Object.keys(days).filter(d => days[d].mins > 0).length;
     _empresaDays = days; _empresaMes = file.name; _compCargado = true;
     _empresaImgSrc = null; _compGuardada = false;
-    _empresaMesDetectado = _detectarMesTexto(rawText);
+
+    if (isPDF) {
+      // Detectar mes del nombre del fichero o del texto
+      _empresaMesDetectado = _detectarMesPDF(file.name) || { y: cY_datos, m: cM_datos };
+    } else {
+      _empresaMesDetectado = _detectarMesTexto(rawText);
+    }
+
     const gy = _empresaMesDetectado ? _empresaMesDetectado.y : cY_datos;
     const gm = _empresaMesDetectado ? _empresaMesDetectado.m : cM_datos;
     guardarCompHoras(gy, gm);
     renderComparacion();
+
     if (n > 0) {
-      showToast('\u2713 ' + n + ' d\u00edas le\u00eddos \u00b7 guardado');
+      showToast('✓ ' + n + ' días leídos · guardado');
     } else {
-      // OCR corrió pero no encontró días — mostrar fragmento del texto capturado
-      const preview = rawText.slice(0, 120).replace(/\n/g, ' ').trim();
       compBody.innerHTML = '<div style="padding:24px 16px">' +
-        '<div style="font-size:14px;font-weight:800;color:var(--acc);margin-bottom:8px">\u26a0 No se detectaron d\u00edas</div>' +
-        '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">El OCR ley\u00f3 el archivo pero no encontr\u00f3 la tabla de horas. Prueba con una imagen m\u00e1s n\u00edtida o en horizontal.</div>' +
-        (preview ? '<div style="font-size:10px;font-family:var(--mono);color:var(--text3);background:var(--bg2);padding:10px;border-radius:var(--rs);border:1px solid var(--border)">Texto detectado: ' + preview + '\u2026</div>' : '') +
-        '<label class="comp-upload-btn" style="margin-top:14px">Intentar con otra imagen<input type="file" accept="image/*" onchange="cargarHojaEmpresa(this)" style="display:none"></label>' +
+        '<div style="font-size:14px;font-weight:800;color:var(--acc);margin-bottom:8px">⚠ No se detectaron días</div>' +
+        '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">' +
+        (isPDF ? 'El PDF se leyó pero no se encontró la tabla de horas. Asegúrate de que es la hoja de jornada de Pycseca.' :
+                 'El OCR leyó el archivo pero no encontró la tabla. Prueba con una imagen más nítida.') +
+        '</div>' +
+        '<label class="comp-upload-btn" style="margin-top:14px">Intentar con otro archivo' +
+        '<input type="file" accept="image/*,.pdf" onchange="cargarHojaEmpresa(this)" style="display:none"></label>' +
         '</div>';
       _compCargado = false;
     }
   } catch(e) {
-    compBody.innerHTML = '<div style="padding:32px 20px;text-align:center"><div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px">\u26a0 Error al leer</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono)">' + e.message + '</div></div>';
+    compBody.innerHTML = '<div style="padding:32px 20px;text-align:center"><div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px">⚠ Error al leer</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono)">' + e.message + '</div></div>';
   }
   input.value = '';
 }
 
-// ── Eliminar hoja cargada ─────────────────────────────────────
+// ── Cargar Excel exportado por la app como fuente de comparativa ──
+function cargarExcelApp(input) {
+  const file = input.files[0]; if (!file) return;
+  if (typeof XLSX === 'undefined') { showToast('Librería Excel no disponible'); return; }
+  const compBody = document.getElementById('compBody');
+  const setMsg = txt => { compBody.innerHTML = '<div id="cmpMsg" style="padding:44px 20px;text-align:center;color:var(--text3);font-family:var(--mono);font-size:13px">' + txt + '</div>'; };
+  setMsg('⏳ Leyendo Excel…');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const MESES_MAP = { 'Enero':0,'Febrero':1,'Marzo':2,'Abril':3,'Mayo':4,'Junio':5,
+                          'Julio':6,'Agosto':7,'Septiembre':8,'Octubre':9,'Noviembre':10,'Diciembre':11 };
+
+      // Buscar la hoja del mes actual visualizado
+      const mesActual = MESES[cM_datos];
+      let sheetName = wb.SheetNames.find(n => n === mesActual);
+
+      // Si no coincide exactamente, buscar por mes parcial
+      if (!sheetName) sheetName = wb.SheetNames.find(n => MESES_MAP[n] === cM_datos);
+      if (!sheetName) {
+        // Mostrar selector de mes disponible
+        const opciones = wb.SheetNames.filter(n => MESES_MAP[n] !== undefined);
+        if (!opciones.length) { showToast('No se encontraron hojas de meses en el Excel'); return; }
+        sheetName = opciones[opciones.length - 1]; // último mes disponible
+        showToast('Mes ' + mesActual + ' no encontrado · cargando ' + sheetName);
+      }
+
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+      const days = {};
+      let leidos = 0;
+
+      for (const row of rows.slice(2)) { // skip header rows
+        const dia = parseInt(row[0]);
+        if (!dia || isNaN(dia) || dia < 1 || dia > 31) continue;
+        const inicio   = String(row[2] || '').trim();
+        const fin      = String(row[3] || '').trim();
+        const comida   = String(row[4] || '').trim();
+        const totalStr = String(row[5] || '').trim();
+        const tipo     = String(row[6] || '').trim().toUpperCase();
+
+        if (tipo === 'FDS' || tipo === 'FEST') continue; // ignorar fds/fest
+        if (!inicio || !fin) continue;
+
+        // Calcular mins desde TOTAL o desde inicio-fin-comida
+        let mins = 0;
+        if (totalStr && totalStr.includes(':')) {
+          const [h, m] = totalStr.split(':').map(Number);
+          mins = h * 60 + m;
+        } else if (inicio && fin) {
+          const t2m = s => { const p = s.split(':'); return p.length === 2 ? +p[0]*60 + +p[1] : -1; };
+          const i = t2m(inicio), o = t2m(fin);
+          if (i >= 0 && o > i) {
+            mins = o - i;
+            if (comida && comida.includes(':')) {
+              const [ch, cm] = comida.split(':').map(Number);
+              mins -= ch * 60 + cm;
+            }
+          }
+        }
+        if (mins <= 0) continue;
+
+        days[dia] = { mins, totalStr: totalStr || (Math.floor(mins/60) + ':' + String(mins%60).padStart(2,'0')), inicio, fin };
+        leidos++;
+      }
+
+      if (!leidos) { showToast('No se encontraron días laborables en la hoja ' + sheetName); input.value = ''; return; }
+
+      // Detectar año/mes del nombre de hoja
+      const mesIdx = MESES_MAP[sheetName];
+      _empresaDays = days;
+      _empresaMes  = 'Excel · ' + sheetName;
+      _compCargado = true;
+      _empresaImgSrc = null;
+      _compGuardada  = false;
+      _empresaMesDetectado = { y: cY_datos, m: mesIdx !== undefined ? mesIdx : cM_datos };
+
+      // Sincronizar mes visualizado
+      if (mesIdx !== undefined) {
+        cM_datos = mesIdx;
+        _mesSync.m = mesIdx;
+      }
+
+      guardarCompHoras(cY_datos, cM_datos);
+      renderMesDatos();
+      renderComparacion();
+      showToast('✓ ' + leidos + ' días leídos del Excel · ' + sheetName);
+    } catch(err) {
+      console.error(err);
+      showToast('Error al leer el Excel: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
 function eliminarHojaEmpresa() { borrarCompHoras(cY_datos, cM_datos); }
 
 // ── Ir al mes detectado ───────────────────────────────────────
@@ -4440,7 +4687,7 @@ function renderComparacion() {
           <label class="comp-upload-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Seleccionar imagen
-            <input type="file" accept="image/*" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
+            <input type="file" accept="image/*,.pdf,application/pdf" id="compPdfInput" style="display:none" onchange="cargarHojaEmpresa(this)">
           </label>
         </div>`;
       return;
