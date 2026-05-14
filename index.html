@@ -847,6 +847,34 @@ body{
 .nomv-fixed-row:last-child{border-bottom:none;}
 .nomv-fixed-lbl{color:var(--text2);}
 .nomv-fixed-val{font-family:var(--mono);font-weight:700;color:var(--text);}
+
+/* ── COMPARATIVA NÓMINA en tab Nómina ── */
+.nomcomp-wrap{margin-top:0;}
+.nomcomp-mes-lbl{font-size:11px;color:var(--text2);background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:var(--rs);padding:9px 12px;margin-bottom:12px;line-height:1.5;}
+.nomcomp-mes-lbl strong{color:var(--purple);}
+.nomcomp-row{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;margin-bottom:6px;transition:border-color .15s;}
+.nomcomp-row:focus-within{border-color:var(--acc);}
+.nomcomp-row-left{flex:1;min-width:0;}
+.nomcomp-row-lbl{font-size:12px;font-weight:700;color:var(--text);}
+.nomcomp-row-sub{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px;}
+.nomcomp-row-app{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:1px;}
+.nomcomp-row-right{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.nomcomp-input{width:80px;text-align:right;font-size:15px;font-weight:900;font-family:var(--mono);border:none;background:transparent;color:var(--text);outline:none;-moz-appearance:textfield;}
+.nomcomp-input::-webkit-inner-spin-button,.nomcomp-input::-webkit-outer-spin-button{-webkit-appearance:none;}
+.nomcomp-unit{font-size:13px;font-weight:700;color:var(--text3);}
+.nomcomp-badge{font-size:11px;font-weight:900;font-family:var(--mono);padding:3px 7px;border-radius:6px;min-width:44px;text-align:center;}
+.nomcomp-badge-ok{color:var(--green);background:rgba(22,163,74,0.1);}
+.nomcomp-badge-warn{color:#B45309;background:rgba(251,191,36,0.15);}
+.nomcomp-badge-err{color:var(--red);background:rgba(220,38,38,0.1);}
+.nomcomp-badge-na{color:var(--text3);}
+.nomcomp-divider{height:1px;background:var(--border);margin:10px 0;}
+.nomcomp-veredicto{border-radius:var(--r);padding:13px 14px;display:flex;align-items:flex-start;gap:10px;margin-top:10px;}
+.nomcomp-veredicto-icon{font-size:22px;flex-shrink:0;}
+.nomcomp-veredicto-title{font-size:14px;font-weight:900;color:var(--text);}
+.nomcomp-veredicto-sub{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5;}
+.nomcomp-save-btn{width:100%;margin-top:12px;padding:13px;background:var(--acc);border:none;border-radius:var(--r);color:white;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:8px;}
+.nomcomp-save-btn:active{opacity:.85;}
+.nomcomp-saved-tag{display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;font-weight:700;color:var(--green);font-family:var(--mono);padding:6px 0 2px;}
 </style>
 </head>
 <body>
@@ -867,7 +895,7 @@ body{
 
 <div class="module-container" id="moduleContainer">
   <!-- PANEL CHAT -->
-  <div id="panelChat" class="module-panel">
+  <div id="panelChat" class="module-panel hidden">
     <div class="chat-msgs" id="msgs"></div>
     <div class="suggestions" id="sugs"></div>
     <div class="input-bar">
@@ -1050,6 +1078,18 @@ body{
         </div>
       </div>
 
+
+      <!-- COMPARATIVA NÓMINA REAL -->
+      <div class="mc-group" id="nomCompGroup">
+        <div class="mc-group-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Comparativa nómina real
+        </div>
+        <div class="sec" id="nomCompSec" style="margin-bottom:0">
+          <div id="nomCompBody"></div>
+        </div>
+      </div>
+
       <!-- ⑥ PARÁMETROS ECONÓMICOS -->
       <div class="mc-group">
         <div class="mc-group-title">
@@ -1122,8 +1162,7 @@ body{
     <div class="verif-hdr-title" id="verifTitle">Verificar mes</div>
   </div>
   <div class="verif-tabs">
-    <button class="verif-tab active" id="verifTabHoras" onclick="switchVerifTab('horas')">📋 Hoja de horas</button>
-    <button class="verif-tab" id="verifTabNomina" onclick="switchVerifTab('nomina')">💰 Nómina</button>
+    <button class="verif-tab active" id="verifTabHoras" style="flex:none;border-bottom:2px solid var(--purple);color:var(--purple);font-weight:800;pointer-events:none">📋 Hoja de horas · comparar con empresa</button>
   </div>
 
   <!-- TAB HORAS -->
@@ -1141,11 +1180,7 @@ body{
     </div>
   </div>
 
-  <!-- TAB NÓMINA: formulario manual + comparativa local -->
-  <div class="verif-body" id="verifBodyNomina" style="display:none">
-    <div class="verif-data-card" id="verifResumenNomina"></div>
-    <div class="nomv-wrap" id="nomvWrap"></div>
-  </div>
+
 </div>
 
 <!-- DISCREPANCY DETAIL SHEET -->
@@ -1344,7 +1379,7 @@ function mesStats(y, m) {
     const dstr = ds(y, m, d), date = new Date(y, m, d), fds = isFDS(date), fest = isFest(dstr);
     const o = gD(y, m, d); let mins = 0;
     if (!o) { if (!fds && !fest) { mins = 480; lab++; } }
-    else { const tipo = o.tipo || 'laboral'; if (tipo === 'vac') { mins = VAC_M; lab++; } else if (tipo === 'fest' || tipo === 'ausencia') mins = 0; else { mins = totalTramos(parsearTramos(o.tramos_txt || '')); if (o.pausa_min) mins -= o.pausa_min; if (mins > 0) lab++; } gas += o.gasto || 0; if (fest && mins > 0) plusFest += cfg.festivo; }
+    else { const tipo = o.tipo || 'laboral'; if (tipo === 'vac') { mins = VAC_M; lab++; } else if (tipo === 'fest' || tipo === 'ausencia') mins = 0; else { const _tr = parsearTramos(o.tramos_txt || ''); const _pausaInline = _tr.reduce((a,t)=>a+t.pausa,0); mins = totalTramos(_tr); if (o.pausa_min && !_pausaInline) mins -= o.pausa_min; if (mins > 0) lab++; } gas += o.gasto || 0; if (fest && mins > 0) plusFest += cfg.festivo; }
     tot += mins;
   }
   const ext = tot - CONV_MIN;
@@ -1428,6 +1463,7 @@ function renderLiquido() {
     }
   }
   _updateNominaToggle();
+  if (document.getElementById('ncVeredicto')) renderNomComp();
   document.getElementById('liqExtras').textContent = '+' + (c.variables).toFixed(2) + '€';
   document.getElementById('liqDedu').textContent = '\u2212' + c.totalDedu.toFixed(2) + '€';
 
@@ -2024,7 +2060,7 @@ function renderPaletaMicuenta() {
 }
 
 function renderAll() {
-  renderLiquido();
+  renderLiquido(); renderNomComp();
   renderGuardiaEditor(); renderSaldo(); renderPaletaMicuenta(); renderInfo(); updateHeaderMicuenta();
   document.getElementById('nSalario').value = nomina.salario;
   document.getElementById('nAntiguedad').value = nomina.antiguedad;
@@ -2071,7 +2107,10 @@ function dayInfJornada(y, m, d) {
   if (tipo === 'vac') { mins = Math.round(cfg.convenio / cfg.vacDias * 60); estado = 'vac'; }
   else if (tipo === 'fest' || tipo === 'ausencia') { mins = 0; estado = 'fest'; }
   else {
-    const tramos = parsearTramos(o.tramos_txt || ''); mins = totalTramos(tramos);
+    const tramos = parsearTramos(o.tramos_txt || '');
+    const pausaInline = tramos.reduce((a,t)=>a+t.pausa,0);
+    mins = totalTramos(tramos);
+    if (o.pausa_min && !pausaInline) mins -= o.pausa_min;
     if (tipo === 'fds') estado = 'wknd';
     else if (mins > 485) estado = 'over';
     else if (mins < 475) estado = 'und';
@@ -2267,7 +2306,8 @@ function abrirClaudeAnalisis() {
     if (tipo === 'fds' && !o.tramos_txt) continue;
     const tr = parsearTramos(o.tramos_txt || '');
     if (!tr.length) continue;
-    const mins = totalTramos(tr) - (o.pausa_min || 0);
+    const pausaInline = tr.reduce((a,t)=>a+t.pausa,0);
+    const mins = totalTramos(tr) - (o.pausa_min && !pausaInline ? o.pausa_min : 0);
     const ext = mins - 480;
     const gastoStr = o.gasto > 0 ? ' | ' + o.gasto.toFixed(2) + '€ (' + (o.concepto || 'gasto') + ')' : '';
     lineas.push('Día ' + d + ' ' + DSEM[fecha.getDay()] + ': ' + tr.map(t => t.inicio + '→' + t.fin).join(' + ') + ' = ' + m2hm(mins) + (ext !== 0 ? ' (' + (ext > 0 ? '+' : '') + m2hm(Math.abs(ext)) + ')' : '') + gastoStr);
@@ -2304,11 +2344,7 @@ function cerrarVerificar() {
 }
 
 function switchVerifTab(tab) {
-  document.getElementById('verifBodyHoras').style.display = tab === 'horas' ? '' : 'none';
-  document.getElementById('verifBodyNomina').style.display = tab === 'nomina' ? '' : 'none';
-  document.getElementById('verifTabHoras').classList.toggle('active', tab === 'horas');
-  document.getElementById('verifTabNomina').classList.toggle('active', tab === 'nomina');
-  if (tab === 'nomina') renderVerifNomina();
+  document.getElementById('verifBodyHoras').style.display = '';
 }
 
 function _handleVerifFile(file, slot) {
@@ -3133,7 +3169,7 @@ function getCtxPro(){
   const o=gD(y,m,d);
   const st=mesStats(y,m);
   let minsHoy=0;
-  if(o&&o.tramos_txt)minsHoy=totalTramos(parsearTramos(o.tramos_txt))-(o.pausa_min||0);
+  if(o&&o.tramos_txt){const _tr=parsearTramos(o.tramos_txt);const _pi=_tr.reduce((a,t)=>a+t.pausa,0);minsHoy=totalTramos(_tr)-(o.pausa_min&&!_pi?o.pausa_min:0);}
   const extraHoy=minsHoy-BASE_MIN;
   const diasFin=new Date(y,m+1,0).getDate()-d;
   return{
@@ -3680,18 +3716,20 @@ function responder(int_){
     const tramos=parsearTramos(texto);
     if(!tramos.length)return'No he podido leer los horarios. Prueba: <span class="pill">7:30-15:40</span>';
     const o=gD(fecha.y,fecha.m,fecha.d)||{};
-    const total=totalTramos(tramos);const pausa=o.pausa_min||0;const mins=total-pausa;const ext=mins-BASE_MIN;
-    sD(fecha.y,fecha.m,fecha.d,{...o,tipo:'laboral',tramos_txt:tramos.map(t=>t.inicio+'-'+t.fin).join(', ')});
+    const total=totalTramos(tramos);const ext=total-BASE_MIN;
+    // Guardar el texto original para preservar pausas inline (-30min)
+    sD(fecha.y,fecha.m,fecha.d,{...o,tipo:'laboral',tramos_txt:texto.trim()});
     ctxConv.ultimaFecha=fecha;ctxConv.inicioPendiente=null;
     const st=mesStats(fecha.y,fecha.m);
     const _t3=getCtxTemporal();
-    const ctx_={totalStr:m2str(mins),extStr:(ext>=0?'+':'\u2212')+m2str(Math.abs(ext)),ext,mesExtStr:(st.ext>=0?'+':'\u2212')+m2str(Math.abs(st.ext)),hhmm_fin:tramos[tramos.length-1].fin,..._t3};
+    const ctx_={totalStr:m2str(total),extStr:(ext>=0?'+':'\u2212')+m2str(Math.abs(ext)),ext,mesExtStr:(st.ext>=0?'+':'\u2212')+m2str(Math.abs(st.ext)),hhmm_fin:tramos[tramos.length-1].fin,..._t3};
     const cat=ext>60?'finLargo':ext<-30?'finCorto':'fin';
     const f=frase(cat,ctx_)||'Jornada guardada \u2705';
     let card=`<div class="res-card">`;
     tramos.forEach((t,i)=>{card+=`<div class="res-row"><span class="res-lbl">Tramo ${i+1}</span><span class="res-val">${t.inicio} \u2192 ${t.fin} = ${m2str(t.mins)}</span></div>`;});
-    if(pausa)card+=`<div class="res-row"><span class="res-lbl">Pausa</span><span class="res-val neg">\u2212${m2str(pausa)}</span></div>`;
-    card+=`<div class="res-row"><span class="res-lbl">Total</span><span class="res-val">${m2str(mins)}</span></div><div class="res-row"><span class="res-lbl">vs 8h</span><span class="res-val ${ext>=0?'pos':'neg'}">${ext>=0?'+':'\u2212'}${m2str(Math.abs(ext))}</span></div></div>`;
+    const pausaTotal=tramos.reduce((a,t)=>a+t.pausa,0);
+    if(pausaTotal)card+=`<div class="res-row"><span class="res-lbl">Pausa</span><span class="res-val neg">\u2212${m2str(pausaTotal)}</span></div>`;
+    card+=`<div class="res-row"><span class="res-lbl">Total</span><span class="res-val">${m2str(total)}</span></div><div class="res-row"><span class="res-lbl">vs 8h</span><span class="res-val ${ext>=0?'pos':'neg'}">${ext>=0?'+':'\u2212'}${m2str(Math.abs(ext))}</span></div></div>`;
     ctxConv.ultimaBotCat=cat;ctxConv.ultimaBotMsg=f;
     return f+card;
   }
@@ -3780,10 +3818,12 @@ function responder(int_){
     const tipo=o.tipo||'laboral';
     if(tipo==='vac')return`${nom} ${fecha.d}/${fecha.m+1}: <span class="pill green">Vacaciones</span>`;
     if(tipo==='ausencia')return`${nom} ${fecha.d}/${fecha.m+1}: <span class="pill red">Ausencia</span>`;
-    const tramos=parsearTramos(o.tramos_txt||'');const total=totalTramos(tramos);const pausa=o.pausa_min||0;const mins=total-pausa;
+    const tramos=parsearTramos(o.tramos_txt||'');const total=totalTramos(tramos);
+    const pausaInline=tramos.reduce((a,t)=>a+t.pausa,0);const pausa=o.pausa_min&&!pausaInline?o.pausa_min:0;const mins=total-pausa;
     let h=`${nom} ${fecha.d}/${fecha.m+1}:<div class="res-card">`;
-    tramos.forEach((t,i)=>{h+=`<div class="res-row"><span class="res-lbl">Tramo ${i+1}</span><span class="res-val">${t.inicio} \u2192 ${t.fin}</span></div>`;});
-    if(pausa)h+=`<div class="res-row"><span class="res-lbl">Pausa</span><span class="res-val neg">\u2212${m2str(pausa)}</span></div>`;
+    tramos.forEach((t,i)=>{h+=`<div class="res-row"><span class="res-lbl">Tramo ${i+1}</span><span class="res-val">${t.inicio} \u2192 ${t.fin}${t.pausa?` <span style="color:var(--text3);font-size:10px">-${m2str(t.pausa)}</span>`:''}</span></div>`;});
+    const pausaShow=pausaInline||pausa;
+    if(pausaShow)h+=`<div class="res-row"><span class="res-lbl">Pausa</span><span class="res-val neg">\u2212${m2str(pausaShow)}</span></div>`;
     h+=`<div class="res-row"><span class="res-lbl">Total</span><span class="res-val">${m2str(mins)}</span></div>`;
     if(o.gasto>0)h+=`<div class="res-row"><span class="res-lbl">Gasto</span><span class="res-val">${o.gasto.toFixed(2)}\u20ac \u00b7 ${o.concepto||''}</span></div>`;
     return h+'</div>';
@@ -4027,6 +4067,9 @@ function irAMesDatos(m) {
     }
   }, { passive: true });
 })();
+document.getElementById('navChat').onclick=()=>{
+  showModule('chat');
+};
 document.getElementById('navJornada').onclick=()=>{
   _sincronizarMes('jornada');
   showModule('jornada'); renderJornada(); renderGuardiaEditor();
@@ -4653,6 +4696,134 @@ function verDiscrepancia(y, m, d) {
 
   document.getElementById('discDetailBody').innerHTML = html;
   document.getElementById('discDetailOv').classList.add('open');
+}
+
+// ============================================================
+// COMPARATIVA NÓMINA REAL — tab Nómina
+// ============================================================
+
+function renderNomComp() {
+  const y = liqYear, m = liqMes;
+  const c = calcLiquido(y, m);
+  const mesPrev = MESES[m > 0 ? m-1 : 11];
+  const yprev   = m > 0 ? y : y - 1;
+  const el      = document.getElementById('nomCompBody');
+  if (!el) return;
+
+  const saved = cargarCompNomina(y, m);
+  const appVals = {
+    guardias: c.st.plusGuardia,
+    festivo:  c.st.plusFest,
+    extras:   c.stPrev.extrasEuros,
+    liquido:  c.liquido,
+  };
+  const realVals = {
+    guardias: saved ? saved.guardias : '',
+    festivo:  saved ? saved.festivo  : '',
+    extras:   saved ? saved.extras   : '',
+    liquido:  saved ? saved.liquido  : '',
+  };
+
+  function _badge(id) {
+    const inp = document.getElementById('nc_' + id);
+    if (!inp) return '';
+    const real = parseFloat(inp.value);
+    const app  = appVals[id];
+    if (isNaN(real) || inp.value === '') return '<span class="nomcomp-badge nomcomp-badge-na">\u2014</span>';
+    const d = Math.abs(app - real);
+    if (d < 0.5) return '<span class="nomcomp-badge nomcomp-badge-ok">\u2713</span>';
+    const sign = real > app ? '+' : '\u2212';
+    const cls  = d < 10 ? 'nomcomp-badge-warn' : 'nomcomp-badge-err';
+    return '<span class="nomcomp-badge ' + cls + '">' + sign + d.toFixed(2) + '\u20ac</span>';
+  }
+
+  function _row(id, lbl, sub, appVal, realVal) {
+    return '<div class="nomcomp-row" id="ncRow_' + id + '">' +
+      '<div class="nomcomp-row-left">' +
+        '<div class="nomcomp-row-lbl">' + lbl + '</div>' +
+        (sub ? '<div class="nomcomp-row-sub">' + sub + '</div>' : '') +
+        '<div class="nomcomp-row-app">App: ' + appVal.toFixed(2) + '\u20ac</div>' +
+      '</div>' +
+      '<div class="nomcomp-row-right">' +
+        '<input class="nomcomp-input" id="nc_' + id + '" type="number" step="0.01" min="0"' +
+        (realVal !== '' ? ' value="' + parseFloat(realVal).toFixed(2) + '"' : '') +
+        ' placeholder="\u2014" oninput="recalcNomComp()">' +
+        '<span class="nomcomp-unit">\u20ac</span>' +
+        '<span id="ncBadge_' + id + '">' + (realVal !== '' ? _badge(id) : '<span class="nomcomp-badge nomcomp-badge-na">\u2014</span>') + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  const savedDate = saved && saved._guardada ? new Date(saved._guardada).toLocaleDateString('es-ES') : null;
+
+  el.innerHTML =
+    '<div class="nomcomp-mes-lbl">\u2139 Esta n\u00f3mina paga las extras de <strong>' + mesPrev + ' ' + yprev + '</strong>. Escribe los valores reales de tu n\u00f3mina.</div>' +
+    _row('guardias', 'Guardias', c.st.guardiasMes + ' sem. \u00d7 ' + cfg.guardia + '\u20ac', appVals.guardias, realVals.guardias) +
+    (c.st.plusFest > 0 || (saved && saved.festivo)
+      ? _row('festivo', 'Plus festivo guardia', Math.round(c.st.plusFest / cfg.festivo || 0) + ' d\u00eda \u00d7 ' + cfg.festivo + '\u20ac', appVals.festivo, realVals.festivo)
+      : '<div class="nomcomp-row" style="opacity:.5"><div class="nomcomp-row-left"><div class="nomcomp-row-lbl">Plus festivo guardia</div><div class="nomcomp-row-sub">Sin festivos en guardia este mes</div></div><div class="nomcomp-row-right"><span class="nomcomp-badge nomcomp-badge-na">N/A</span></div></div>') +
+    _row('extras', 'Horas extras', 'De ' + mesPrev + ' \u00d7 ' + cfg.precioH + '\u20ac/h', appVals.extras, realVals.extras) +
+    '<div class="nomcomp-divider"></div>' +
+    _row('liquido', 'L\u00edquido a percibir', 'Total despu\u00e9s de deducciones', appVals.liquido, realVals.liquido) +
+    '<div id="ncVeredicto"></div>' +
+    '<button class="nomcomp-save-btn" onclick="guardarNomComp()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Guardar comparativa</button>' +
+    (savedDate ? '<div class="nomcomp-saved-tag">\u2713 Guardado el ' + savedDate + '</div>' : '');
+
+  recalcNomComp();
+}
+
+function recalcNomComp() {
+  const y = liqYear, m = liqMes;
+  const c = calcLiquido(y, m);
+  const appVals = { guardias: c.st.plusGuardia, festivo: c.st.plusFest, extras: c.stPrev.extrasEuros, liquido: c.liquido };
+  let allFilled = true, bigDiff = null;
+
+  for (const id of ['guardias','festivo','extras','liquido']) {
+    const inp = document.getElementById('nc_' + id);
+    const bdg = document.getElementById('ncBadge_' + id);
+    if (!inp || !bdg) continue;
+    const real = parseFloat(inp.value);
+    const app  = appVals[id];
+    if (isNaN(real) || inp.value === '') { allFilled = false; bdg.innerHTML = '<span class="nomcomp-badge nomcomp-badge-na">\u2014</span>'; continue; }
+    const d    = Math.abs(app - real);
+    const sign = real > app ? '+' : '\u2212';
+    if (d >= 0.5 && id === 'liquido') bigDiff = app - real;
+    bdg.innerHTML = d < 0.5
+      ? '<span class="nomcomp-badge nomcomp-badge-ok">\u2713</span>'
+      : '<span class="nomcomp-badge ' + (d < 10 ? 'nomcomp-badge-warn' : 'nomcomp-badge-err') + '">' + sign + d.toFixed(2) + '\u20ac</span>';
+  }
+
+  const vd = document.getElementById('ncVeredicto');
+  if (!vd) return;
+  if (!allFilled) { vd.innerHTML = ''; return; }
+
+  if (bigDiff === null) {
+    vd.innerHTML = '<div class="nomcomp-veredicto" style="background:rgba(22,163,74,0.08)">' +
+      '<div class="nomcomp-veredicto-icon">\u2713</div>' +
+      '<div><div class="nomcomp-veredicto-title">La n\u00f3mina cuadra</div>' +
+      '<div class="nomcomp-veredicto-sub">Todos los conceptos coinciden con la estimaci\u00f3n</div></div></div>';
+  } else {
+    const cobras = bigDiff > 0 ? 'cobras\u00a0menos\u00a0de\u00a0lo\u00a0estimado' : 'cobras\u00a0m\u00e1s\u00a0de\u00a0lo\u00a0estimado';
+    const bg     = bigDiff > 0 ? 'rgba(220,38,38,0.07)' : 'rgba(249,115,22,0.07)';
+    const icon   = bigDiff > 0 ? '\u26a0' : '\u2139';
+    vd.innerHTML = '<div class="nomcomp-veredicto" style="background:' + bg + '">' +
+      '<div class="nomcomp-veredicto-icon">' + icon + '</div>' +
+      '<div><div class="nomcomp-veredicto-title">Diferencia de ' + Math.abs(bigDiff).toFixed(2) + '\u20ac en el l\u00edquido</div>' +
+      '<div class="nomcomp-veredicto-sub">' + cobras.charAt(0).toUpperCase() + cobras.slice(1) + '. Revisa las filas marcadas.</div></div></div>';
+  }
+}
+
+function guardarNomComp() {
+  const y = liqYear, m = liqMes;
+  const ids = ['guardias','festivo','extras','liquido'];
+  const data = { _guardada: new Date().toISOString() };
+  for (const id of ids) {
+    const inp = document.getElementById('nc_' + id);
+    data[id] = inp ? (parseFloat(inp.value) || 0) : 0;
+  }
+  guardarCompNomina(y, m, data);
+  showToast('\u2713 Comparativa guardada');
+  renderNomComp();
 }
 </script>
 </body>
