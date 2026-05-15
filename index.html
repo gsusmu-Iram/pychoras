@@ -3977,12 +3977,12 @@ function renderMesDetalleBody() {
   const dim=new Date(y,m+1,0).getDate();
 
   if(_mdTab==='tabla') {
-    // Tabla de días del mes
     let h=`<div class="mdt-col-hdr">
       <span class="mdt-col-lbl" style="width:52px">Día</span>
       <span class="mdt-col-lbl" style="flex:1">Inicio</span>
       <span class="mdt-col-lbl" style="flex:1">Fin</span>
-      <span class="mdt-col-lbl" style="width:60px;text-align:right">Total</span>
+      <span class="mdt-col-lbl" style="flex:1;text-align:center">Comida</span>
+      <span class="mdt-col-lbl" style="width:56px;text-align:right">Total</span>
     </div>`;
     let totMin=0;
     for(let d=1;d<=dim;d++){
@@ -3990,33 +3990,70 @@ function renderMesDetalleBody() {
       const fecha=new Date(y,m,d);
       const dow=['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'][fecha.getDay()];
       const tipo=o?o.tipo||'laboral':'laboral';
+
+      // FDS
       if(tipo==='fds'&&!o?.tramos_txt){
-        h+=`<div class="mdt-row skip" style="padding:7px 14px"><span style="width:52px;font-size:13px;font-weight:800;color:#94a3b8">${d} <span style="font-size:10px">${dow}</span></span><span style="font-size:11px;color:#cbd5e1;font-family:var(--mono)">FDS</span></div>`;
+        h+=`<div class="mdt-row skip" style="padding:7px 14px;border-left-color:#e2e8f0">
+          <span style="width:52px;font-size:13px;font-weight:800;color:#94a3b8">${d} <span style="font-size:10px">${dow}</span></span>
+          <span style="font-size:11px;color:#cbd5e1;font-family:var(--mono)">FDS</span>
+        </div>`;
         continue;
       }
+      // FESTIVO
       if(tipo==='fest'){
-        h+=`<div class="mdt-row skip" style="padding:7px 14px"><span style="width:52px;font-size:13px;font-weight:800;color:#94a3b8">${d} <span style="font-size:10px">${dow}</span></span><span style="font-size:11px;color:#cbd5e1;font-family:var(--mono)">FEST</span></div>`;
+        h+=`<div class="mdt-row" style="padding:7px 14px;border-left:3px solid #e2e8f0;background:#f8fafc;opacity:.6">
+          <span style="width:52px;font-size:13px;font-weight:800;color:#94a3b8">${d} <span style="font-size:10px">${dow}</span></span>
+          <span style="font-size:11px;color:#a78bfa;font-family:var(--mono);font-weight:700">FEST</span>
+        </div>`;
         continue;
       }
+      // VACACIONES
+      if(tipo==='vac'){
+        h+=`<div class="mdt-row" style="padding:9px 14px;border-left:3px solid #eab308;background:rgba(234,179,8,0.05)">
+          <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
+          <span style="flex:1;font-size:12px;color:#a16207;font-weight:700;font-family:var(--mono)">VAC</span>
+          <span style="flex:1"></span><span style="flex:1"></span><span style="width:56px"></span>
+        </div>`;
+        continue;
+      }
+      // AUSENCIA
+      if(tipo==='ausencia'){
+        h+=`<div class="mdt-row" style="padding:9px 14px;border-left:3px solid #ef4444;background:rgba(239,68,68,0.05)">
+          <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
+          <span style="flex:1;font-size:12px;color:#dc2626;font-weight:700;font-family:var(--mono)">AUSENCIA</span>
+          <span style="flex:1"></span><span style="flex:1"></span><span style="width:56px"></span>
+        </div>`;
+        continue;
+      }
+
       const tr=parsearTramos(o?.tramos_txt||'');
       const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
-      const mins=totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0);
-      const ext=mins-BASE_MIN;
-      const cls=ext>10?'over':ext<-10?'under':'ok';
+      const pausaMin=o?.pausa_min&&!pausaInline?o.pausa_min:0;
+      const pausa=pausaInline||pausaMin;
+      const mins=totalTramos(tr)-pausaMin;
       const inicio=tr.length?tr[0].inicio:'—';
       const fin=tr.length?tr[tr.length-1].fin:'—';
+      const pausaStr=pausa>0?m2hm(pausa):'—';
+      // Sin registrar (día pasado laborable sin datos)
+      const sinDatos=!tr.length&&tipo!=='vac'&&tipo!=='ausencia';
       totMin+=mins;
-      h+=`<div class="mdt-row ${cls}">
+
+      // Color: verde si tiene horas, blanco si no tiene
+      const borderCol=sinDatos?'transparent':'#22c55e';
+      const bgCol=sinDatos?'transparent':'rgba(34,197,94,0.03)';
+
+      h+=`<div class="mdt-row" style="padding:9px 14px;border-left:3px solid ${borderCol};background:${bgCol}">
         <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
         <span style="flex:1;font-size:12px;font-family:var(--mono);color:#374151">${inicio}</span>
         <span style="flex:1;font-size:12px;font-family:var(--mono);color:#374151">${fin}</span>
-        <span style="width:60px;text-align:right;font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${mins>0?m2hm(mins):'—'}</span>
+        <span style="flex:1;text-align:center;font-size:12px;font-family:var(--mono);color:${pausa>0?'#f97316':'#cbd5e1'}">${pausaStr}</span>
+        <span style="width:56px;text-align:right;font-size:13px;font-weight:700;font-family:var(--mono);color:${mins>0?'var(--acc)':'#cbd5e1'}">${mins>0?m2hm(mins):'—'}</span>
       </div>`;
     }
     h+=`<div style="display:flex;align-items:center;padding:12px 14px;background:#f8fafc;border-top:2px solid #e2e8f0;border-left:3px solid var(--acc)">
       <span style="width:52px;font-size:11px;font-weight:900;color:#374151;text-transform:uppercase;letter-spacing:.05em">Total</span>
-      <span style="flex:2"></span>
-      <span style="width:60px;text-align:right;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--acc)">${m2hm(totMin)}</span>
+      <span style="flex:3"></span>
+      <span style="width:56px;text-align:right;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--acc)">${m2hm(totMin)}</span>
     </div><div style="height:60px"></div>`;
     body.innerHTML=h;
 
@@ -4432,16 +4469,16 @@ function guardarCompHoras(y, m) {
 function cargarCompHoras(y, m) {
   try {
     const raw = localStorage.getItem(_compHorasKey(y, m));
-    if (!raw) return false;
+    if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data.days || !Object.keys(data.days).length) return false;
+    if (!data.days || !Object.keys(data.days).length) return null;
     _empresaDays = data.days;
     _empresaMes  = data.nombre || 'Guardado';
     _empresaMesDetectado = { y, m };
     _compCargado = true;
     _compGuardada = true;
-    return true;
-  } catch(e) { return false; }
+    return data.days;
+  } catch(e) { return null; }
 }
 
 function borrarCompHoras(y, m) {
