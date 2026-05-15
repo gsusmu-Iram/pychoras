@@ -3922,7 +3922,9 @@ function abrirMesDetalle(m) {
     panel.style.display='flex';
     panel.classList.add('open');
 
-    setMesDetalleTab(tieneComp?'comp':'tabla');
+    // Respetar tab actual si ya estaba abierto, si no: comp si hay datos, tabla si no
+    const tabInicial = _mdTab !== 'tabla' ? _mdTab : (tieneComp ? 'comp' : 'tabla');
+    setMesDetalleTab(tabInicial);
   } catch(e) {
     console.error('abrirMesDetalle error:', e);
   }
@@ -4157,11 +4159,10 @@ function renderMesDetalleBody() {
   }
 }
 
-// Subir PDF directamente desde el detalle de mes
 function cargarHojaEmpresaDetalle(input) {
+  // Forzar tab comp antes de cargar para que al terminar se quede ahí
+  _mdTab = 'comp';
   cargarHojaEmpresa(input);
-  // Refresh detalle tras carga (con pequeño delay para que guarde)
-  setTimeout(()=>{ renderMesDetalleBody(); abrirMesDetalle(cM_datos); }, 800);
 }
 
 // ── Swipe horizontal en el calendario de Jornada ─────────────
@@ -4545,7 +4546,6 @@ async function cargarHojaEmpresa(input) {
     _empresaImgSrc = null; _compGuardada = false;
 
     if (isPDF) {
-      // Detectar mes del nombre del fichero o del texto
       _empresaMesDetectado = _detectarMesPDF(file.name) || { y: cY_datos, m: cM_datos };
     } else {
       _empresaMesDetectado = _detectarMesTexto(rawText);
@@ -4554,16 +4554,23 @@ async function cargarHojaEmpresa(input) {
     const gy = _empresaMesDetectado ? _empresaMesDetectado.y : cY_datos;
     const gm = _empresaMesDetectado ? _empresaMesDetectado.m : cM_datos;
     guardarCompHoras(gy, gm);
-    renderComparacion();
 
     if (n > 0) {
       showToast('✓ ' + n + ' días leídos · guardado');
+      // Refresh panel detalle si está abierto, en el tab comparar
+      const panel = document.getElementById('mesDetallePanel');
+      if (panel && panel.classList.contains('open')) {
+        _mdTab = 'comp';
+        abrirMesDetalle(gm);
+      } else {
+        try { renderComparacion(); } catch(e) {}
+      }
     } else {
-      compBody.innerHTML = '<div style="padding:24px 16px">' +
+      const compBody = document.getElementById('compBody');
+      if (compBody) compBody.innerHTML = '<div style="padding:24px 16px">' +
         '<div style="font-size:14px;font-weight:800;color:var(--acc);margin-bottom:8px">⚠ No se detectaron días</div>' +
         '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">' +
-        (isPDF ? 'El PDF se leyó pero no se encontró la tabla de horas. Asegúrate de que es la hoja de jornada de Pycseca.' :
-                 'El OCR leyó el archivo pero no encontró la tabla. Prueba con una imagen más nítida.') +
+        (isPDF ? 'El PDF se leyó pero no se encontró la tabla de horas.' : 'El OCR no encontró la tabla. Prueba con una imagen más nítida.') +
         '</div>' +
         '<label class="comp-upload-btn" style="margin-top:14px">Intentar con otro archivo' +
         '<input type="file" accept="image/*,.pdf" onchange="cargarHojaEmpresa(this)" style="display:none"></label>' +
@@ -4661,8 +4668,14 @@ function cargarExcelApp(input) {
       }
 
       guardarCompHoras(cY_datos, cM_datos);
-      renderMesDatos();
-      renderComparacion();
+      const panel = document.getElementById('mesDetallePanel');
+      if (panel && panel.classList.contains('open')) {
+        _mdTab = 'comp';
+        abrirMesDetalle(cM_datos);
+      } else {
+        try { renderComparacion(); } catch(e) {}
+        try { renderMesDatos(); } catch(e) {}
+      }
       showToast('✓ ' + leidos + ' días leídos del Excel · ' + sheetName);
     } catch(err) {
       console.error(err);
