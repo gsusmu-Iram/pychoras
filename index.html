@@ -4481,136 +4481,106 @@ function _parsearTextoHoras(text) {
   return days;
 }
 
-// ── Parser PDF Pycseca — formato exacto conocido ─────────────
+// ── Parser PDF Pycseca — robusto para texto encriptado ───────
 async function _parsearPDFHoras(arrayBuffer) {
   if (!_initPdfJs()) throw new Error('pdf.js no disponible');
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  let fullText = '';
+  // Extraer texto preservando posición Y para reconstruir líneas
+  const allItems = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
+    const vp = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
-    fullText += content.items.map(i => i.str).join(' ') + ' ';
+    for (const it of content.items) {
+      if (!it.str.trim()) continue;
+      allItems.push({ str: it.str.trim(), y: Math.round(vp.height - it.transform[5]), x: Math.round(it.transform[4]) });
+    }
   }
 
+  // Agrupar en líneas por Y (gap > 3px = nueva línea)
+  allItems.sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x);
+  const lines = [];
+  let curY = -999, curLine = [];
+  for (const it of allItems) {
+    if (Math.abs(it.y - curY) > 3 && curLine.length) { lines.push(curLine.map(i=>i.str).join(' ')); curLine = []; }
+    curLine.push(it); curY = it.y;
+  }
+  if (curLine.length) lines.push(curLine.map(i=>i.str).join(' '));
+
   const days = {};
+  const esHora = t => { const m=t.match(/^(\d{1,2}):(\d{2})$/); if(!m) return false; const h=+m[1],mm=+m[2]; return h<=23&&mm<=59; };
 
-  // El texto de Pycseca es una línea continua con este patrón por día:
-  // Normal:      "1 0,00 -3,88 7:30 16:11 8:41"
-  // Sin jornada: "3 0,00 -10,86 0:00"
-  // Tramo partido:"15 14 0,00 37,44 7:30 14:44 15:19 18:33 10:28"
-  //               (14 = número de guardia, 15 = día)
-  // Ignorar: PARCIAL, TOTALES, SALDO INICIAL, cabeceras
+  // Ignorar líneas de cabecera/totales
+  const ignorar = /PARCIAL|TOTALES?|SALDO\s*INICIAL|VACACIONES|TARJETA|\bIT\b|INSTALADOR|DIA\s+DIETAS|HORA\s+HORA/i;
 
-  // Limpiar cabeceras conocidas
-  const limpio = fullText
-    .replace(/SALDO INICIAL[^0-9]*/gi, ' ')
-    .replace(/PARCIAL[^0-9ABCDEFGHIJKLMNOPQRSTUVWXYZ]*/gi, ' ')
-    .replace(/TOTALES?[^0-9]*/gi, ' ')
-    .replace(/VACACIONES[\s\d]*/gi, ' ')
-    .replace(/\bIT\b[\s\d]*/gi, ' ')
-    .replace(/TARJETA/gi, ' ')
-    .replace(/INSTALADOR[^0-9]*/gi, ' ')
-    .replace(/GASOIL|DIETAS|PEAJES|MATERIAL|PARKING|HOTELES|VARIOS|FONDOS|VEHICUL|PUBLIC|RELAC\./gi, ' ')
-    .replace(/INICIO|FIN|TOTAL|EXTR|PROV|SALDO|HOR[A]?\b/gi, ' ')
-    .replace(/DIA\b/gi, ' ')
-    .replace(/T[ÉE]CNICOS/gi, ' ')
-    .replace(/MES\s*:/gi, ' ');
+  // Texto completo para estrategia fallback
+  const fullText = lines.join(' ');
 
-  // Buscar todos los números HH:MM válidos con su posición
-  // y todos los números de día (1-31)
-  // Estrategia: recorrer token a token
+  for (const line of lines) {
+    if (ignorar.test(line)) continue;
 
-  const tokens = limpio.split(/\s+/).filter(Boolean);
+    // Buscar número de día al inicio de la línea (puede haber número de guardia antes)
+    const nums = line.match(/^(\d{1,2})(?:\s+(\d{1,2}))?\s/);
+    if (!nums) continue;
 
-  // Función para saber si un token es HH:MM válido (hora laboral, no ratio)
-  const esHora = t => {
-    const m = t.match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return false;
-    const h = parseInt(m[1]), mm = parseInt(m[2]);
-    return h <= 23 && mm <= 59;
-  };
-
-  // Función para saber si es número decimal tipo "0,00" o "-3,88" (gastos/saldo)
-  const esDecimal = t => /^-?\d+[,\.]\d+$/.test(t);
-
-  // Función para saber si es número de día potencial
-  const esDia = t => /^\d{1,2}$/.test(t) && parseInt(t) >= 1 && parseInt(t) <= 31;
-
-  let i = 0;
-  while (i < tokens.length) {
-    const tok = tokens[i];
-
-    // ¿Es candidato a número de día?
-    if (!esDia(tok)) { i++; continue; }
-
-    let dia = parseInt(tok);
-
-    // Mirar el siguiente token — si también es número de día pequeño,
-    // puede ser el número de guardia (Pycseca pone guardia ANTES del día en dias 15,16,22,28,29)
-    // Heurística: si el siguiente token es otro número y el día ya existe, el actual es guardia
-    const next = tokens[i + 1];
-    if (next && esDia(next) && days[dia] !== undefined) {
-      // dia ya existe → tok es guardia, next es el día real
-      i++;
-      dia = parseInt(tokens[i]);
-    } else if (next && esDia(next) && parseInt(next) === dia + 1) {
-      // Siguiente token es el día siguiente → tok es el día real, procesar
-    } else if (next && esDia(next) && !esDecimal(tokens[i + 2] || '')) {
-      // Puede ser "15 14" donde 15 es día y 14 es guardia, o al revés
-      // Si tok < next y tok no existe aún, tok es el día
-      // Si tok > next miramos si next ya existe
-      if (days[parseInt(next)] !== undefined) {
-        // next ya existe como día → tok es el día actual
-      } else if (days[dia] !== undefined) {
-        i++;
-        dia = parseInt(tokens[i]);
-      }
+    let dia = parseInt(nums[1]);
+    // Si hay segundo número y el primero ya existe como día, el primero es guardia
+    if (nums[2]) {
+      const n2 = parseInt(nums[2]);
+      if (days[dia] !== undefined && n2>=1 && n2<=31) dia = n2;
     }
+    if (dia < 1 || dia > 31) continue;
 
-    // Recoger tokens hasta el próximo candidato a día (que no sea guardia)
-    const segmento = [];
-    let j = i + 1;
-    while (j < tokens.length) {
-      const t = tokens[j];
-      // Si encontramos un número 1-31 que no es decimal y hay al menos una hora en segmento
-      if (esDia(t) && segmento.some(s => esHora(s))) break;
-      segmento.push(t);
-      j++;
-    }
-
-    // Extraer horas del segmento
-    const horas = segmento.filter(esHora);
-
-    if (horas.length === 0) {
-      // Verificar si hay "0,00" → día sin jornada
-      if (!days[dia]) days[dia] = { mins: 0, totalStr: '0:00' };
-      i = j;
-      continue;
-    }
+    // Extraer todas las horas HH:MM de la línea
+    const horas = line.split(/\s+/).filter(esHora);
+    if (!horas.length) { if(!days[dia]) days[dia]={mins:0,totalStr:'0:00'}; continue; }
 
     const totalStr = horas[horas.length - 1];
     const [th, tm] = totalStr.split(':').map(Number);
+    if (th===0 && tm===0) { if(!days[dia]) days[dia]={mins:0,totalStr:'0:00'}; continue; }
 
-    if (th === 0 && tm === 0) {
-      if (!days[dia]) days[dia] = { mins: 0, totalStr: '0:00' };
-      i = j;
-      continue;
-    }
-
-    const mins = th * 60 + tm;
-
-    // Solo guardar si no existe o si tiene más horas (evitar duplicados por guardia)
+    const mins = th*60+tm;
     if (!days[dia] || days[dia].mins < mins) {
       const inicio = horas[0];
-      const fin = horas.length >= 2 ? horas[horas.length - 2] : horas[0];
+      const fin = horas.length >= 2 ? horas[horas.length-2] : horas[0];
       days[dia] = { mins, totalStr, inicio, fin };
     }
-
-    i = j;
   }
 
-  console.log('[PycHoras PDF] días detectados:', Object.keys(days).length, days);
+  // Si la estrategia de líneas no funcionó bien (< 5 días con horas), fallback: texto completo
+  const nDias = Object.values(days).filter(v=>v.mins>0).length;
+  if (nDias < 5) {
+    // Estrategia token por token sobre texto completo
+    const tokens = fullText.replace(/PARCIAL|TOTALES?|SALDO|VACACIONES|TARJETA|\bIT\b/gi,' ').split(/\s+/).filter(Boolean);
+    const esDia = t => /^\d{1,2}$/.test(t) && +t>=1 && +t<=31;
+    let i=0;
+    while(i<tokens.length){
+      const tok=tokens[i];
+      if(!esDia(tok)){i++;continue;}
+      let dia=+tok;
+      const next=tokens[i+1];
+      if(next&&esDia(next)&&days[dia]!==undefined){i++;dia=+tokens[i];}
+      const seg=[];let j=i+1;
+      while(j<tokens.length){
+        const t=tokens[j];
+        if(esDia(t)&&seg.some(s=>esHora(s)))break;
+        seg.push(t);j++;
+      }
+      const horas=seg.filter(esHora);
+      if(!horas.length){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
+      const totalStr=horas[horas.length-1];
+      const[th,tm]=totalStr.split(':').map(Number);
+      if(th===0&&tm===0){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
+      const mins=th*60+tm;
+      if(!days[dia]||days[dia].mins<mins){
+        days[dia]={mins,totalStr,inicio:horas[0],fin:horas.length>=2?horas[horas.length-2]:horas[0]};
+      }
+      i=j;
+    }
+  }
+
+  console.log('[PycHoras] PDF detectado:', Object.values(days).filter(v=>v.mins>0).length, 'días con horas');
   return days;
 }
 function _detectarMesPDF(nombre) {
