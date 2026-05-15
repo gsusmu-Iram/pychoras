@@ -927,8 +927,13 @@ body{
     <!-- ① PANTALLA PRINCIPAL: Resumen Anual (scrollable) -->
     <div id="datosAnualScreen" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
       <div style="padding:16px 14px 4px;flex-shrink:0;">
-        <div style="font-size:22px;font-weight:900;color:var(--text)">Resumen 2026</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Toca un mes para ver el detalle</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-right:4px">
+          <div>
+            <div id="anualTituloAnio" style="font-size:22px;font-weight:900;color:var(--text)">Resumen 2026</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">Toca un mes para ver el detalle</div>
+          </div>
+          <div id="anualAnioSelector"></div>
+        </div>
       </div>
       <div id="anualBody" style="flex:1;padding-bottom:calc(var(--nav-h)+20px)"></div>
     </div>
@@ -2045,8 +2050,10 @@ function exportarExcel() {
     XLSX.utils.book_append_sheet(wb, wsCN, 'Comp.Nóminas');
   }
 
-  const fecha = new Date().toISOString().split('T')[0];
-  XLSX.writeFile(wb, `RegistroAnual_2026_${fecha}.xlsx`);
+  const hoy = new Date();
+  const mesNombre = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][hoy.getMonth()];
+  const nombreArchivo = `${hoy.getDate()}_${mesNombre}_${hoy.getFullYear()}`;
+  XLSX.writeFile(wb, `PycHoras_${nombreArchivo}.xlsx`);
   localStorage.setItem(KB, new Date().toISOString());
   renderInfo();
   showToast('✓ Excel exportado');
@@ -2165,7 +2172,7 @@ function renderAll() {
 // MÓDULO JORNADA (completo)
 // ============================================================
 
-let cY = 2026, cM = new Date().getMonth(), mF = null, mT = 'laboral';
+let cY = new Date().getFullYear(), cM = new Date().getMonth(), mF = null, mT = 'laboral';
 
 function cntLab(y, m) {
   const dm = new Date(y, m+1, 0).getDate(); let c = 0;
@@ -2371,7 +2378,7 @@ let _verifB64Nomina = null, _verifTypeNomina = null;
 // MÓDULO DATOS (completo)
 // ============================================================
 
-let cY_datos = 2026, cM_datos = new Date().getMonth(), vista = 0;
+let cY_datos = new Date().getFullYear(), cM_datos = new Date().getMonth(), vista = 0;
 
 function m2hhmmFmt(m) { const a=Math.abs(m),h=Math.floor(a/60),mi=a%60; return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0'); }
 
@@ -2519,6 +2526,12 @@ function renderTablaDatos() {
 
 function renderAnualDatos() {
   const y=cY_datos, hoy=new Date(), mesHoy=hoy.getMonth(), anioHoy=hoy.getFullYear();
+
+  // Actualizar título y selector de año
+  const tituloEl = document.getElementById('anualTituloAnio');
+  const selectorEl = document.getElementById('anualAnioSelector');
+  if(tituloEl) tituloEl.textContent = 'Resumen ' + y;
+  if(selectorEl) selectorEl.innerHTML = _renderAnioSelector();
   let totY=0,extY=0,labY=0,gasY=0;
   const stats=[];
   for(let m=0;m<12;m++){
@@ -4102,11 +4115,12 @@ function renderMesDetalleBody() {
       if(empRegistra && Math.abs(diff)>3) discDias.push({d,appMin,empMin,diff});
     }
 
-    const diffTot=totApp-totEmp;
-    const diffTotStr=(diffTot>0?'+':diffTot<0?'\u2212':'')+m2hm(Math.abs(diffTot));
-    const diffTotCol=diffTot>5?'#ef4444':diffTot<-5?'#f97316':'#22c55e';
+    const nDiasComp = Object.keys(compData).filter(d=>compData[d]&&compData[d].mins>0).length;
+    const extApp = totApp - (BASE_MIN * nDiasComp);
+    const extEmp = totEmp - (BASE_MIN * nDiasComp);
+    const diffExt = extApp - extEmp;
 
-    // ── Resumen causas ────────────────────────────────────────
+    // ── Causas ────────────────────────────────────────────────
     let minsPausas=0, nPausas=0, minsDuda=0, nDuda=0;
     discDias.forEach(({d,diff})=>{
       if(diff>0 && TRAMOS_PARTIDOS.has(d)){minsPausas+=diff;nPausas++;}
@@ -4114,32 +4128,18 @@ function renderMesDetalleBody() {
     });
 
     let causasTxt='';
-    if(nPausas>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nPausas} días con pausa de comida sin registrar · <strong>${m2hm(minsPausas)}h</strong></span></div>`;
-    if(nDuda>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nDuda} día${nDuda>1?'s':''} con diferencia sin causa clara · <strong>${m2hm(minsDuda)}h</strong> — verificar con empresa</span></div>`;
+    if(nPausas>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nPausas} día${nPausas>1?'s':''} con pausa de comida sin registrar · <strong>${m2hm(minsPausas)}h</strong></span></div>`;
+    if(nDuda>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nDuda} día${nDuda>1?'s':''} con diferencia sin causa clara · <strong>${m2hm(minsDuda)}h</strong> — verificar</span></div>`;
     discDias.filter(({diff})=>diff<0).forEach(({d,diff})=>{
-      causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">Día ${d}: empresa registra ${m2hm(Math.abs(diff))} más que la app</span></div>`;
+      causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#d35400;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">Día ${d}: empresa registra ${m2hm(Math.abs(diff))} más que la app</span></div>`;
     });
 
     let h='';
-
-    // Card resumen
-    h+=`<div style="margin:12px 14px;background:white;border-radius:14px;box-shadow:var(--sh-card);overflow:hidden">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--dark2)">
-        <div style="padding:12px 10px;text-align:center">
-          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">App</div>
-          <div style="font-size:16px;font-weight:900;color:var(--acc);font-family:var(--mono)">${m2hm(totApp)}</div>
-        </div>
-        <div style="padding:12px 10px;text-align:center;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08)">
-          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Empresa</div>
-          <div style="font-size:16px;font-weight:900;color:white;font-family:var(--mono)">${m2hm(totEmp)}</div>
-        </div>
-        <div style="padding:12px 10px;text-align:center">
-          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Diferencia</div>
-          <div style="font-size:16px;font-weight:900;font-family:var(--mono);color:${diffTotCol}">${diffTotStr}</div>
-        </div>
-      </div>
-      ${causasTxt?`<div style="padding:12px 14px;border-top:1px solid var(--border)">${causasTxt}</div>`:'<div style="padding:10px 14px;display:flex;align-items:center;gap:8px"><span style="font-size:16px">✓</span><span style="font-size:12px;font-weight:700;color:var(--green)">Todos los registros coinciden</span></div>'}
-    </div>`;
+    if(causasTxt){
+      h+=`<div style="margin:10px 14px 8px;background:white;border-radius:12px;padding:12px 14px;box-shadow:var(--sh-card)">${causasTxt}</div>`;
+    } else {
+      h+=`<div style="margin:10px 14px 8px;padding:10px 14px;display:flex;align-items:center;gap:8px;background:rgba(34,197,94,0.06);border-radius:10px;border:1px solid rgba(34,197,94,0.2)"><span style="font-size:16px">✓</span><span style="font-size:12px;font-weight:700;color:var(--green)">Todos los registros coinciden</span></div>`;
+    }
 
     // ── Tabla todos los días ──────────────────────────────────
     h+=`<div style="margin:0 14px 12px">`;
@@ -4159,13 +4159,21 @@ function renderMesDetalleBody() {
       const empDay=compData[d];
       const isLast=d===dim;
 
-      // FDS / FEST — fila compacta gris
+      // FDS / FEST — filas especiales
       if((tipo==='fds'||tipo==='fest')&&!o?.tramos_txt){
-        h+=`<div style="display:flex;align-items:center;padding:6px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};opacity:.4">
-          <div style="width:52px"><span style="font-size:12px;font-weight:700;color:#94a3b8">${d}</span> <span style="font-size:9px;color:#cbd5e1">${dow}</span></div>
-          <span style="flex:1;font-size:11px;color:#cbd5e1;font-family:var(--mono)">${tipo==='fest'?'FEST':'FDS'}</span>
-          <span style="flex:1"></span><span style="width:80px"></span>
-        </div>`;
+        if(tipo==='fest'){
+          h+=`<div style="display:flex;align-items:center;padding:7px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid #eab308;background:rgba(234,179,8,0.08)">
+            <div style="width:52px"><span style="font-size:12px;font-weight:700;color:#92400e">${d}</span> <span style="font-size:9px;color:#a16207">${dow}</span></div>
+            <span style="flex:1;font-size:11px;color:#a16207;font-family:var(--mono);font-weight:700">FEST</span>
+            <span style="flex:1"></span><span style="width:80px"></span>
+          </div>`;
+        } else {
+          h+=`<div style="display:flex;align-items:center;padding:6px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};opacity:.35">
+            <div style="width:52px"><span style="font-size:12px;font-weight:700;color:#94a3b8">${d}</span> <span style="font-size:9px;color:#cbd5e1">${dow}</span></div>
+            <span style="flex:1;font-size:11px;color:#cbd5e1;font-family:var(--mono)">FDS</span>
+            <span style="flex:1"></span><span style="width:80px"></span>
+          </div>`;
+        }
         continue;
       }
 
@@ -4218,24 +4226,41 @@ function renderMesDetalleBody() {
         : sinRegistro ? `<span style="color:#94a3b8;font-size:11px">—</span>`
         : `<span style="font-size:12px;font-weight:900;font-family:var(--mono);color:${diffCol}">${diff>0?'+':'\u2212'}${m2hm(absDiff)}</span>`;
 
-      h+=`<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid ${borderCol};background:${bg}">
+      // Fila entera coloreada (verde también)
+      const rowBg = ok ? 'rgba(34,197,94,0.06)' : sinRegistro ? 'transparent' : diff>0 ? 'rgba(192,57,43,0.05)' : 'rgba(211,84,0,0.05)';
+      const rowBorder = ok ? '#22c55e' : sinRegistro ? 'transparent' : diff>0 ? '#c0392b' : '#d35400';
+
+      h+=`<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid ${rowBorder};background:${rowBg}">
         <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
         <div style="flex:1;display:flex;align-items:center">
           <span style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${appMin>0?m2hm(appMin):'—'}</span>
           ${etiqueta}
         </div>
-        <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:#374151">${empMin>0?m2hm(empMin):empDay?'—':'—'}</span>
+        <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:#374151">${empMin>0?m2hm(empMin):'—'}</span>
         <span style="width:80px;text-align:right">${diffStr}</span>
       </div>`;
     }
     h+=`</div></div>`;
 
-    // ── Total ─────────────────────────────────────────────────
-    h+=`<div style="margin:0 14px 12px;display:flex;align-items:center;padding:12px 14px;background:var(--dark2);border-radius:10px;border-left:3px solid var(--acc)">
-      <span style="width:52px;font-size:11px;font-weight:900;color:var(--text-d3);text-transform:uppercase;letter-spacing:.05em">Total</span>
-      <span style="flex:1;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--acc)">${m2hm(totApp)}</span>
-      <span style="flex:1;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--text-d)">${m2hm(totEmp)}</span>
-      <span style="width:80px;text-align:right;font-size:14px;font-weight:900;font-family:var(--mono);color:${diffTotCol}">${diffTotStr}</span>
+    // ── Totales en extras ─────────────────────────────────────
+    const diffExtStr2 = (diffExt>0?'\u2212':diffExt<0?'+':'') + m2hm(Math.abs(diffExt));
+    const diffExtCol2 = Math.abs(diffExt)<5?'#4ade80':diffExt>0?'#f87171':'#fb923c';
+
+    h+=`<div style="margin:0 14px 12px;background:var(--dark2);border-radius:10px;overflow:hidden">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:12px 10px;gap:4px">
+        <div style="text-align:center">
+          <div style="font-size:8px;color:var(--text-d3);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">App extras</div>
+          <div style="font-size:15px;font-weight:900;font-family:var(--mono);color:var(--acc)">${extApp>=0?'+':'\u2212'}${m2hm(Math.abs(extApp))}</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08)">
+          <div style="font-size:8px;color:var(--text-d3);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Empresa extras</div>
+          <div style="font-size:15px;font-weight:900;font-family:var(--mono);color:var(--text-d)">${extEmp>=0?'+':'\u2212'}${m2hm(Math.abs(extEmp))}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:8px;color:var(--text-d3);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Diferencia</div>
+          <div style="font-size:15px;font-weight:900;font-family:var(--mono);color:${diffExtCol2}">${diffExtStr2}</div>
+        </div>
+      </div>
     </div>`;
 
     // ── Leyenda ───────────────────────────────────────────────
@@ -4417,6 +4442,10 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
   cM_datos=new Date().getMonth();
   renderJornada();
   renderMesDatos();
+
+  // ── Comprobación fin de año ───────────────────────────────
+  _comprobarFinDeAnio();
+
   // Registro Service Worker (PWA)
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -4425,9 +4454,54 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
   }
 })();
 
-// ============================================================
-// MÓDULO COMPARAR — Comparativa local app vs empresa
-// ============================================================
+// ── Fin de año y selector de año ─────────────────────────────
+function _comprobarFinDeAnio() {
+  const hoy = new Date();
+  const dia = hoy.getDate(), mes = hoy.getMonth(), anio = hoy.getFullYear();
+  if (mes === 11 && dia === 31) {
+    const KEY_AVISO = 'pyc_aviso_fya_' + anio;
+    if (!localStorage.getItem(KEY_AVISO)) {
+      setTimeout(() => {
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)';
+        modal.innerHTML = `<div style="background:var(--dark2);border-radius:22px 22px 0 0;width:100%;max-width:480px;padding:24px 20px 32px;border:1px solid var(--border-d)">
+          <div style="font-size:28px;text-align:center;margin-bottom:12px">🎉</div>
+          <div style="font-size:18px;font-weight:900;color:var(--text-d);text-align:center;margin-bottom:8px">Último día de ${anio}</div>
+          <div style="font-size:13px;color:var(--text-d2);text-align:center;margin-bottom:20px;line-height:1.5">Descarga el registro antes de medianoche para tener la copia de seguridad de ${anio}</div>
+          <button onclick="exportarExcel();localStorage.setItem('${KEY_AVISO}','1');this.closest('[style*=fixed]').remove();"
+            style="width:100%;padding:15px;background:linear-gradient(135deg,var(--acc),var(--acc-dk));border:none;border-radius:14px;color:white;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px;letter-spacing:.04em">
+            📥 Descargar registro ${anio}
+          </button>
+          <button onclick="localStorage.setItem('${KEY_AVISO}','1');this.closest('[style*=fixed]').remove();"
+            style="width:100%;padding:13px;background:transparent;border:1px solid var(--border-d);border-radius:14px;color:var(--text-d3);font-size:13px;font-weight:700;cursor:pointer">
+            Lo haré más tarde
+          </button>
+        </div>`;
+        document.body.appendChild(modal);
+      }, 2000);
+    }
+  }
+}
+
+function cambiarAnioAnual(dir) {
+  const anioActual = new Date().getFullYear();
+  if (dir > 0 && cY_datos >= anioActual) return;
+  cY_datos += dir;
+  renderAnualDatos();
+}
+
+function _renderAnioSelector() {
+  const anioActual = new Date().getFullYear();
+  return `<div style="display:flex;align-items:center;gap:8px">
+    <button onclick="cambiarAnioAnual(-1)" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text-d2);border-radius:8px;padding:4px 10px;font-size:16px;cursor:pointer;line-height:1">‹</button>
+    <span style="font-size:16px;font-weight:900;color:${cY_datos<anioActual?'var(--acc-mid)':'var(--text-d)'};min-width:48px;text-align:center">${cY_datos}</span>
+    <button onclick="cambiarAnioAnual(1)" ${cY_datos>=anioActual?'disabled':''}
+      style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text-d2);border-radius:8px;padding:4px 10px;font-size:16px;cursor:pointer;line-height:1;${cY_datos>=anioActual?'opacity:.3;cursor:default':''}">›</button>
+  </div>`;
+}
+
+// ── MÓDULO COMPARAR — Comparativa local app vs empresa
+
 
 let _empresaDays = {};    // { day: { mins, totalStr } }
 let _empresaMes  = null;
