@@ -4481,106 +4481,66 @@ function _parsearTextoHoras(text) {
   return days;
 }
 
-// ── Parser PDF Pycseca — robusto para texto encriptado ───────
+// ── Parser PDF Pycseca — token a token ───────────────────────
 async function _parsearPDFHoras(arrayBuffer) {
   if (!_initPdfJs()) throw new Error('pdf.js no disponible');
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  // Extraer texto preservando posición Y para reconstruir líneas
-  const allItems = [];
+  let fullText = '';
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
-    const vp = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
-    for (const it of content.items) {
-      if (!it.str.trim()) continue;
-      allItems.push({ str: it.str.trim(), y: Math.round(vp.height - it.transform[5]), x: Math.round(it.transform[4]) });
-    }
+    fullText += content.items.map(i => i.str).join(' ') + ' ';
   }
-
-  // Agrupar en líneas por Y (gap > 3px = nueva línea)
-  allItems.sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x);
-  const lines = [];
-  let curY = -999, curLine = [];
-  for (const it of allItems) {
-    if (Math.abs(it.y - curY) > 3 && curLine.length) { lines.push(curLine.map(i=>i.str).join(' ')); curLine = []; }
-    curLine.push(it); curY = it.y;
-  }
-  if (curLine.length) lines.push(curLine.map(i=>i.str).join(' '));
 
   const days = {};
-  const esHora = t => { const m=t.match(/^(\d{1,2}):(\d{2})$/); if(!m) return false; const h=+m[1],mm=+m[2]; return h<=23&&mm<=59; };
 
-  // Ignorar líneas de cabecera/totales
-  const ignorar = /PARCIAL|TOTALES?|SALDO\s*INICIAL|VACACIONES|TARJETA|\bIT\b|INSTALADOR|DIA\s+DIETAS|HORA\s+HORA/i;
+  const limpio = fullText
+    .replace(/SALDO INICIAL[^0-9]*/gi, ' ')
+    .replace(/PARCIAL[^0-9A-Z]*/gi, ' ')
+    .replace(/TOTALES?[^0-9]*/gi, ' ')
+    .replace(/VACACIONES[\s\d]*/gi, ' ')
+    .replace(/\bIT\b[\s\d]*/gi, ' ')
+    .replace(/TARJETA/gi, ' ')
+    .replace(/INSTALADOR[^0-9]*/gi, ' ')
+    .replace(/GASOIL|DIETAS|PEAJES|MATERIAL|PARKING|HOTELES|VARIOS|FONDOS|VEHICUL|PUBLIC|RELAC\./gi, ' ')
+    .replace(/INICIO|FIN|TOTAL|EXTR|PROV|SALDO|HOR[A]?\b/gi, ' ')
+    .replace(/DIA\b/gi, ' ')
+    .replace(/T[ÉE]CNICOS/gi, ' ')
+    .replace(/MES\s*:/gi, ' ');
 
-  // Texto completo para estrategia fallback
-  const fullText = lines.join(' ');
+  const tokens = limpio.split(/\s+/).filter(Boolean);
+  const esHora = t => { const m=t.match(/^(\d{1,2}):(\d{2})$/); if(!m) return false; return +m[1]<=23&&+m[2]<=59; };
+  const esDia  = t => /^\d{1,2}$/.test(t) && +t>=1 && +t<=31;
 
-  for (const line of lines) {
-    if (ignorar.test(line)) continue;
+  let i=0;
+  while(i<tokens.length){
+    const tok=tokens[i];
+    if(!esDia(tok)){i++;continue;}
+    let dia=+tok;
+    const next=tokens[i+1];
+    if(next&&esDia(next)&&days[dia]!==undefined){i++;dia=+tokens[i];}
+    else if(next&&esDia(next)&&days[+next]===undefined&&days[dia]!==undefined){i++;dia=+tokens[i];}
 
-    // Buscar número de día al inicio de la línea (puede haber número de guardia antes)
-    const nums = line.match(/^(\d{1,2})(?:\s+(\d{1,2}))?\s/);
-    if (!nums) continue;
-
-    let dia = parseInt(nums[1]);
-    // Si hay segundo número y el primero ya existe como día, el primero es guardia
-    if (nums[2]) {
-      const n2 = parseInt(nums[2]);
-      if (days[dia] !== undefined && n2>=1 && n2<=31) dia = n2;
+    const seg=[];let j=i+1;
+    while(j<tokens.length){
+      const t=tokens[j];
+      if(esDia(t)&&seg.some(s=>esHora(s)))break;
+      seg.push(t);j++;
     }
-    if (dia < 1 || dia > 31) continue;
-
-    // Extraer todas las horas HH:MM de la línea
-    const horas = line.split(/\s+/).filter(esHora);
-    if (!horas.length) { if(!days[dia]) days[dia]={mins:0,totalStr:'0:00'}; continue; }
-
-    const totalStr = horas[horas.length - 1];
-    const [th, tm] = totalStr.split(':').map(Number);
-    if (th===0 && tm===0) { if(!days[dia]) days[dia]={mins:0,totalStr:'0:00'}; continue; }
-
-    const mins = th*60+tm;
-    if (!days[dia] || days[dia].mins < mins) {
-      const inicio = horas[0];
-      const fin = horas.length >= 2 ? horas[horas.length-2] : horas[0];
-      days[dia] = { mins, totalStr, inicio, fin };
+    const horas=seg.filter(esHora);
+    if(!horas.length){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
+    const totalStr=horas[horas.length-1];
+    const[th,tm]=totalStr.split(':').map(Number);
+    if(th===0&&tm===0){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
+    const mins=th*60+tm;
+    if(!days[dia]||days[dia].mins<mins){
+      days[dia]={mins,totalStr,inicio:horas[0],fin:horas.length>=2?horas[horas.length-2]:horas[0]};
     }
+    i=j;
   }
 
-  // Si la estrategia de líneas no funcionó bien (< 5 días con horas), fallback: texto completo
-  const nDias = Object.values(days).filter(v=>v.mins>0).length;
-  if (nDias < 5) {
-    // Estrategia token por token sobre texto completo
-    const tokens = fullText.replace(/PARCIAL|TOTALES?|SALDO|VACACIONES|TARJETA|\bIT\b/gi,' ').split(/\s+/).filter(Boolean);
-    const esDia = t => /^\d{1,2}$/.test(t) && +t>=1 && +t<=31;
-    let i=0;
-    while(i<tokens.length){
-      const tok=tokens[i];
-      if(!esDia(tok)){i++;continue;}
-      let dia=+tok;
-      const next=tokens[i+1];
-      if(next&&esDia(next)&&days[dia]!==undefined){i++;dia=+tokens[i];}
-      const seg=[];let j=i+1;
-      while(j<tokens.length){
-        const t=tokens[j];
-        if(esDia(t)&&seg.some(s=>esHora(s)))break;
-        seg.push(t);j++;
-      }
-      const horas=seg.filter(esHora);
-      if(!horas.length){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
-      const totalStr=horas[horas.length-1];
-      const[th,tm]=totalStr.split(':').map(Number);
-      if(th===0&&tm===0){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
-      const mins=th*60+tm;
-      if(!days[dia]||days[dia].mins<mins){
-        days[dia]={mins,totalStr,inicio:horas[0],fin:horas.length>=2?horas[horas.length-2]:horas[0]};
-      }
-      i=j;
-    }
-  }
-
-  console.log('[PycHoras] PDF detectado:', Object.values(days).filter(v=>v.mins>0).length, 'días con horas');
+  console.log('[PycHoras] días detectados:', Object.values(days).filter(v=>v.mins>0).length);
   return days;
 }
 function _detectarMesPDF(nombre) {
