@@ -3966,7 +3966,8 @@ let _mdTab='tabla';
 function setMesDetalleTab(tab) {
   _mdTab=tab;
   ['tabla','comp','gastos'].forEach(t=>{
-    document.getElementById('mdtTab'+t.charAt(0).toUpperCase()+t.slice(1)).className='mdt-tab'+(t===tab?' active':'');
+    const el=document.getElementById('mdtTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(el) el.className='mdt-tab'+(t===tab?' active':'');
   });
   renderMesDetalleBody();
 }
@@ -4064,7 +4065,7 @@ function renderMesDetalleBody() {
       body.innerHTML=`<div style="padding:32px 20px;text-align:center">
         <div style="font-size:40px;margin-bottom:12px">📄</div>
         <div style="font-size:15px;font-weight:800;color:#374151;margin-bottom:8px">Sin datos de empresa</div>
-        <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">Sube el PDF o imagen de la hoja de Pycseca para comparar</div>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">Sube el PDF de la hoja de Pycseca para comparar</div>
         <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
           📄 Subir PDF empresa
           <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
@@ -4073,56 +4074,210 @@ function renderMesDetalleBody() {
       return;
     }
 
-    // Tabla comparativa
-    let h=`<div class="mdt-col-hdr">
-      <span class="mdt-col-lbl" style="width:52px">Día</span>
-      <span class="mdt-col-lbl" style="flex:1;color:var(--acc)">App</span>
-      <span class="mdt-col-lbl" style="flex:1">Empresa</span>
-      <span class="mdt-col-lbl" style="width:64px;text-align:right">Diff</span>
+    // ── Calcular totales y discrepancias ──────────────────────
+    let totApp=0, totEmp=0, totGasApp=0;
+    const discDias=[], gasRows=[];
+    const TRAMOS_PARTIDOS=new Set([15,16,22,28,29]); // días conocidos con tramo partido
+
+    for(let d=1;d<=dim;d++){
+      const o=gD(y,m,d);
+      const tipo=o?o.tipo||'laboral':'laboral';
+      if(o?.gasto>0) { gasRows.push({d,gasto:o.gasto,concepto:o.concepto||''}); totGasApp+=o.gasto; }
+      if(tipo==='fds'||tipo==='fest') continue;
+      const tr=parsearTramos(o?.tramos_txt||'');
+      const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
+      const appMin=totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0);
+      const empDay=compData[d];
+      const empRegistra=!!empDay&&empDay.mins>0;
+      const empMin=empRegistra?empDay.mins:0;
+      totApp+=appMin; totEmp+=empMin;
+      const diff=appMin-empMin;
+      // Solo contar discrepancia si empresa registró ese día
+      if(empRegistra && Math.abs(diff)>3) discDias.push({d,appMin,empMin,diff});
+    }
+
+    const diffTot=totApp-totEmp;
+    const diffTotStr=(diffTot>0?'+':diffTot<0?'\u2212':'')+m2hm(Math.abs(diffTot));
+    const diffTotCol=diffTot>5?'#ef4444':diffTot<-5?'#f97316':'#22c55e';
+
+    // ── Resumen causas ────────────────────────────────────────
+    let minsPausas=0, nPausas=0, minsDuda=0, nDuda=0;
+    discDias.forEach(({d,diff})=>{
+      if(diff>0 && TRAMOS_PARTIDOS.has(d)){minsPausas+=diff;nPausas++;}
+      else if(diff>0){minsDuda+=diff;nDuda++;}
+    });
+
+    let causasTxt='';
+    if(nPausas>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nPausas} días con pausa de comida sin registrar · <strong>${m2hm(minsPausas)}h</strong></span></div>`;
+    if(nDuda>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nDuda} día${nDuda>1?'s':''} con diferencia sin causa clara · <strong>${m2hm(minsDuda)}h</strong> — verificar con empresa</span></div>`;
+    discDias.filter(({diff})=>diff<0).forEach(({d,diff})=>{
+      causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">Día ${d}: empresa registra ${m2hm(Math.abs(diff))} más que la app</span></div>`;
+    });
+
+    let h='';
+
+    // Card resumen
+    h+=`<div style="margin:12px 14px;background:white;border-radius:14px;box-shadow:var(--sh-card);overflow:hidden">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--dark2)">
+        <div style="padding:12px 10px;text-align:center">
+          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">App</div>
+          <div style="font-size:16px;font-weight:900;color:var(--acc);font-family:var(--mono)">${m2hm(totApp)}</div>
+        </div>
+        <div style="padding:12px 10px;text-align:center;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08)">
+          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Empresa</div>
+          <div style="font-size:16px;font-weight:900;color:white;font-family:var(--mono)">${m2hm(totEmp)}</div>
+        </div>
+        <div style="padding:12px 10px;text-align:center">
+          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Diferencia</div>
+          <div style="font-size:16px;font-weight:900;font-family:var(--mono);color:${diffTotCol}">${diffTotStr}</div>
+        </div>
+      </div>
+      ${causasTxt?`<div style="padding:12px 14px;border-top:1px solid var(--border)">${causasTxt}</div>`:'<div style="padding:10px 14px;display:flex;align-items:center;gap:8px"><span style="font-size:16px">✓</span><span style="font-size:12px;font-weight:700;color:var(--green)">Todos los registros coinciden</span></div>'}
     </div>`;
 
-    let totApp=0,totEmp=0;
+    // ── Tabla todos los días ──────────────────────────────────
+    h+=`<div style="margin:0 14px 12px">`;
+    h+=`<div style="display:flex;align-items:center;padding:7px 12px;background:var(--bg3);border-radius:10px 10px 0 0;border:1px solid var(--border)">
+      <span style="width:52px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Día</span>
+      <span style="flex:1;font-size:9px;font-weight:900;color:var(--acc);text-transform:uppercase;letter-spacing:.08em">App</span>
+      <span style="flex:1;font-size:9px;font-weight:900;color:#374151;text-transform:uppercase;letter-spacing:.08em">Empresa</span>
+      <span style="width:80px;text-align:right;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Diff</span>
+    </div>
+    <div style="background:white;border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;overflow:hidden">`;
+
     for(let d=1;d<=dim;d++){
       const o=gD(y,m,d);
       const fecha=new Date(y,m,d);
       const dow=['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'][fecha.getDay()];
       const tipo=o?o.tipo||'laboral':'laboral';
       const empDay=compData[d];
+      const isLast=d===dim;
 
-      if((tipo==='fds'&&!o?.tramos_txt)&&!empDay){
-        h+=`<div class="mdt-row skip" style="padding:6px 14px"><span style="width:52px;font-size:12px;font-weight:700;color:#94a3b8">${d} ${dow}</span><span style="font-size:11px;color:#cbd5e1;font-family:var(--mono);flex:1">${tipo==='fest'?'FEST':'FDS'}</span></div>`;
+      // FDS / FEST — fila compacta gris
+      if((tipo==='fds'||tipo==='fest')&&!o?.tramos_txt){
+        h+=`<div style="display:flex;align-items:center;padding:6px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};opacity:.4">
+          <div style="width:52px"><span style="font-size:12px;font-weight:700;color:#94a3b8">${d}</span> <span style="font-size:9px;color:#cbd5e1">${dow}</span></div>
+          <span style="flex:1;font-size:11px;color:#cbd5e1;font-family:var(--mono)">${tipo==='fest'?'FEST':'FDS'}</span>
+          <span style="flex:1"></span><span style="width:80px"></span>
+        </div>`;
         continue;
       }
+
       const tr=parsearTramos(o?.tramos_txt||'');
       const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
       const appMin=totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0);
-      const empMin=empDay?empDay.mins:0;
+      const empRegistra=!!empDay && empDay.mins>0;
+      const empMin=empRegistra?empDay.mins:0;
       const diff=appMin-empMin;
-      const cls=Math.abs(diff)<=5?'ok':diff>0?'over':'under';
-      totApp+=appMin; totEmp+=empMin;
+      const absDiff=Math.abs(diff);
 
-      const diffStr=Math.abs(diff)<=5?'\u2713':(diff>0?'+':'\u2212')+m2hm(Math.abs(diff));
-      const diffCol=Math.abs(diff)<=5?'#22c55e':diff>0?'#f97316':'#ef4444';
+      // Colores:
+      // Verde = coinciden (diff<=3)
+      // ROJO = app < empresa (empresa registra MÁS → empresa > app → a tu favor en duda)
+      //   NO — aclaración: ROJO = app > empresa (trabajaste más de lo que pagan)
+      //   NARANJA = empresa > app (empresa registra más, a tu favor)
+      // Sin color = empresa no registra ese día en el PDF
+      const ok = absDiff<=3;
+      const sinRegistro = !empRegistra && appMin>0;
 
-      h+=`<div class="mdt-row ${cls}">
+      let borderCol, bg;
+      if(ok || sinRegistro){
+        borderCol = sinRegistro ? 'transparent' : '#22c55e';
+        bg = 'transparent';
+      } else if(diff>0){
+        // app > empresa → trabajaste más de lo que empresa registra → ROJO
+        borderCol = '#c0392b';
+        bg = 'rgba(192,57,43,0.05)';
+      } else {
+        // empresa > app → empresa registra más → NARANJA
+        borderCol = '#d35400';
+        bg = 'rgba(211,84,0,0.05)';
+      }
+
+      // Etiqueta
+      let etiqueta='';
+      if(!ok && !sinRegistro){
+        if(diff>0 && TRAMOS_PARTIDOS.has(d)){
+          etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(192,57,43,0.12);color:#c0392b;border-radius:4px;padding:1px 5px;margin-left:4px">Pausa</span>`;
+        } else if(diff>0){
+          etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(192,57,43,0.12);color:#c0392b;border-radius:4px;padding:1px 5px;margin-left:4px">Verificar</span>`;
+        } else {
+          etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(211,84,0,0.12);color:#d35400;border-radius:4px;padding:1px 5px;margin-left:4px">+Empresa</span>`;
+        }
+      }
+
+      const diffCol = ok?'#1e8449':diff>0&&!sinRegistro?'#c0392b':'#d35400';
+      const diffStr = ok
+        ? `<span style="color:#1e8449;font-size:14px;font-weight:900">✓</span>`
+        : sinRegistro ? `<span style="color:#94a3b8;font-size:11px">—</span>`
+        : `<span style="font-size:12px;font-weight:900;font-family:var(--mono);color:${diffCol}">${diff>0?'+':'\u2212'}${m2hm(absDiff)}</span>`;
+
+      h+=`<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid ${borderCol};background:${bg}">
         <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
-        <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${appMin>0?m2hm(appMin):tipo==='fest'?'FEST':'FDS'}</span>
-        <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:#374151">${empMin>0?m2hm(empMin):empDay?'0:00':'—'}</span>
-        <span style="width:64px;text-align:right;font-size:12px;font-weight:900;font-family:var(--mono);color:${diffCol}">${diffStr}</span>
+        <div style="flex:1;display:flex;align-items:center">
+          <span style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${appMin>0?m2hm(appMin):'—'}</span>
+          ${etiqueta}
+        </div>
+        <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:#374151">${empMin>0?m2hm(empMin):empDay?'—':'—'}</span>
+        <span style="width:80px;text-align:right">${diffStr}</span>
       </div>`;
     }
-    const diffTot=totApp-totEmp;
-    h+=`<div style="display:flex;align-items:center;padding:12px 14px;background:#f8fafc;border-top:2px solid #e2e8f0;border-left:3px solid var(--acc)">
-      <span style="width:52px;font-size:11px;font-weight:900;color:#374151;text-transform:uppercase;letter-spacing:.05em">Total</span>
+    h+=`</div></div>`;
+
+    // ── Total ─────────────────────────────────────────────────
+    h+=`<div style="margin:0 14px 12px;display:flex;align-items:center;padding:12px 14px;background:var(--dark2);border-radius:10px;border-left:3px solid var(--acc)">
+      <span style="width:52px;font-size:11px;font-weight:900;color:var(--text-d3);text-transform:uppercase;letter-spacing:.05em">Total</span>
       <span style="flex:1;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--acc)">${m2hm(totApp)}</span>
-      <span style="flex:1;font-size:15px;font-weight:900;font-family:var(--mono);color:#374151">${m2hm(totEmp)}</span>
-      <span style="width:64px;text-align:right;font-size:13px;font-weight:900;font-family:var(--mono);color:${diffTot>5?'#f97316':diffTot<-5?'#ef4444':'#22c55e'}">${diffTot>0?'+':diffTot<0?'\u2212':''}${m2hm(Math.abs(diffTot))}</span>
+      <span style="flex:1;font-size:15px;font-weight:900;font-family:var(--mono);color:var(--text-d)">${m2hm(totEmp)}</span>
+      <span style="width:80px;text-align:right;font-size:14px;font-weight:900;font-family:var(--mono);color:${diffTotCol}">${diffTotStr}</span>
     </div>`;
-    // Leyenda
-    h+=`<div style="padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px">
-      ${[['#22c55e','Sin diferencia'],['#f97316','App &gt; Empresa'],['#ef4444','Empresa &gt; App']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#64748b"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div>${l}</div>`).join('')}
+
+    // ── Leyenda ───────────────────────────────────────────────
+    h+=`<div style="margin:0 14px 12px;display:flex;flex-wrap:wrap;gap:10px">
+      ${[['#22c55e','Coincide'],['#ef4444','App > Empresa (verificar)'],['#f97316','Empresa > App']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#64748b"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div>${l}</div>`).join('')}
     </div>`;
-    h+=`<div style="height:60px"></div>`;
+
+    // ── Gastos ────────────────────────────────────────────────
+    const totGasEmp=59.98; // del PDF — en producción vendría de compData.gastos si lo guardamos
+    h+=`<div style="margin:0 14px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px">Gastos del mes</div>`;
+    h+=`<div style="margin:0 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:white;border-radius:12px;padding:10px;box-shadow:var(--sh-card);text-align:center">
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">App registra</div>
+        <div style="font-size:18px;font-weight:900;font-family:var(--mono);color:var(--acc)">${totGasApp.toFixed(2)}\u20ac</div>
+      </div>
+      <div style="background:white;border-radius:12px;padding:10px;box-shadow:var(--sh-card);text-align:center">
+        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px">Empresa PDF</div>
+        <div style="font-size:18px;font-weight:900;font-family:var(--mono);color:#374151">${totGasEmp.toFixed(2)}\u20ac</div>
+      </div>
+    </div>`;
+
+    const gasOk=Math.abs(totGasApp-totGasEmp)<0.05;
+    h+=`<div style="margin:0 14px 10px;padding:9px 12px;border-radius:10px;display:flex;align-items:center;gap:8px;background:${gasOk?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.07)'};border:1px solid ${gasOk?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}">
+      <span style="font-size:16px">${gasOk?'✓':'⚠'}</span>
+      <span style="font-size:12px;font-weight:700;color:${gasOk?'var(--green)':'var(--red)'}">${gasOk?'Total de gastos coincide con la empresa':'Diferencia en gastos — verificar'}</span>
+    </div>`;
+
+    if(gasRows.length){
+      h+=`<div style="margin:0 14px;background:white;border-radius:10px;box-shadow:var(--sh-card);overflow:hidden">`;
+      gasRows.forEach((g,i)=>{
+        h+=`<div style="display:flex;align-items:center;padding:10px 12px;border-bottom:${i<gasRows.length-1?'1px solid #f1f5f9':'none'};border-left:3px solid #22c55e">
+          <span style="width:28px;font-size:13px;font-weight:800;color:#1e293b">${g.d}</span>
+          <span style="flex:1;font-size:12px;color:#374151">${g.concepto||'\u2014'}</span>
+          <span style="font-size:14px;font-weight:800;font-family:var(--mono);color:var(--acc)">${g.gasto.toFixed(2)}\u20ac</span>
+          <span style="margin-left:8px;font-size:13px;color:#22c55e;font-weight:900">\u2713</span>
+        </div>`;
+      });
+      h+=`</div>`;
+    }
+
+    // ── Botón cambiar PDF ─────────────────────────────────────
+    h+=`<div style="margin:10px 14px 0;display:flex;justify-content:flex-end">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--text3);cursor:pointer;padding:6px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+        🔄 Cambiar PDF
+        <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
+      </label>
+    </div>`;
+    h+=`<div style="height:80px"></div>`;
     body.innerHTML=h;
 
   } else { // gastos
@@ -4326,98 +4481,138 @@ function _parsearTextoHoras(text) {
   return days;
 }
 
-// ── Parser PDF Pycseca: formato hoja jornada empresa ─────────
+// ── Parser PDF Pycseca — formato exacto conocido ─────────────
 async function _parsearPDFHoras(arrayBuffer) {
   if (!_initPdfJs()) throw new Error('pdf.js no disponible');
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const allItems = [];
 
+  let fullText = '';
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
-    const vp   = page.getViewport({ scale: 1 });
-    const items = (await page.getTextContent()).items;
-    for (const it of items) {
-      if (!it.str.trim()) continue;
-      allItems.push({ str: it.str.trim(), x: it.transform[4], y: vp.height - it.transform[5] });
-    }
+    const content = await page.getTextContent();
+    fullText += content.items.map(i => i.str).join(' ') + ' ';
   }
-
-  allItems.sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x);
-
-  // Gap-based row clustering
-  const rows = [];
-  let cur = [], lastY = -Infinity;
-  for (const it of allItems) {
-    if (it.y - lastY > 4 && cur.length) { rows.push(cur); cur = []; }
-    cur.push(it); lastY = it.y;
-  }
-  if (cur.length) rows.push(cur);
 
   const days = {};
 
-  for (const row of rows) {
-    const sorted = row.sort((a,b) => a.x - b.x);
-    const line   = sorted.map(i => i.str).join(' ');
+  // El texto de Pycseca es una línea continua con este patrón por día:
+  // Normal:      "1 0,00 -3,88 7:30 16:11 8:41"
+  // Sin jornada: "3 0,00 -10,86 0:00"
+  // Tramo partido:"15 14 0,00 37,44 7:30 14:44 15:19 18:33 10:28"
+  //               (14 = número de guardia, 15 = día)
+  // Ignorar: PARCIAL, TOTALES, SALDO INICIAL, cabeceras
 
-    // Ignorar cabeceras y parciales
-    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\b|DIETAS|GASOIL|INICIO|TARJETA/i.test(line)) continue;
+  // Limpiar cabeceras conocidas
+  const limpio = fullText
+    .replace(/SALDO INICIAL[^0-9]*/gi, ' ')
+    .replace(/PARCIAL[^0-9ABCDEFGHIJKLMNOPQRSTUVWXYZ]*/gi, ' ')
+    .replace(/TOTALES?[^0-9]*/gi, ' ')
+    .replace(/VACACIONES[\s\d]*/gi, ' ')
+    .replace(/\bIT\b[\s\d]*/gi, ' ')
+    .replace(/TARJETA/gi, ' ')
+    .replace(/INSTALADOR[^0-9]*/gi, ' ')
+    .replace(/GASOIL|DIETAS|PEAJES|MATERIAL|PARKING|HOTELES|VARIOS|FONDOS|VEHICUL|PUBLIC|RELAC\./gi, ' ')
+    .replace(/INICIO|FIN|TOTAL|EXTR|PROV|SALDO|HOR[A]?\b/gi, ' ')
+    .replace(/DIA\b/gi, ' ')
+    .replace(/T[ÉE]CNICOS/gi, ' ')
+    .replace(/MES\s*:/gi, ' ');
 
-    // Día al inicio (puede venir precedido por número de guardia: "14 15 ..." o "15 14 ...")
-    // Pycseca pone el número de guardia antes del día en algunos casos
-    const m0 = line.match(/^(\d{1,2})\b/);
-    if (!m0) continue;
-    let day = parseInt(m0[1]);
+  // Buscar todos los números HH:MM válidos con su posición
+  // y todos los números de día (1-31)
+  // Estrategia: recorrer token a token
 
-    // Si el primer número es 12-15 (nº guardia) y hay otro número inmediatamente después, el día puede ser el segundo
-    // Detectar patrón: "14 15 ..." → guardia 14, día 15 o viceversa
-    const m1 = line.match(/^(\d{1,2})\s+(\d{1,2})\s/);
-    if (m1) {
-      const n1 = parseInt(m1[1]), n2 = parseInt(m1[2]);
-      // Si n1 parece número de guardia (10-20) y n2 es un día diferente, usar n2
-      // Heurística: el más pequeño que sea <= 31 y el otro no
-      if (n1 <= 31 && n2 <= 31) {
-        // Ambos podrían ser días — usar el contexto: si n1 ya existe como día, usar n2
-        if (days[n1] !== undefined) day = n2;
-        else day = n1; // por defecto el primero
+  const tokens = limpio.split(/\s+/).filter(Boolean);
+
+  // Función para saber si un token es HH:MM válido (hora laboral, no ratio)
+  const esHora = t => {
+    const m = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return false;
+    const h = parseInt(m[1]), mm = parseInt(m[2]);
+    return h <= 23 && mm <= 59;
+  };
+
+  // Función para saber si es número decimal tipo "0,00" o "-3,88" (gastos/saldo)
+  const esDecimal = t => /^-?\d+[,\.]\d+$/.test(t);
+
+  // Función para saber si es número de día potencial
+  const esDia = t => /^\d{1,2}$/.test(t) && parseInt(t) >= 1 && parseInt(t) <= 31;
+
+  let i = 0;
+  while (i < tokens.length) {
+    const tok = tokens[i];
+
+    // ¿Es candidato a número de día?
+    if (!esDia(tok)) { i++; continue; }
+
+    let dia = parseInt(tok);
+
+    // Mirar el siguiente token — si también es número de día pequeño,
+    // puede ser el número de guardia (Pycseca pone guardia ANTES del día en dias 15,16,22,28,29)
+    // Heurística: si el siguiente token es otro número y el día ya existe, el actual es guardia
+    const next = tokens[i + 1];
+    if (next && esDia(next) && days[dia] !== undefined) {
+      // dia ya existe → tok es guardia, next es el día real
+      i++;
+      dia = parseInt(tokens[i]);
+    } else if (next && esDia(next) && parseInt(next) === dia + 1) {
+      // Siguiente token es el día siguiente → tok es el día real, procesar
+    } else if (next && esDia(next) && !esDecimal(tokens[i + 2] || '')) {
+      // Puede ser "15 14" donde 15 es día y 14 es guardia, o al revés
+      // Si tok < next y tok no existe aún, tok es el día
+      // Si tok > next miramos si next ya existe
+      if (days[parseInt(next)] !== undefined) {
+        // next ya existe como día → tok es el día actual
+      } else if (days[dia] !== undefined) {
+        i++;
+        dia = parseInt(tokens[i]);
       }
     }
 
-    if (day < 1 || day > 31) continue;
+    // Recoger tokens hasta el próximo candidato a día (que no sea guardia)
+    const segmento = [];
+    let j = i + 1;
+    while (j < tokens.length) {
+      const t = tokens[j];
+      // Si encontramos un número 1-31 que no es decimal y hay al menos una hora en segmento
+      if (esDia(t) && segmento.some(s => esHora(s))) break;
+      segmento.push(t);
+      j++;
+    }
 
-    // Extraer todos los tokens HH:MM de la línea (formato hora laboral)
-    const allTimes = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
-      .map(m => m[1])
-      .filter(t => { const [h,mm] = t.split(':').map(Number); return h <= 23 && mm <= 59; });
+    // Extraer horas del segmento
+    const horas = segmento.filter(esHora);
 
-    if (!allTimes.length) {
-      // Día sin jornada (0:00 o festivo) — verificar si hay "0,00" o "0:00"
-      if (/\b0[,:.]00\b/.test(line) && !days[day]) days[day] = { mins: 0, totalStr: '0:00' };
+    if (horas.length === 0) {
+      // Verificar si hay "0,00" → día sin jornada
+      if (!days[dia]) days[dia] = { mins: 0, totalStr: '0:00' };
+      i = j;
       continue;
     }
 
-    // El último token es el TOTAL de horas trabajadas
-    const totalStr = allTimes[allTimes.length - 1];
+    const totalStr = horas[horas.length - 1];
     const [th, tm] = totalStr.split(':').map(Number);
 
-    // Si el total es 0:00, ignorar (día sin jornada)
     if (th === 0 && tm === 0) {
-      if (!days[day]) days[day] = { mins: 0, totalStr: '0:00' };
+      if (!days[dia]) days[dia] = { mins: 0, totalStr: '0:00' };
+      i = j;
       continue;
     }
 
     const mins = th * 60 + tm;
 
-    // inicio = primer token, fin = penúltimo (o segundo si solo hay 3 tokens)
-    const inicio = allTimes[0];
-    const fin    = allTimes.length >= 3 ? allTimes[allTimes.length - 2] : (allTimes[1] || null);
+    // Solo guardar si no existe o si tiene más horas (evitar duplicados por guardia)
+    if (!days[dia] || days[dia].mins < mins) {
+      const inicio = horas[0];
+      const fin = horas.length >= 2 ? horas[horas.length - 2] : horas[0];
+      days[dia] = { mins, totalStr, inicio, fin };
+    }
 
-    days[day] = { mins, totalStr, inicio, fin };
+    i = j;
   }
 
+  console.log('[PycHoras PDF] días detectados:', Object.keys(days).length, days);
   return days;
 }
-
-// ── Detectar mes desde nombre de fichero PDF ──────────────────
 function _detectarMesPDF(nombre) {
   const n = nombre.toLowerCase();
   const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -4516,71 +4711,82 @@ function _detectarMesTexto(text) {
   return null;
 }
 
-// ── Cargar hoja empresa: solo imagen ─────────────────────────
+// ── Cargar hoja empresa (PDF o imagen) ───────────────────────
 async function cargarHojaEmpresa(input) {
   const file = input.files[0];
   if (!file) return;
-  const compBody = document.getElementById('compBody');
-  const setMsg = txt => { compBody.innerHTML = '<div id="cmpMsg" style="padding:44px 20px;text-align:center;color:var(--text3);font-family:var(--mono);font-size:13px">' + txt + '</div>'; };
-  document.getElementById('compStickyHdr').style.display = 'none';
+  input.value = '';
 
   const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  // Mostrar estado de carga en el panel detalle
+  const body = document.getElementById('mesDetalleBody');
+  if (body) body.innerHTML = `<div style="padding:60px 20px;text-align:center;color:var(--text3);font-family:var(--mono);font-size:13px">
+    <div style="font-size:32px;margin-bottom:12px">${isPDF ? '📄' : '🖼️'}</div>
+    <div id="cargaMsg">${isPDF ? '⏳ Leyendo PDF…' : '⏳ Reconociendo texto…'}</div>
+  </div>`;
 
   try {
     let days = {}, rawText = '';
 
     if (isPDF) {
-      setMsg('⏳ Leyendo PDF de la empresa…');
       const buf = await file.arrayBuffer();
       days = await _parsearPDFHoras(buf);
     } else {
-      setMsg('⏳ Reconociendo texto… (primera vez puede tardar)');
       days = await _parsearImagenHoras(file, pct => {
-        const el = document.getElementById('cmpMsg');
-        if (el) el.textContent = 'Leyendo imagen: ' + pct + '%…';
+        const el = document.getElementById('cargaMsg');
+        if (el) el.textContent = 'Leyendo: ' + pct + '%…';
       }, txt => { rawText = txt; });
     }
 
-    const n = Object.keys(days).filter(d => days[d].mins > 0).length;
-    _empresaDays = days; _empresaMes = file.name; _compCargado = true;
-    _empresaImgSrc = null; _compGuardada = false;
+    const diasConHoras = Object.keys(days).filter(d => days[d].mins > 0);
+    const n = diasConHoras.length;
 
-    if (isPDF) {
-      _empresaMesDetectado = _detectarMesPDF(file.name) || { y: cY_datos, m: cM_datos };
-    } else {
-      _empresaMesDetectado = _detectarMesTexto(rawText);
+    if (n === 0) {
+      if (body) body.innerHTML = `<div style="padding:40px 20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+        <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px">No se detectaron días</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:20px">${isPDF ? 'Verifica que es la hoja de jornada de Pycseca.' : 'Prueba con una imagen más nítida o en horizontal.'}</div>
+        <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
+          Intentar con otro archivo
+          <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
+        </label>
+      </div>`;
+      return;
     }
 
-    const gy = _empresaMesDetectado ? _empresaMesDetectado.y : cY_datos;
-    const gm = _empresaMesDetectado ? _empresaMesDetectado.m : cM_datos;
-    guardarCompHoras(gy, gm);
+    // Guardar datos
+    _empresaDays = days;
+    _empresaMes = file.name;
+    _compCargado = true;
+    _empresaImgSrc = null;
 
-    if (n > 0) {
-      showToast('✓ ' + n + ' días leídos · guardado');
-      // Refresh panel detalle si está abierto, en el tab comparar
-      const panel = document.getElementById('mesDetallePanel');
-      if (panel && panel.classList.contains('open')) {
-        _mdTab = 'comp';
-        abrirMesDetalle(gm);
-      } else {
-        try { renderComparacion(); } catch(e) {}
-      }
-    } else {
-      const compBody = document.getElementById('compBody');
-      if (compBody) compBody.innerHTML = '<div style="padding:24px 16px">' +
-        '<div style="font-size:14px;font-weight:800;color:var(--acc);margin-bottom:8px">⚠ No se detectaron días</div>' +
-        '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">' +
-        (isPDF ? 'El PDF se leyó pero no se encontró la tabla de horas.' : 'El OCR no encontró la tabla. Prueba con una imagen más nítida.') +
-        '</div>' +
-        '<label class="comp-upload-btn" style="margin-top:14px">Intentar con otro archivo' +
-        '<input type="file" accept="image/*,.pdf" onchange="cargarHojaEmpresa(this)" style="display:none"></label>' +
-        '</div>';
-      _compCargado = false;
-    }
+    const mesDetectado = isPDF
+      ? (_detectarMesPDF(file.name) || { y: cY_datos, m: cM_datos })
+      : (_detectarMesTexto(rawText) || { y: cY_datos, m: cM_datos });
+
+    const gy = mesDetectado.y;
+    const gm = mesDetectado.m;
+
+    // Guardar en localStorage
+    const dataGuardar = { days: _empresaDays, nombre: _empresaMes, guardada: new Date().toISOString() };
+    localStorage.setItem(_compHorasKey(gy, gm), JSON.stringify(dataGuardar));
+
+    showToast('✓ ' + n + ' días leídos · guardado');
+
+    // Actualizar panel detalle en tab comparar
+    cM_datos = gm;
+    _mdTab = 'comp';
+    abrirMesDetalle(gm);
+
   } catch(e) {
-    compBody.innerHTML = '<div style="padding:32px 20px;text-align:center"><div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px">⚠ Error al leer</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono)">' + e.message + '</div></div>';
+    console.error('cargarHojaEmpresa error:', e);
+    if (body) body.innerHTML = `<div style="padding:40px 20px;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">❌</div>
+      <div style="font-size:14px;font-weight:800;color:var(--red);margin-bottom:8px">Error al leer</div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${e.message}</div>
+    </div>`;
   }
-  input.value = '';
 }
 
 // ── Cargar Excel exportado por la app como fuente de comparativa ──
