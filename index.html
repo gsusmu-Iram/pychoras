@@ -3897,12 +3897,16 @@ function abrirMesDetalle(m) {
     document.getElementById('mesDetalleSub').textContent=st.lab+' días · '+m2hm(st.tot)+' horas'+(esFuturo?' · previsión':'');
 
     const empTotal=tieneComp?_calcEmpresaTotal(compData):null;
-    const diff=empTotal!==null?st.tot-empTotal:null;
+    const diff=empTotal!==null?st.tot-empTotal:null; // positivo = app>empresa = te pagan menos
+
+    const diffStr=diff===null?'—':diff===0?'0:00':(diff>0?'\u2212':'+')+ m2hm(Math.abs(diff));
+    const diffCol=diff===null?'#fb923c':Math.abs(diff)<5?'#4ade80':diff>0?'#f87171':'#fb923c';
+    const diffSub=diff===null?'':Math.abs(diff)<5?'Cuadra':'días con diff';
 
     document.getElementById('mesDetalleCards').innerHTML=
       _mdCard('Mi registro',m2hm(st.tot),(st.ext>=0?'+':'\u2212')+m2hm(Math.abs(st.ext))+' extras','#f97316')+
       _mdCard('Empresa PDF',empTotal!==null?m2hm(empTotal):'Sin PDF',empTotal!==null?'PDF cargado':'Sube el PDF','white')+
-      _mdCard('Diferencia',diff!==null?(diff>=0?'+':'\u2212')+m2hm(Math.abs(diff)):'—',diff!==null?_discDias(compData,st,m,y)+' días':'','#fb923c');
+      _mdCard('Diferencia',diffStr,diffSub,diffCol);
 
     let ver='';
     if(tieneComp&&diff!==null){
@@ -3945,7 +3949,9 @@ function _mdCard(lbl,val,sub,col) {
 }
 
 function _calcEmpresaTotal(compData) {
-  return Object.values(compData).reduce((a,v)=>a+(v.mins||0),0);
+  // Si el PDF guardó el total oficial de TOTALES, usarlo
+  if(compData._totalOficial) return compData._totalOficial;
+  return Object.values(compData).filter(v=>v&&v.mins).reduce((a,v)=>a+(v.mins||0),0);
 }
 
 function _discDias(compData,st,m,y) {
@@ -4519,8 +4525,9 @@ async function _parsearPDFHoras(arrayBuffer) {
     if(!esDia(tok)){i++;continue;}
     let dia=+tok;
     const next=tokens[i+1];
-    if(next&&esDia(next)&&days[dia]!==undefined){i++;dia=+tokens[i];}
-    else if(next&&esDia(next)&&days[+next]===undefined&&days[dia]!==undefined){i++;dia=+tokens[i];}
+    // Guardia Pycseca es siempre >= 10 (12, 14, 15...). Solo saltar si next es guardia plausible
+    if(next&&esDia(next)&&+next>=10&&days[dia]!==undefined){i++;dia=+tokens[i];}
+    else if(next&&esDia(next)&&+next>=10&&days[+next]===undefined&&days[dia]!==undefined){i++;dia=+tokens[i];}
 
     const seg=[];let j=i+1;
     while(j<tokens.length){
@@ -4540,7 +4547,16 @@ async function _parsearPDFHoras(arrayBuffer) {
     i=j;
   }
 
-  console.log('[PycHoras] días detectados:', Object.values(days).filter(v=>v.mins>0).length);
+  // Buscar el total oficial de horas del PDF (línea TOTALES ... HH:MM)
+  const totalOficialMatch = fullText.match(/TOTALES?[^0-9]*[\d.,\s-]*?(\d{3,4}:\d{2})/i)
+    || fullText.match(/(\d{3,4}:\d{2})\s*$/);
+  if(totalOficialMatch){
+    const[th,tm]=totalOficialMatch[1].split(':').map(Number);
+    days._totalOficial=th*60+tm;
+  }
+
+  console.log('[PycHoras] días detectados:', Object.values(days).filter(v=>v&&v.mins>0).length,
+    days._totalOficial ? '· Total oficial: '+days._totalOficial+'min' : '');
   return days;
 }
 function _detectarMesPDF(nombre) {
