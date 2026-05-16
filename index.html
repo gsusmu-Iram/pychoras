@@ -1275,15 +1275,103 @@ function sD(y, m, d, v) {
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const DSEM = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-const FESTIVOS_2026 = [
-  { d: '2026-01-01', n: 'Año Nuevo' }, { d: '2026-01-06', n: 'Reyes Magos' }, { d: '2026-01-22', n: 'San Vicente Mártir' },
-  { d: '2026-03-19', n: 'San José' }, { d: '2026-04-03', n: 'Viernes Santo' }, { d: '2026-04-06', n: 'Lunes de Pascua' },
-  { d: '2026-04-13', n: 'San Vicente Ferrer' }, { d: '2026-05-01', n: 'Día del Trabajador' }, { d: '2026-06-24', n: 'San Juan' },
-  { d: '2026-08-15', n: 'Asunción' }, { d: '2026-10-09', n: 'Comunitat Valenciana' }, { d: '2026-10-12', n: 'Fiesta Nacional' },
-  { d: '2026-12-08', n: 'Inmaculada' }, { d: '2026-12-25', n: 'Navidad' }
-];
-const FEST_SET = new Set(FESTIVOS_2026.map(f => f.d));
-const GUARDIAS_2026 = []; // Guardias gestionadas manualmente desde Mi Cuenta
+// ── Cálculo automático de festivos por año ────────────────────
+function calcularSemanaSanta(y) {
+  // Algoritmo de Meeus/Jones/Butcher
+  const a=y%19, b=Math.floor(y/100), c=y%100;
+  const d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3), h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4), k=c%4;
+  const l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451);
+  const mes=Math.floor((h+l-7*m+114)/31)-1; // 0-based
+  const dia=((h+l-7*m+114)%31)+1;
+  return new Date(y, mes, dia); // Domingo de Pascua
+}
+
+function calcularFestivosAnio(y) {
+  const f = [];
+  const add = (mes, dia, nombre) => {
+    f.push({ d: ds(y, mes, dia), n: nombre });
+  };
+  const addDate = (date, nombre) => {
+    f.push({ d: ds(y, date.getMonth(), date.getDate()), n: nombre });
+  };
+
+  // Pascua
+  const pascua = calcularSemanaSanta(y);
+  const viernesSanto = new Date(pascua); viernesSanto.setDate(pascua.getDate()-2);
+  const lunesPascua = new Date(pascua); lunesPascua.setDate(pascua.getDate()+1);
+
+  // Festivos fijos nacionales
+  add(0, 1, 'Año Nuevo');
+  add(0, 6, 'Reyes Magos');
+  addDate(viernesSanto, 'Viernes Santo');
+  add(4, 1, 'Día del Trabajador');
+  add(7, 15, 'Asunción');
+  add(9, 12, 'Fiesta Nacional');
+  add(11, 8, 'Inmaculada');
+  add(11, 25, 'Navidad');
+
+  // Festivos Comunitat Valenciana (fijos)
+  add(9, 9, 'Comunitat Valenciana');
+  addDate(lunesPascua, 'Lunes de Pascua');
+
+  // San José (19 marzo) — sustituido si cae en Semana Santa
+  const sanJose = new Date(y, 2, 19);
+  const enSS = sanJose >= viernesSanto && sanJose <= lunesPascua;
+  if (!enSS) add(2, 19, 'San José');
+
+  // San Vicente Mártir (22 enero) — Valencia ciudad
+  add(0, 22, 'San Vicente Mártir');
+
+  // San Vicente Ferrer — lunes después del segundo domingo de Pascua
+  const svf = new Date(pascua); svf.setDate(pascua.getDate() + 8);
+  while(svf.getDay() !== 1) svf.setDate(svf.getDate()+1);
+  addDate(svf, 'San Vicente Ferrer');
+
+  // San Juan (24 junio) — festivo Valencia
+  add(5, 24, 'San Juan');
+
+  // Cargar festivos personalizados del usuario (por si ha añadido/eliminado alguno)
+  const KEY = 'pyc_festivos_custom_' + y;
+  try {
+    const custom = JSON.parse(localStorage.getItem(KEY) || '{}');
+    // Añadir extras del usuario
+    (custom.add || []).forEach(item => { if(!f.find(x=>x.d===item.d)) f.push(item); });
+    // Eliminar los que el usuario quitó
+    const eliminados = new Set(custom.remove || []);
+    return f.filter(x => !eliminados.has(x.d)).sort((a,b) => a.d.localeCompare(b.d));
+  } catch(e) { return f.sort((a,b) => a.d.localeCompare(b.d)); }
+}
+
+// Cache de festivos por año
+const _festivosCache = {};
+function getFestivos(y) {
+  if (!_festivosCache[y]) _festivosCache[y] = calcularFestivosAnio(y);
+  return _festivosCache[y];
+}
+
+// Compatibilidad: FESTIVOS_2026 y FEST_SET para el año actual
+const FESTIVOS_2026 = getFestivos(2026);
+let _festAnio = new Date().getFullYear();
+let FEST_SET = new Set(getFestivos(_festAnio).map(f => f.d));
+
+function actualizarFestSet(y) {
+  _festAnio = y;
+  FEST_SET = new Set(getFestivos(y).map(f => f.d));
+}
+function isFest(s) {
+  const y = parseInt(s.substring(0,4));
+  if (y !== _festAnio) actualizarFestSet(y);
+  return FEST_SET.has(s);
+}
+function getFestNombre(s) {
+  const y = parseInt(s.substring(0,4));
+  const lista = getFestivos(y);
+  const f = lista.find(x => x.d === s);
+  return f ? f.n : 'Festivo';
+}const GUARDIAS_2026 = []; // Guardias gestionadas manualmente desde Mi Cuenta
 function buildGuardiaSet() {
   const s = new Set();
   GUARDIAS_2026.forEach(g => {
@@ -1772,6 +1860,18 @@ function parsearNominaPDF(txt, nombre) {
   }
   resEl.innerHTML = resHtml;
 
+  // ── Rellenar comparativa nómina automáticamente desde PDF ──
+  if (gua !== null || ext !== null || liquido !== null) {
+    const toSave = {
+      guardias: gua !== null ? gua : undefined,
+      extras:   ext !== null ? ext : undefined,
+      liquido:  liquido !== null ? liquido : undefined,
+      _guardada: new Date().toISOString(),
+    };
+    guardarCompNomina(liqYear, liqMes, toSave);
+    renderNomComp();
+  }
+
   showToast(actualizados > 0 ? '✓ ' + actualizados + ' conceptos leídos del PDF' : 'PDF cargado · revisa los campos');
 }
 function nuevoPDF() {
@@ -1843,7 +1943,7 @@ function exportarExcel() {
   if (typeof XLSX === 'undefined') { showToast('Cargando librería...'); return; }
   const wb = XLSX.utils.book_new();
   const DSEM_FULL = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  const FESTIVOS_SET = new Set(FESTIVOS_2026.map(f => f.d));
+  const FESTIVOS_SET = new Set(getFestivos(new Date().getFullYear()).map(f => f.d));
 
   function guardiaDiasSet() {
     const s = new Set();
@@ -3254,7 +3354,7 @@ function responderFechaHora(raw){
   if(/\b(es d[ií]a laboral|hoy (es )?laborable|es festivo hoy|hoy es festivo)\b/.test(s)){
     const dstr2=ds(hoy.getFullYear(),hoy.getMonth(),hoy.getDate());
     const dw2=hoy.getDay();
-    if(isFest(dstr2)){const f2=FESTIVOS_2026.find(f=>f.d===dstr2);return '📅 Hoy es festivo: <span class="pill purple">'+(f2?f2.n:'Festivo')+'</span> — ¡a descansar!';}
+    if(isFest(dstr2)){const f2=getFestivos(new Date().getFullYear()).find(f=>f.d===dstr2);return '📅 Hoy es festivo: <span class="pill purple">'+(f2?f2.n:'Festivo')+'</span> — ¡a descansar!';}
     if(dw2===0||dw2===6)return 'Hoy es '+DES[dw2]+' — 🏖️ fin de semana, no laborable.';
     return 'Sí, hoy es '+DES[dw2]+' — día laborable 💼 ¿Fichamos?';
   }
@@ -3743,25 +3843,28 @@ function responder(int_){
 
   if(accion==='qFestivoDia'){
     const {fecha}=int_;const dstr=ds(fecha.y,fecha.m,fecha.d);
-    const fest=FESTIVOS_2026.find(f=>f.d===dstr);const nom=DSEM[new Date(fecha.y,fecha.m,fecha.d).getDay()];
+    const fest=getFestivos(fecha.y).find(f=>f.d===dstr);const nom=DSEM[new Date(fecha.y,fecha.m,fecha.d).getDay()];
     return fest?`S\u00ed, el ${nom} ${fecha.d}/${fecha.m+1} es festivo: <span class="pill purple">${fest.n}</span>`:`No, el ${nom} ${fecha.d}/${fecha.m+1} no es festivo en Valencia.`;
   }
 
   if(accion==='qFestivoNext'){
     const hoyStr=ds(hoy.getFullYear(),hoy.getMonth(),hoy.getDate());
-    const prox=FESTIVOS_2026.find(f=>f.d>=hoyStr);if(!prox)return'No quedan m\u00e1s festivos en 2026.';
+    const _fl=getFestivos(hoy.getFullYear());
+    const prox=_fl.find(f=>f.d>=hoyStr);if(!prox)return'No quedan más festivos este año.';
     const d=new Date(prox.d+'T00:00:00');const diff=Math.ceil((d-hoy)/(864e5));
-    return`Pr\u00f3ximo festivo:<div class="res-card"><div class="res-row"><span class="res-lbl">Fecha</span><span class="res-val blue">${d.getDate()}/${d.getMonth()+1}</span></div><div class="res-row"><span class="res-lbl">Nombre</span><span class="res-val">${prox.n}</span></div><div class="res-row"><span class="res-lbl">En</span><span class="res-val">${diff} d\u00edas</span></div></div>`;
+    return`Próximo festivo:<div class="res-card"><div class="res-row"><span class="res-lbl">Fecha</span><span class="res-val blue">${d.getDate()}/${d.getMonth()+1}</span></div><div class="res-row"><span class="res-lbl">Nombre</span><span class="res-val">${prox.n}</span></div><div class="res-row"><span class="res-lbl">En</span><span class="res-val">${diff} días</span></div></div>`;
   }
 
   if(accion==='qFestivosQuedan'){
     const hoyStr=ds(hoy.getFullYear(),hoy.getMonth(),hoy.getDate());
-    const rest=FESTIVOS_2026.filter(f=>f.d>=hoyStr);
+    const rest=getFestivos(hoy.getFullYear()).filter(f=>f.d>=hoyStr);
     return`Festivos que quedan (${rest.length}):<div class="res-card">${rest.map(f=>{const d=new Date(f.d+'T00:00:00');return`<div class="res-row"><span class="res-lbl">${d.getDate()}/${d.getMonth()+1}</span><span class="res-val">${f.n}</span></div>`;}).join('')}</div>`;
   }
 
   if(accion==='qFestivos'){
-    const lista=int_.mes>=0?FESTIVOS_2026.filter(f=>+f.d.split('-')[1]-1===int_.mes):FESTIVOS_2026;
+    const _fy=int_.mes>=0?cY:hoy.getFullYear();
+    const _fl2=getFestivos(_fy);
+    const lista=int_.mes>=0?_fl2.filter(f=>+f.d.split('-')[1]-1===int_.mes):_fl2;
     return`Festivos${int_.mes>=0?' '+MESES[int_.mes]:''}:<div class="res-card">${lista.map(f=>{const d=new Date(f.d+'T00:00:00');return`<div class="res-row"><span class="res-lbl">${d.getDate()}/${d.getMonth()+1}</span><span class="res-val">${f.n}</span></div>`;}).join('')||'Sin festivos'}</div>`;
   }
 
@@ -4454,10 +4557,12 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
   }
 })();
 
-// ── Fin de año y selector de año ─────────────────────────────
+// ── Comprobación fin de año y nuevo año ──────────────────────
 function _comprobarFinDeAnio() {
   const hoy = new Date();
   const dia = hoy.getDate(), mes = hoy.getMonth(), anio = hoy.getFullYear();
+
+  // Aviso el 31 de diciembre
   if (mes === 11 && dia === 31) {
     const KEY_AVISO = 'pyc_aviso_fya_' + anio;
     if (!localStorage.getItem(KEY_AVISO)) {
@@ -4481,8 +4586,46 @@ function _comprobarFinDeAnio() {
       }, 2000);
     }
   }
+
+  // Aviso en enero para confirmar festivos del nuevo año
+  if (mes === 0 && dia <= 7) {
+    const KEY_FEST = 'pyc_festivos_confirmados_' + anio;
+    if (!localStorage.getItem(KEY_FEST)) {
+      setTimeout(() => _mostrarWizardFestivos(anio), 3000);
+    }
+  }
 }
 
+function _mostrarWizardFestivos(anio) {
+  const festivos = getFestivos(anio);
+  const KEY_FEST = 'pyc_festivos_confirmados_' + anio;
+
+  const filas = festivos.map(f => {
+    const d = new Date(f.d + 'T12:00:00');
+    const dow = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()];
+    return `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+      <span style="font-size:12px;font-family:var(--mono);color:var(--acc);width:70px">${d.getDate()}/${d.getMonth()+1} ${dow}</span>
+      <span style="flex:1;font-size:12px;color:var(--text-d2)">${f.n}</span>
+    </div>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)';
+  modal.innerHTML = `<div style="background:var(--dark2);border-radius:22px 22px 0 0;width:100%;max-width:480px;padding:22px 20px 28px;border:1px solid var(--border-d);max-height:80vh;display:flex;flex-direction:column">
+    <div style="font-size:17px;font-weight:900;color:var(--text-d);margin-bottom:4px">📅 Festivos ${anio}</div>
+    <div style="font-size:12px;color:var(--text-d3);margin-bottom:14px">Calculados automáticamente · Confirma si son correctos para Valencia</div>
+    <div style="flex:1;overflow-y:auto;margin-bottom:16px">${filas}</div>
+    <button onclick="localStorage.setItem('${KEY_FEST}','1');this.closest('[style*=fixed]').remove();showToast('✓ Festivos ${anio} confirmados');"
+      style="width:100%;padding:14px;background:linear-gradient(135deg,var(--acc),var(--acc-dk));border:none;border-radius:14px;color:white;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">
+      ✓ Confirmar festivos ${anio}
+    </button>
+    <button onclick="this.closest('[style*=fixed]').remove();"
+      style="width:100%;padding:12px;background:transparent;border:1px solid var(--border-d);border-radius:14px;color:var(--text-d3);font-size:13px;font-weight:700;cursor:pointer">
+      Revisar más tarde
+    </button>
+  </div>`;
+  document.body.appendChild(modal);
+}
 function cambiarAnioAnual(dir) {
   const anioActual = new Date().getFullYear();
   if (dir > 0 && cY_datos >= anioActual) return;
@@ -4492,12 +4635,13 @@ function cambiarAnioAnual(dir) {
 
 function _renderAnioSelector() {
   const anioActual = new Date().getFullYear();
-  return `<div style="display:flex;align-items:center;gap:8px">
-    <button onclick="cambiarAnioAnual(-1)" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text-d2);border-radius:8px;padding:4px 10px;font-size:16px;cursor:pointer;line-height:1">‹</button>
-    <span style="font-size:16px;font-weight:900;color:${cY_datos<anioActual?'var(--acc-mid)':'var(--text-d)'};min-width:48px;text-align:center">${cY_datos}</span>
-    <button onclick="cambiarAnioAnual(1)" ${cY_datos>=anioActual?'disabled':''}
-      style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text-d2);border-radius:8px;padding:4px 10px;font-size:16px;cursor:pointer;line-height:1;${cY_datos>=anioActual?'opacity:.3;cursor:default':''}">›</button>
-  </div>`;
+  const colAnio = cY_datos < anioActual ? 'var(--acc-mid)' : 'var(--text-d)';
+  const disabledNext = cY_datos >= anioActual ? 'disabled style="opacity:.3;cursor:default"' : '';
+  return '<div style="display:flex;align-items:center;gap:8px">' +
+    '<button onclick="cambiarAnioAnual(-1)" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text-d2);border-radius:8px;padding:4px 10px;font-size:16px;cursor:pointer;line-height:1">\u2039</button>' +
+    '<span style="font-size:16px;font-weight:900;color:' + colAnio + ';min-width:48px;text-align:center">' + cY_datos + '</span>' +
+    '<button onclick="cambiarAnioAnual(1)" ' + disabledNext + ' style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--text-d2);border-radius:8px;padding:4px 10px;font-size:16px;cursor:pointer;line-height:1">\u203a</button>' +
+    '</div>';
 }
 
 // ── MÓDULO COMPARAR — Comparativa local app vs empresa
