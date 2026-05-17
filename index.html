@@ -1718,14 +1718,30 @@ function guardarSaldoEmpresa() {
   renderSaldo();
 }
 
-function cargarPDF(input) {
+async function cargarPDF(input) {
   const file = input.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const txt = e.target.result;
-    parsearNominaPDF(txt, file.name);
-  };
-  reader.readAsText(file, 'utf-8');
+  try {
+    // Intentar extraer texto con pdf.js (funciona con PDFs encriptados)
+    if (_initPdfJs()) {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let txt = '';
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        txt += content.items.map(i => i.str).join(' ') + ' ';
+      }
+      parsearNominaPDF(txt, file.name);
+    } else {
+      // Fallback: leer como texto (solo funciona con PDFs no encriptados)
+      const reader = new FileReader();
+      reader.onload = e => parsearNominaPDF(e.target.result, file.name);
+      reader.readAsText(file, 'utf-8');
+    }
+  } catch(e) {
+    console.error('Error leyendo PDF nómina:', e);
+    showToast('Error al leer el PDF · intenta de nuevo');
+  }
 }
 
 function parsearNominaPDF(txt, nombre) {
@@ -4218,9 +4234,9 @@ function renderMesDetalleBody() {
       if(empRegistra && Math.abs(diff)>3) discDias.push({d,appMin,empMin,diff});
     }
 
-    const nDiasComp = Object.keys(compData).filter(d=>compData[d]&&compData[d].mins>0).length;
-    const extApp = totApp - (BASE_MIN * nDiasComp);
-    const extEmp = totEmp - (BASE_MIN * nDiasComp);
+    const CONV_MIN_MES = cfg.convenio * 60;
+    const extApp = totApp - CONV_MIN_MES;
+    const extEmp = totEmp - CONV_MIN_MES;
     const diffExt = extApp - extEmp;
 
     // ── Causas ────────────────────────────────────────────────
