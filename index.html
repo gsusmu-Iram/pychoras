@@ -4696,27 +4696,52 @@ function _normalizarOCR(text) {
 function _parsearTextoHoras(text) {
   const days = {};
   const norm = _normalizarOCR(text);
-  // Dividir en líneas, limpiar ruido por carácter
   const lines = norm.split('\n');
+
+  // Detectar mes del texto para validar días
+  const mesMatch = norm.match(/(?:ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s+(\d{4})/i);
+  const MESES_N = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  let mesIdx = -1, anio = new Date().getFullYear();
+  if (mesMatch) {
+    anio = parseInt(mesMatch[1]);
+    mesIdx = MESES_N.findIndex(m => norm.toUpperCase().includes(m));
+  }
+
+  let saltarSiguiente = false;
   for (const rawLine of lines) {
     const line = rawLine.trim().replace(/\s+/g, ' ');
     if (!line) continue;
-    if (/PARCIAL|TOTALE|SALDO\s+INI|VACAC|COMPUTO/i.test(line)) continue;
-    // Día al inicio — acepta 1-31 seguido de espacio, coma, punto o ":"
+    // Ignorar cabeceras y saldo inicial (incluyendo cuando OCR omite "INICIAL")
+    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\s+DIETA|INSTALADOR|TÉCNICO/i.test(line)) {
+      saltarSiguiente = true; continue;
+    }
+    if (saltarSiguiente) { saltarSiguiente = false; continue; }
+
     const m0 = line.match(/^(\d{1,2})[\s,\.:]/);
     if (!m0) continue;
     const day = parseInt(m0[1]);
     if (day < 1 || day > 31) continue;
-    // Extraer tokens HH:MM válidos
+
+    // Validar que el día existe en el mes detectado
+    if (mesIdx >= 0) {
+      const dim = new Date(anio, mesIdx + 1, 0).getDate();
+      if (day > dim) continue;
+      // Si el día es domingo (0) y la línea no tiene horas, muy probablemente es ruido
+      const dow = new Date(anio, mesIdx, day).getDay();
+      // No excluir — pueden trabajar domingos en guardia
+    }
+
     const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
       .map(m => m[1])
       .filter(t => { const [h,mm]=t.split(':').map(Number); return h<=23&&mm<=59; });
     if (!times.length) { if (!days[day]) days[day]={mins:0,totalStr:'0:00'}; continue; }
     const totalStr = times[times.length - 1];
     const [h, mm] = totalStr.split(':').map(Number);
-    days[day] = { mins: h*60+mm, totalStr,
-      inicio: times[0]||null,
-      fin: times.length>2 ? times[times.length-2] : (times[1]||null) };
+    if (!days[day] || days[day].mins < h*60+mm) {
+      days[day] = { mins: h*60+mm, totalStr,
+        inicio: times[0]||null,
+        fin: times.length>2 ? times[times.length-2] : (times[1]||null) };
+    }
   }
   return days;
 }
@@ -4758,10 +4783,22 @@ async function _parsearPDFHoras(arrayBuffer) {
     const tok=tokens[i];
     if(!esDia(tok)){i++;continue;}
     let dia=+tok;
+
+    // pdf.js a veces parte "11" en "1"+"1", "12" en "1"+"2", etc.
+    // Si el token es un solo dígito y el siguiente también, intentar combinarlos
     const next=tokens[i+1];
-    // Guardia Pycseca es siempre >= 10 (12, 14, 15...). Solo saltar si next es guardia plausible
-    if(next&&esDia(next)&&+next>=10&&days[dia]!==undefined){i++;dia=+tokens[i];}
-    else if(next&&esDia(next)&&+next>=10&&days[+next]===undefined&&days[dia]!==undefined){i++;dia=+tokens[i];}
+    if(tok.length===1 && next && /^\d$/.test(next)) {
+      const combined = +(tok+next);
+      if(combined>=10 && combined<=31 && days[combined]===undefined) {
+        dia=combined;
+        i++; // consumir el segundo dígito
+      }
+    }
+
+    // Guardia Pycseca es siempre >= 10. Solo saltar si next es guardia plausible
+    const next2=tokens[i+1];
+    if(next2&&esDia(next2)&&+next2>=10&&days[dia]!==undefined){i++;dia=+tokens[i];}
+    else if(next2&&esDia(next2)&&+next2>=10&&days[+next2]===undefined&&days[dia]!==undefined){i++;dia=+tokens[i];}
 
     const seg=[];let j=i+1;
     while(j<tokens.length){
