@@ -4825,15 +4825,11 @@ function _parsearTextoHoras(text) {
     mesIdx = MESES_N.findIndex(m => norm.toUpperCase().includes(m));
   }
 
-  let saltarSiguiente = false;
   for (const rawLine of lines) {
     const line = rawLine.trim().replace(/\s+/g, ' ');
     if (!line) continue;
-    // Ignorar cabeceras y saldo inicial (incluyendo cuando OCR omite "INICIAL")
-    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\s+DIETA|INSTALADOR|TÉCNICO/i.test(line)) {
-      saltarSiguiente = true; continue;
-    }
-    if (saltarSiguiente) { saltarSiguiente = false; continue; }
+    // Ignorar cabeceras, totales y líneas de metadatos
+    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\s+DIETA|INSTALADOR|T[ÉE]CNICO|FIRMA|EMAIL|SIGNATURE/i.test(line)) continue;
 
     const m0 = line.match(/^(\d{1,2})[\s,\.:]/);
     if (!m0) continue;
@@ -4844,9 +4840,6 @@ function _parsearTextoHoras(text) {
     if (mesIdx >= 0) {
       const dim = new Date(anio, mesIdx + 1, 0).getDate();
       if (day > dim) continue;
-      // Si el día es domingo (0) y la línea no tiene horas, muy probablemente es ruido
-      const dow = new Date(anio, mesIdx, day).getDay();
-      // No excluir — pueden trabajar domingos en guardia
     }
 
     const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
@@ -5077,7 +5070,21 @@ async function cargarHojaEmpresa(input) {
 
     if (isPDF) {
       const buf = await file.arrayBuffer();
-      days = await _parsearPDFHoras(buf);
+      try {
+        days = await _parsearPDFHoras(buf);
+      } catch(pdfErr) {
+        // PDF encriptado u otro error → pedir imagen
+        if (body) body.innerHTML = `<div style="padding:40px 20px;text-align:center">
+          <div style="font-size:32px;margin-bottom:12px">🔒</div>
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px">PDF encriptado</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:20px">Este PDF no se puede leer directamente.<br>Sube una foto o pantallazo de la hoja.</div>
+          <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
+            📷 Subir imagen
+            <input type="file" accept="image/*" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
+          </label>
+        </div>`;
+        return;
+      }
     } else {
       days = await _parsearImagenHoras(file, pct => {
         const el = document.getElementById('cargaMsg');
