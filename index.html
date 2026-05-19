@@ -138,15 +138,6 @@ body{
 .chat-input:focus{border-color:rgba(249,115,22,0.4);}
 .send-btn{width:42px;height:42px;background:var(--acc);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(249,115,22,0.35);flex-shrink:0;transition:all .15s;}
 .send-btn:active{transform:scale(.92);box-shadow:0 2px 6px rgba(249,115,22,0.2);}
-.hoja-btn{width:42px;height:42px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s;font-size:19px;line-height:1;}
-.hoja-btn:active{transform:scale(.92);background:rgba(255,255,255,0.14);}
-.hoja-confirm{background:var(--bg2);border:1px solid var(--border);border-radius:4px 16px 16px 16px;padding:14px;box-shadow:var(--sh-card);font-size:13px;}
-.hoja-confirm-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);}
-.hoja-confirm-row:last-of-type{border-bottom:none;}
-.hoja-confirm-lbl{color:var(--text3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
-.hoja-confirm-val{font-family:var(--mono);font-weight:700;color:var(--text);font-size:13px;}
-.hoja-btn-ok{flex:1;padding:10px;background:var(--acc);color:white;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;}
-.hoja-btn-cancel{padding:10px 14px;background:var(--bg3);color:var(--text3);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:10px;margin-right:8px;}
 .send-btn svg{width:18px;height:18px;stroke:white;fill:none;stroke-width:2.3;}
 .typing{display:flex;gap:4px;align-items:center;padding:10px 13px;}
 .typing span{width:7px;height:7px;background:var(--text3);border-radius:50%;animation:bounce 1.2s infinite;}
@@ -892,10 +883,6 @@ body{
     <div class="chat-msgs" id="msgs"></div>
     <div class="suggestions" id="sugs"></div>
     <div class="input-bar">
-      <label class="hoja-btn" title="Subir hoja del día">
-        📷
-        <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="procesarHojaDia(this)">
-      </label>
       <input class="chat-input" id="chatIn" type="text" placeholder="inicio 7:30 · fin 15:40 · extras mes..." autocomplete="off">
       <button class="send-btn" id="sendBtn">
         <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -1249,7 +1236,7 @@ let ctxConv = { inicioPendiente: null, ultimaFecha: null, ultimaConsulta: null, 
 
 // Variables específicas de mi cuenta
 let liqMes = new Date().getMonth();
-let liqYear = new Date().getFullYear();
+let liqYear = 2026;
 
 // ============================================================
 // FUNCIONES DE PERSISTENCIA
@@ -1504,7 +1491,29 @@ function calcLiquido(y, m) {
   const stPrev = mesStats(prevY, prevM); // mes anterior → horas extras
 
   const baseFija = nomina.salario + nomina.antiguedad + nomina.beneficios + nomina.transporte + nomina.vestuario + nomina.complemento + nomina.prima + nomina.nocturnidad;
-  const variables = stPrev.extrasEuros + st.plusFest + st.plusGuardia;
+
+  // Guardias: se cobran en el mes siguiente a cuando TERMINAN
+  // Una guardia que empieza el 6/3 termina el 12/3 → se cobra en Abril
+  // Una guardia que empieza el 28/1 termina el 3/2 → se cobra en Marzo
+  function guardiasQueSeCobranEn(y, m) {
+    let count = 0;
+    const todas = [...GUARDIAS_2026, ...(guardiasCambios._extra||[]).map(s=>new Date(s+'T12:00:00'))];
+    for (const g of todas) {
+      const key = g.toISOString().split('T')[0];
+      if (guardiasCambios[key]==='eliminada'||guardiasCambios[key]==='cancelada') continue;
+      // La guardia termina 6 días después del inicio
+      const fin = new Date(g); fin.setDate(fin.getDate()+6);
+      // Se cobra en el mes siguiente al que termina
+      const cobroM = fin.getMonth()===11?0:fin.getMonth()+1;
+      const cobroY = fin.getMonth()===11?fin.getFullYear()+1:fin.getFullYear();
+      if (cobroY===y && cobroM===m) count++;
+    }
+    return count;
+  }
+
+  const guardiasEsteMes = guardiasQueSeCobranEn(y, m);
+  const plusGuardiaEsteMes = guardiasEsteMes * cfg.guardia;
+  const variables = stPrev.extrasEuros + st.plusFest + plusGuardiaEsteMes;
   const totalDevengado = baseFija + variables;
   const baseSSFija = baseFija - nomina.transporte - nomina.vestuario - nomina.prima;
   const deduSS = parseFloat((baseSSFija * 0.065).toFixed(2));
@@ -1512,7 +1521,7 @@ function calcLiquido(y, m) {
   const deduIRPF = parseFloat((totalDevengado * (nomina.irpf / 100)).toFixed(2));
   const totalDedu = deduSS + deduExtSS + deduIRPF;
   const liquido = totalDevengado - totalDedu;
-  return { baseFija, variables, totalDevengado, deduSS, deduExtSS, deduIRPF, totalDedu, liquido, st, stPrev, prevM, prevY };
+  return { baseFija, variables, totalDevengado, deduSS, deduExtSS, deduIRPF, totalDedu, liquido, st, stPrev, prevM, prevY, guardiasEsteMes, plusGuardiaEsteMes };
 }
 
 function renderLiquido() {
@@ -1526,8 +1535,8 @@ function renderLiquido() {
   const badge = document.getElementById('liqGuardiaBadge');
   const info = document.getElementById('liqGuardiaInfo');
   if (badge && info) {
-    if (c.st.guardiasMes > 0) {
-      info.textContent = c.st.guardiasMes + ' guardia' + (c.st.guardiasMes > 1 ? 's' : '') + ' · +' + c.st.plusGuardia.toFixed(0) + '€';
+    if (c.guardiasEsteMes > 0) {
+      info.textContent = c.guardiasEsteMes + ' guardia' + (c.guardiasEsteMes > 1 ? 's' : '') + ' · +' + c.plusGuardiaEsteMes.toFixed(0) + '€';
       badge.style.display = 'flex';
     } else {
       badge.style.display = 'none';
@@ -1539,7 +1548,7 @@ function renderLiquido() {
   // Guardia hero: 180€ si hay guardia este mes, 0€ si no
   const guardiaHeroEl = document.getElementById('liqGuardiaHero');
   if (guardiaHeroEl) {
-    const gVal = c.st.plusGuardia;
+    const gVal = c.plusGuardiaEsteMes;
     guardiaHeroEl.textContent = (gVal > 0 ? '+' : '') + gVal.toFixed(0) + '€';
     guardiaHeroEl.style.color = gVal > 0 ? 'var(--purple, #7C3AED)' : 'var(--text3)';
   }
@@ -1553,7 +1562,7 @@ function renderLiquido() {
   if (stPrev.ext > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small>${prevLabel} · +${m2str(stPrev.ext)} × ${cfg.precioH}€/h</small></div><div class="extra-val pos">+${stPrev.extrasEuros.toFixed(2)}€</div></div>`;
   else if (stPrev.ext < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">D\u00e9ficit horas <small>${prevLabel} · ${m2str(stPrev.ext)} vs convenio</small></div><div class="extra-val neg">${(stPrev.ext / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
   else evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small>${prevLabel} · Exacto al convenio</small></div><div class="extra-val" style="color:var(--text3)">\u00b10€</div></div>`;
-  if (st.guardiasMes > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus guardia semana<small>${st.guardiasMes} semana${st.guardiasMes > 1 ? 's' : ''} × ${cfg.guardia}€</small></div><div class="extra-val purple">+${st.plusGuardia.toFixed(2)}€</div></div>`;
+  if (c.guardiasEsteMes > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus guardia semana<small>${c.guardiasEsteMes} semana${c.guardiasEsteMes > 1 ? 's' : ''} × ${cfg.guardia}€</small></div><div class="extra-val purple">+${c.plusGuardiaEsteMes.toFixed(2)}€</div></div>`;
   if (st.plusFest > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo trabajado<small>${st.plusFest / cfg.festivo} d\u00eda${st.plusFest / cfg.festivo > 1 ? 's' : ''} × ${cfg.festivo}€</small></div><div class="extra-val purple">+${st.plusFest.toFixed(2)}€</div></div>`;
   if (st.gas > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Gastos reembolsables<small>Para cotejar con empresa</small></div><div class="extra-val acc">${st.gas.toFixed(2)}€</div></div>`;
   evHtml += `<div class="extra-row total"><div class="extra-lbl" style="font-weight:800;color:var(--text)">Total variables</div><div class="extra-val pos" style="font-size:15px">+${(c.variables).toFixed(2)}€</div></div>`;
@@ -1971,9 +1980,8 @@ function importarBackupCompleto(input) {
 function exportarExcel() {
   if (typeof XLSX === 'undefined') { showToast('Cargando librería...'); return; }
   const wb = XLSX.utils.book_new();
-  const expYear = cY_datos || new Date().getFullYear();
   const DSEM_FULL = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  const FESTIVOS_SET = new Set(getFestivos(expYear).map(f => f.d));
+  const FESTIVOS_SET = new Set(getFestivos(new Date().getFullYear()).map(f => f.d));
 
   function guardiaDiasSet() {
     const s = new Set();
@@ -1992,19 +2000,19 @@ function exportarExcel() {
   for (let mi = 0; mi < 12; mi++) {
     const mesNombre = MESES[mi];
     const aoa = [];
-    aoa.push([`JORNADA ${expYear} — ${mesNombre.toUpperCase()}`, '', '', '', '', '', '', '', '', '', '']);
+    aoa.push([`JORNADA 2026 — ${mesNombre.toUpperCase()}`, '', '', '', '', '', '', '', '', '', '']);
     aoa.push(['DÍA','SEM.','INICIO','FIN','COMIDA','TOTAL','TIPO','GUARDIA','GASTO €','CONCEPTO','NOTA']);
 
-    const dm = new Date(expYear, mi+1, 0).getDate();
+    const dm = new Date(2026, mi+1, 0).getDate();
     let totMins = 0, totGas = 0;
 
     for (let d = 1; d <= dm; d++) {
-      const fecha = new Date(expYear, mi, d);
-      const dstr  = `${expYear}-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const fecha = new Date(2026, mi, d);
+      const dstr  = `2026-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const fds   = fecha.getDay() === 0 || fecha.getDay() === 6;
       const fest  = FESTIVOS_SET.has(dstr);
       const guard = guardia_set.has(dstr);
-      const o     = gD(expYear, mi, d);
+      const o     = gD(2026, mi, d);
 
       let inicio='', fin='', comida='', total='', tipo='', gasto='', concepto='', nota='';
       let mins = 0;
@@ -2067,11 +2075,11 @@ function exportarExcel() {
   }
 
   // ── HOJA RESUMEN ─────────────────────────────────────
-  const resAoa = [[`RESUMEN JORNADA ${expYear}`,'','','','','','','','']];
+  const resAoa = [['RESUMEN JORNADA 2026','','','','','','','','']];
   resAoa.push(['MES','DÍAS TRAB.','HORAS REALES','HORAS CONV.','EXTRAS','GASTOS €','GUARDIAS','€/HORA','IMPORTE €']);
   let totY=0,extY=0,labY=0,gasY=0,impY=0,gSemsY=0;
   for (let mi = 0; mi < 12; mi++) {
-    const st = mesStats(expYear, mi);
+    const st = mesStats(2026, mi);
     // Contar guardias: base (vacías por diseño) + extras añadidas por usuario
     let gSems = st.guardiasMes; // mesStats ya cuenta ambas correctamente
     gSemsY += gSems;
@@ -2079,25 +2087,25 @@ function exportarExcel() {
     resAoa.push([MESES[mi],st.lab,minsToHHMM(st.tot),minsToHHMM(cfg.convenio*60),(e>=0?'+':'')+minsToHHMM(e),st.gas>0?parseFloat(st.gas.toFixed(2)):'',gSems>0?gSems+' sem.':'',cfg.precioH,imp]);
     totY+=st.tot; extY+=e; labY+=st.lab; gasY+=st.gas; impY+=imp;
   }
-  resAoa.push([`TOTAL ${expYear}`,labY,minsToHHMM(totY),minsToHHMM(cfg.convenio*60*12),(extY>=0?'+':'')+minsToHHMM(extY),gasY>0?parseFloat(gasY.toFixed(2)):'',gSemsY>0?gSemsY+' sem.':'',cfg.precioH,parseFloat(impY.toFixed(2))]);
+  resAoa.push(['TOTAL 2026',labY,minsToHHMM(totY),minsToHHMM(cfg.convenio*60*12),(extY>=0?'+':'')+minsToHHMM(extY),gasY>0?parseFloat(gasY.toFixed(2)):'',gSemsY>0?gSemsY+' sem.':'',cfg.precioH,parseFloat(impY.toFixed(2))]);
   const wsRes = XLSX.utils.aoa_to_sheet(resAoa);
   wsRes['!cols'] = [{wch:14},{wch:10},{wch:13},{wch:12},{wch:9},{wch:9},{wch:9},{wch:7},{wch:11}];
-  XLSX.utils.book_append_sheet(wb, wsRes, `Resumen ${expYear}`);
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen 2026');
 
   // ── HOJA NÓMINA ──────────────────────────────────────
-  const nomAoa = [[`NÓMINA ${expYear}`,'','','','','','','','','','','','']];
+  const nomAoa = [['NÓMINA 2026','','','','','','','','','','','','']];
   nomAoa.push(['MES','S.BASE','ANTIGÜED.','BENEFIC.','TRANSP.','VESTUAR.','COMPLEM.','PRIMA AT','NOCT.','HRS EXT','IRPF %','LÍQUIDO','OBSERV.']);
   for (let mi = 0; mi < 12; mi++) {
-    const st = mesStats(expYear, mi);
+    const st = mesStats(2026, mi);
     const extEuros = parseFloat((Math.max(0,st.ext)/60*cfg.precioH).toFixed(2));
     nomAoa.push([MESES[mi],nomina.salario,nomina.antiguedad,nomina.beneficios,nomina.transporte,nomina.vestuario,nomina.complemento,nomina.prima,nomina.nocturnidad,extEuros||'',nomina.irpf,'','']);
   }
   const wsNom = XLSX.utils.aoa_to_sheet(nomAoa);
   wsNom['!cols'] = Array(13).fill({wch:10});
-  XLSX.utils.book_append_sheet(wb, wsNom, `Nómina ${expYear}`);
+  XLSX.utils.book_append_sheet(wb, wsNom, 'Nómina 2026');
 
   // ── HOJA GUARDIAS ─────────────────────────────────────
-  const gAoa = [[`GUARDIAS ${expYear}`,'','','','']];
+  const gAoa = [['GUARDIAS 2026','','','','']];
   gAoa.push(['INICIO','FIN','DÍAS LAB.','PLUS €','ESTADO']);
   let totG=0;
   GUARDIAS_2026.forEach(g=>{
@@ -2106,7 +2114,7 @@ function exportarExcel() {
     const cambio=guardiasCambios[key];
     const estado=cambio==='cancelada'?'Cambiada':fin<new Date()?'Completada':g<=new Date()&&fin>=new Date()?'En curso':'Pendiente';
     let lab=0;for(let i=0;i<7;i++){const d=new Date(g);d.setDate(d.getDate()+i);if(d.getDay()>0&&d.getDay()<6)lab++;}
-    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/${g.getFullYear()}`,`${fin.getDate()}/${fin.getMonth()+1}/${fin.getFullYear()}`,lab,cfg.guardia,estado]);
+    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/2026`,`${fin.getDate()}/${fin.getMonth()+1}/2026`,lab,cfg.guardia,estado]);
     totG+=cfg.guardia;
   });
   // ── Guardias extra añadidas por el usuario ──
@@ -2116,25 +2124,25 @@ function exportarExcel() {
     const fin=new Date(g);fin.setDate(fin.getDate()+6);
     const estado=fin<new Date()?'Completada':g<=new Date()&&fin>=new Date()?'En curso':'Pendiente';
     let lab=0;for(let i=0;i<7;i++){const d=new Date(g);d.setDate(d.getDate()+i);if(d.getDay()>0&&d.getDay()<6)lab++;}
-    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/${g.getFullYear()}`,`${fin.getDate()}/${fin.getMonth()+1}/${fin.getFullYear()}`,lab,cfg.guardia,estado+' (+extra)']);
+    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/2026`,`${fin.getDate()}/${fin.getMonth()+1}/2026`,lab,cfg.guardia,estado+' (+extra)']);
     totG+=cfg.guardia;
   });
   gAoa.push(['TOTAL','','',totG,'']);
   const wsG = XLSX.utils.aoa_to_sheet(gAoa);
   wsG['!cols'] = [{wch:12},{wch:12},{wch:10},{wch:8},{wch:12}];
-  XLSX.utils.book_append_sheet(wb, wsG, `Guardias ${expYear}`);
+  XLSX.utils.book_append_sheet(wb, wsG, 'Guardias 2026');
 
   // ── Hojas de comparativas guardadas ───────────────────────
   for (let mi = 0; mi < 12; mi++) {
-    const chRaw = localStorage.getItem(KCH + '_' + expYear + '_' + String(mi+1).padStart(2,'0'));
+    const chRaw = localStorage.getItem(KCH + '_2026_' + String(mi+1).padStart(2,'0'));
     if (!chRaw) continue;
     try {
       const { days } = JSON.parse(chRaw);
-      const dm2 = new Date(expYear, mi+1, 0).getDate();
-      const chAoa = [['COMPARATIVA HORAS · ' + MESES[mi].toUpperCase() + ' ' + expYear,'','','','']];
+      const dm2 = new Date(2026, mi+1, 0).getDate();
+      const chAoa = [['COMPARATIVA HORAS · ' + MESES[mi].toUpperCase() + ' 2026','','','','']];
       chAoa.push(['DÍA','MI REGISTRO','EMPRESA','DIFERENCIA','ESTADO']);
       for (let d = 1; d <= dm2; d++) {
-        const inf = dayInfoDatos(expYear, mi, d);
+        const inf = dayInfoDatos(2026, mi, d);
         const emp = days[d];
         if (inf.fds || inf.fest) continue;
         const empMin = emp ? emp.mins : null;
@@ -2148,15 +2156,15 @@ function exportarExcel() {
     } catch(e) {}
   }
   // ── Hoja comparativa nóminas ────────────────────────────────
-  const cnAoa = [[`COMPARATIVA NÓMINAS ${expYear}`,'','','','']];
+  const cnAoa = [['COMPARATIVA NÓMINAS 2026','','','','']];
   cnAoa.push(['MES NÓMINA','CONCEPTO','APP ESTIMA','NÓMINA REAL','DIFERENCIA']);
   let hasCN = false;
   for (let mi = 0; mi < 12; mi++) {
-    const cnRaw = localStorage.getItem(KCN + '_' + expYear + '_' + String(mi+1).padStart(2,'0'));
+    const cnRaw = localStorage.getItem(KCN + '_2026_' + String(mi+1).padStart(2,'0'));
     if (!cnRaw) continue;
     try {
       const { data: n } = JSON.parse(cnRaw);
-      const c = calcLiquido(expYear, mi);
+      const c = calcLiquido(2026, mi);
       const pairs = [
         ['Líquido', c.liquido, n.liquido],
         ['Guardias', c.st.plusGuardia, n.guardias],
@@ -2206,10 +2214,6 @@ function importarExcel(input) {
         const mi = MESES_MAP[sheetName];
         if (mi === undefined) continue;
         const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
-        // Detectar el año del encabezado de la hoja (fila 0)
-        const header0 = String(rows[0]?.[0] || '');
-        const anoMatch = header0.match(/\b(20\d{2})\b/);
-        const impYear = anoMatch ? parseInt(anoMatch[1]) : new Date().getFullYear();
         for (const row of rows.slice(2)) {
           const dia = row[0];
           if (!dia || isNaN(parseInt(dia))) continue;
@@ -2244,9 +2248,9 @@ function importarExcel(input) {
           if (nota) o.nota = nota;
           if (!Object.keys(o).length) continue;
 
-          if (!nuevoDat[impYear]) nuevoDat[impYear] = {};
-          if (!nuevoDat[impYear][mi]) nuevoDat[impYear][mi] = {};
-          nuevoDat[impYear][mi][d] = o;
+          if (!nuevoDat[2026]) nuevoDat[2026] = {};
+          if (!nuevoDat[2026][mi]) nuevoDat[2026][mi] = {};
+          nuevoDat[2026][mi][d] = o;
           importados++;
         }
       }
@@ -3601,7 +3605,7 @@ function _detectar(raw,s_norm){
     return{accion:'gasto',valor:importe,concepto,fecha:parseFecha(s)||ctxConv.ultimaFecha||fechaHoy};
   }
 
-  if(/\b(extra|extras|horas? extra)\b/.test(s))return{accion:'qExtras',mes:parseMes(s),anual:/\b(a[n\u00f1]o|anual|\d{4})\b/.test(s),y:hoy.getFullYear()};
+  if(/\b(extra|extras|horas? extra)\b/.test(s))return{accion:'qExtras',mes:parseMes(s),anual:/\b(a[n\u00f1]o|anual|2026)\b/.test(s),y:hoy.getFullYear()};
   if(/\b(cu[a\u00e1]nto gast|en qu[e\u00e9] (me he?|he) gastado|gastos? del?|total gastos?|qu[e\u00e9] (me he?|he) gastado)\b/.test(s)||(/\bgastos\b/.test(s)&&/\b(mes|a[n\u00f1]o|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\b/.test(s)))return{accion:'qGastos',mes:parseMes(s),anual:/a[n\u00f1]o/.test(s),y:hoy.getFullYear()};
   if(/\b(resumen|c[o\u00f3]mo voy|balance|cu[a\u00e1]nto llevo)\b/.test(s))return{accion:'qResumen',mes:parseMes(s),y:hoy.getFullYear()};
   if(/\b(qu[e\u00e9] hice|ver el|jornada del?|c[o\u00f3]mo fue)\b/.test(s)){const fecha=parseFecha(s);if(fecha)return{accion:'qDia',fecha};}
@@ -3617,7 +3621,7 @@ function _detectar(raw,s_norm){
 
   if(/\b(guardia|guardias)\b/.test(s)){
     if(/pr\u00f3xima|siguiente/.test(s))return{accion:'qGuardiaNext'};
-    if(/todas|lista|cu[a\u00e1]ndo|\d{4}/.test(s))return{accion:'qGuardiasTodas'};
+    if(/todas|lista|cu[a\u00e1]ndo|2026/.test(s))return{accion:'qGuardiasTodas'};
     return{accion:'qGuardiasInfo'};
   }
 
@@ -3648,10 +3652,7 @@ function responder(int_){
     const hhmm=m2hhmm(int_.hora);
     const _t=getCtxTemporal();
     const f=frase('inicio',{hhmm,..._t})||`Entrada ${hhmm} \u2705`;
-    const fObj=ctxConv.ultimaFecha;
-    const dowI=DSEM[new Date(fObj.y,fObj.m,fObj.d).getDay()];
-    const fechaCardI=`<div class="res-row"><span class="res-lbl">D\u00eda</span><span class="res-val">${dowI} ${fObj.d} ${MESES_C[fObj.m]}</span></div>`;
-    const card=`<div class="res-card">${fechaCardI}<div class="res-row"><span class="res-lbl">Entrada</span><span class="res-val">${hhmm}</span></div></div>`;
+    const card=`<div class="res-card"><div class="res-row"><span class="res-lbl">Entrada</span><span class="res-val">${hhmm}</span></div></div>`;
     ctxConv.ultimaBotCat='inicio';ctxConv.ultimaBotMsg=f;
     return f+card;
   }
@@ -3672,9 +3673,7 @@ function responder(int_){
     const ctx_={totalStr:m2str(mins),extStr:(ext>=0?'+':'\u2212')+m2str(Math.abs(ext)),ext,mesExtStr:(st.ext>=0?'+':'\u2212')+m2str(Math.abs(st.ext)),hhmm_fin:m2hhmm(finMin),..._t2};
     const cat=ext>60?'finLargo':ext<-30?'finCorto':'fin';
     const f=frase(cat,ctx_)||`Jornada guardada \u2705`;
-    const dowF=DSEM[new Date(fecha.y,fecha.m,fecha.d).getDay()];
-    const fechaCardF=`<div class="res-row"><span class="res-lbl">D\u00eda</span><span class="res-val">${dowF} ${fecha.d} ${MESES_C[fecha.m]}</span></div>`;
-    const card=`<div class="res-card">${fechaCardF}<div class="res-row"><span class="res-lbl">Entrada</span><span class="res-val">${m2hhmm(inicioMin)}</span></div><div class="res-row"><span class="res-lbl">Salida</span><span class="res-val">${m2hhmm(finMin)}</span></div>${pausa?`<div class="res-row"><span class="res-lbl">Pausa</span><span class="res-val neg">\u2212${m2str(pausa)}</span></div>`:''}<div class="res-row"><span class="res-lbl">Total hoy</span><span class="res-val">${m2str(mins)}</span></div><div class="res-row"><span class="res-lbl">vs 8h</span><span class="res-val ${ext>=0?'pos':'neg'}">${ext>=0?'+':'\u2212'}${m2str(Math.abs(ext))}</span></div><div class="res-row"><span class="res-lbl">Extras mes</span><span class="res-val ${st.ext>=0?'pos':'neg'}">${st.ext>=0?'+':'\u2212'}${m2str(Math.abs(st.ext))}</span></div></div>`;
+    const card=`<div class="res-card"><div class="res-row"><span class="res-lbl">Entrada</span><span class="res-val">${m2hhmm(inicioMin)}</span></div><div class="res-row"><span class="res-lbl">Salida</span><span class="res-val">${m2hhmm(finMin)}</span></div>${pausa?`<div class="res-row"><span class="res-lbl">Pausa</span><span class="res-val neg">\u2212${m2str(pausa)}</span></div>`:''}<div class="res-row"><span class="res-lbl">Total hoy</span><span class="res-val">${m2str(mins)}</span></div><div class="res-row"><span class="res-lbl">vs 8h</span><span class="res-val ${ext>=0?'pos':'neg'}">${ext>=0?'+':'\u2212'}${m2str(Math.abs(ext))}</span></div><div class="res-row"><span class="res-lbl">Extras mes</span><span class="res-val ${st.ext>=0?'pos':'neg'}">${st.ext>=0?'+':'\u2212'}${m2str(Math.abs(st.ext))}</span></div></div>`;
     ctxConv.ultimaBotCat=cat;ctxConv.ultimaBotMsg=f;
     return f+card;
   }
@@ -3908,7 +3907,7 @@ function responder(int_){
   }
 
   if(accion==='qGuardiaNext'){
-    const g=proximaGuardia();if(!g)return`No hay m\u00e1s guardias en ${new Date().getFullYear()}.`;
+    const g=proximaGuardia();if(!g)return'No hay m\u00e1s guardias en 2026.';
     const fin=new Date(g);fin.setDate(fin.getDate()+6);const diff=Math.ceil((g-hoy)/(864e5));
     return`Tu pr\u00f3xima guardia:<div class="res-card"><div class="res-row"><span class="res-lbl">Inicio</span><span class="res-val blue">${DSEM[g.getDay()]} ${g.getDate()}/${g.getMonth()+1}</span></div><div class="res-row"><span class="res-lbl">Fin</span><span class="res-val">${DSEM[fin.getDay()]} ${fin.getDate()}/${fin.getMonth()+1}</span></div><div class="res-row"><span class="res-lbl">En</span><span class="res-val">${diff>0?diff+' d\u00edas':'Esta semana'}</span></div></div>`;
   }
@@ -4001,7 +4000,7 @@ function aplicarTemaGlobal(n) {
 
 // Nav button wiring
 // ── Estado compartido de mes entre módulos ───────────────────
-let _mesSync = { y: new Date().getFullYear(), m: new Date().getMonth() };
+let _mesSync = { y: 2026, m: new Date().getMonth() };
 
 function _sincronizarMes(destino) {
   // Al entrar a un módulo, ajustar su estado de mes al compartido
@@ -4019,6 +4018,18 @@ function goMes(dir) {
 function goLiqMes(dir) {
   liqMes += dir; if (liqMes > 11) { liqMes = 0; liqYear++; } if (liqMes < 0) { liqMes = 11; liqYear--; }
   _mesSync.y = liqYear; _mesSync.m = liqMes;
+  // Resetear estado del PDF al cambiar de mes
+  const pdfLoaded = document.getElementById('pdfLoaded');
+  const pdfEmpty = document.getElementById('pdfEmpty');
+  if (pdfLoaded) pdfLoaded.classList.remove('show');
+  if (pdfEmpty) pdfEmpty.classList.add('show');
+  // Cargar datos guardados del nuevo mes
+  const saved = cargarCompNomina(liqYear, liqMes);
+  if (saved) {
+    // Si hay datos guardados para este mes, mostrar el estado de cargado
+    if (pdfLoaded) pdfLoaded.classList.add('show');
+    if (pdfEmpty) pdfEmpty.classList.remove('show');
+  }
   renderLiquido();
 }
 
@@ -4373,9 +4384,8 @@ function renderMesDetalleBody() {
       // Fila entera coloreada (verde también)
       const rowBg = ok ? 'rgba(34,197,94,0.06)' : sinRegistro ? 'transparent' : diff>0 ? 'rgba(192,57,43,0.05)' : 'rgba(211,84,0,0.05)';
       const rowBorder = ok ? '#22c55e' : sinRegistro ? 'transparent' : diff>0 ? '#c0392b' : '#d35400';
-      const rowId = (!ok && !sinRegistro) ? ` id="compRow_${d}"` : '';
 
-      h+=`<div${rowId} style="display:flex;align-items:center;padding:9px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid ${rowBorder};background:${rowBg}">
+      h+=`<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid ${rowBorder};background:${rowBg}">
         <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
         <div style="flex:1;display:flex;align-items:center">
           <span style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${appMin>0?m2hm(appMin):'—'}</span>
@@ -4453,11 +4463,8 @@ function renderMesDetalleBody() {
       h+=`</div>`;
     }
 
-    // ── Botones compartir y cambiar PDF ──────────────────────
-    h+=`<div style="margin:10px 14px 0;display:flex;gap:8px;justify-content:flex-end">
-      <button onclick="compartirResumenMes(${y},${m})" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:white;cursor:pointer;padding:6px 12px;background:var(--acc);border:none;border-radius:8px">
-        📤 Compartir
-      </button>
+    // ── Botón cambiar PDF ─────────────────────────────────────
+    h+=`<div style="margin:10px 14px 0;display:flex;justify-content:flex-end">
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--text3);cursor:pointer;padding:6px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
         🔄 Cambiar PDF
         <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
@@ -4465,8 +4472,6 @@ function renderMesDetalleBody() {
     </div>`;
     h+=`<div style="height:80px"></div>`;
     body.innerHTML=h;
-    // Añadir botones "Ver hoja" en filas con discrepancia que tengan PDF guardado
-    _actualizarBotonesHoja(y, m, discDias.map(x => x.d));
 
   } else { // gastos
     let h='', totG=0;
@@ -4499,86 +4504,6 @@ function renderMesDetalleBody() {
     }
     h+=`<div style="height:60px"></div>`;
     body.innerHTML=h;
-  }
-}
-
-async function compartirResumenMes(y, m) {
-  const MESES_N = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const st = mesStats(y, m);
-  const compData = cargarCompHoras(y, m) || {};
-  const diasComp = Object.keys(compData).filter(k => !k.startsWith('_') && compData[k] && compData[k].mins > 0);
-  const tieneComp = diasComp.length > 0;
-  const CONV_MIN = cfg.convenio * 60;
-  const totApp = st.tot;
-  const extApp = totApp - CONV_MIN;
-
-  let empTotal = null;
-  if (tieneComp) {
-    empTotal = compData._totalOficial || diasComp.reduce((a, k) => a + compData[k].mins, 0);
-  }
-
-  const dim = new Date(y, m + 1, 0).getDate();
-  const discrepancias = [];
-  if (tieneComp) {
-    for (let d = 1; d <= dim; d++) {
-      const o = gD(y, m, d);
-      const tipo = o ? o.tipo || 'laboral' : 'laboral';
-      if (tipo === 'fds' || tipo === 'fest') continue;
-      const tr = parsearTramos(o?.tramos_txt || '');
-      const pausaInline = tr.reduce((a, t) => a + t.pausa, 0);
-      const appMin = totalTramos(tr) - (o?.pausa_min && !pausaInline ? o.pausa_min : 0);
-      const empDay = compData[d];
-      if (empDay && empDay.mins > 0 && Math.abs(appMin - empDay.mins) > 3) {
-        discrepancias.push({ d, appMin, empMin: empDay.mins, diff: appMin - empDay.mins });
-      }
-    }
-  }
-
-  let texto = `\uD83D\uDCCA RESUMEN HORAS \u2014 ${MESES_N[m].toUpperCase()} ${y}\n`;
-  texto += `Pycseca Seguridad\n\n`;
-  texto += `CONVENIO: ${m2hm(CONV_MIN)}h/mes\n`;
-  texto += `MI REGISTRO (App): ${m2hm(totApp)}h`;
-  if (extApp !== 0) texto += ` \u2192 ${extApp > 0 ? '+' : ''}${m2hm(extApp)}h extras`;
-  texto += '\n';
-
-  if (empTotal !== null) {
-    const extEmp = empTotal - CONV_MIN;
-    const diff = totApp - empTotal;
-    texto += `EMPRESA (PDF): ${m2hm(empTotal)}h`;
-    if (extEmp !== 0) texto += ` \u2192 ${extEmp > 0 ? '+' : ''}${m2hm(extEmp)}h extras`;
-    texto += '\n';
-    texto += `DIFERENCIA: ${diff > 0 ? '+' : ''}${m2hm(diff)}h ${diff > 0 ? 'a favor m\u00edo' : diff < 0 ? 'a favor empresa' : 'sin diferencia'}\n`;
-  } else {
-    texto += `EMPRESA: Sin PDF cargado\n`;
-  }
-
-  if (discrepancias.length > 0) {
-    texto += `\n\u26A0\uFE0F D\u00CDAS CON DISCREPANCIA (${discrepancias.length}):\n`;
-    discrepancias.forEach(({ d, appMin, empMin, diff }) => {
-      texto += `\u00B7 D\u00eda ${d}: App ${m2hm(appMin)}h / Empresa ${m2hm(empMin)}h \u2192 ${diff > 0 ? '+' : ''}${m2hm(diff)}h\n`;
-    });
-  } else if (tieneComp) {
-    texto += `\n\u2705 Todos los registros coinciden con la empresa\n`;
-  }
-
-  texto += `\n\u2014\u2014\u2014\nGenerado por PycHoras \u00B7 ${new Date().toLocaleDateString('es-ES')}`;
-
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: `Horas ${MESES_N[m]} ${y} \u00B7 PycHoras`, text: texto });
-    } else {
-      await navigator.clipboard.writeText(texto);
-      showToast('\u2713 Resumen copiado al portapapeles');
-    }
-  } catch (e) {
-    if (e.name !== 'AbortError') {
-      try {
-        await navigator.clipboard.writeText(texto);
-        showToast('\u2713 Resumen copiado al portapapeles');
-      } catch {
-        showToast('Compartir no disponible en este navegador');
-      }
-    }
   }
 }
 
@@ -4825,11 +4750,15 @@ function _parsearTextoHoras(text) {
     mesIdx = MESES_N.findIndex(m => norm.toUpperCase().includes(m));
   }
 
+  let saltarSiguiente = false;
   for (const rawLine of lines) {
     const line = rawLine.trim().replace(/\s+/g, ' ');
     if (!line) continue;
-    // Ignorar cabeceras, totales y líneas de metadatos
-    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\s+DIETA|INSTALADOR|T[ÉE]CNICO|FIRMA|EMAIL|SIGNATURE/i.test(line)) continue;
+    // Ignorar cabeceras y saldo inicial (incluyendo cuando OCR omite "INICIAL")
+    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\s+DIETA|INSTALADOR|TÉCNICO/i.test(line)) {
+      saltarSiguiente = true; continue;
+    }
+    if (saltarSiguiente) { saltarSiguiente = false; continue; }
 
     const m0 = line.match(/^(\d{1,2})[\s,\.:]/);
     if (!m0) continue;
@@ -4840,6 +4769,9 @@ function _parsearTextoHoras(text) {
     if (mesIdx >= 0) {
       const dim = new Date(anio, mesIdx + 1, 0).getDate();
       if (day > dim) continue;
+      // Si el día es domingo (0) y la línea no tiene horas, muy probablemente es ruido
+      const dow = new Date(anio, mesIdx, day).getDay();
+      // No excluir — pueden trabajar domingos en guardia
     }
 
     const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
@@ -4951,12 +4883,8 @@ async function _parsearPDFHoras(arrayBuffer) {
 function _detectarMesPDF(nombre) {
   const n = nombre.toLowerCase();
   const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const anioActual = new Date().getFullYear();
   for (let i = 0; i < meses.length; i++) {
-    if (n.includes(meses[i])) {
-      const ym = nombre.match(/20(\d{2})/);
-      return { y: ym ? parseInt('20'+ym[1]) : anioActual, m: i };
-    }
+    if (n.includes(meses[i])) return { y: 2026, m: i };
   }
   // Buscar patrón _MMYYYY_ o _042026_
   const mNum = nombre.match(/_(\d{2})(\d{4})_/) || nombre.match(/(\d{2})(\d{4})/);
@@ -5020,9 +4948,9 @@ function borrarCompHoras(y, m) {
   localStorage.removeItem(_compHorasKey(y, m));
   _empresaDays = {}; _empresaMes = null; _empresaImgSrc = null;
   _compCargado = false; _compGuardada = false; _empresaMesDetectado = null;
+  document.getElementById('compStickyHdr').style.display = 'none';
+  renderComparacion();
   showToast('Comparativa eliminada');
-  _mdTab = 'comp';
-  abrirMesDetalle(m);
 }
 
 function guardarCompNomina(y, m, data) {
@@ -5044,7 +4972,7 @@ function _detectarMesTexto(text) {
     const re = new RegExp(MESES_ES[mi].toUpperCase());
     if (re.test(upper)) {
       const ym = upper.match(/20(\d{2})/);
-      return { m: mi, y: ym ? parseInt('20'+ym[1]) : new Date().getFullYear() };
+      return { m: mi, y: ym ? parseInt('20'+ym[1]) : 2026 };
     }
   }
   return null;
@@ -5070,21 +4998,7 @@ async function cargarHojaEmpresa(input) {
 
     if (isPDF) {
       const buf = await file.arrayBuffer();
-      try {
-        days = await _parsearPDFHoras(buf);
-      } catch(pdfErr) {
-        // PDF encriptado u otro error → pedir imagen
-        if (body) body.innerHTML = `<div style="padding:40px 20px;text-align:center">
-          <div style="font-size:32px;margin-bottom:12px">🔒</div>
-          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px">PDF encriptado</div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:20px">Este PDF no se puede leer directamente.<br>Sube una foto o pantallazo de la hoja.</div>
-          <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
-            📷 Subir imagen
-            <input type="file" accept="image/*" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
-          </label>
-        </div>`;
-        return;
-      }
+      days = await _parsearPDFHoras(buf);
     } else {
       days = await _parsearImagenHoras(file, pct => {
         const el = document.getElementById('cargaMsg');
@@ -5552,7 +5466,7 @@ function renderNomComp() {
 
   const saved = cargarCompNomina(y, m);
   const appVals = {
-    guardias: c.st.plusGuardia,
+    guardias: c.plusGuardiaEsteMes,
     festivo:  c.st.plusFest,
     extras:   c.stPrev.extrasEuros,
     liquido:  c.liquido,
@@ -5598,7 +5512,7 @@ function renderNomComp() {
 
   el.innerHTML =
     '<div class="nomcomp-mes-lbl">\u2139 Esta n\u00f3mina paga las extras de <strong>' + mesPrev + ' ' + yprev + '</strong>. Escribe los valores reales de tu n\u00f3mina.</div>' +
-    _row('guardias', 'Guardias', c.st.guardiasMes + ' sem. \u00d7 ' + cfg.guardia + '\u20ac', appVals.guardias, realVals.guardias) +
+    _row('guardias', 'Guardias', c.guardiasEsteMes + ' sem. \u00d7 ' + cfg.guardia + '\u20ac', appVals.guardias, realVals.guardias) +
     (c.st.plusFest > 0 || (saved && saved.festivo)
       ? _row('festivo', 'Plus festivo guardia', Math.round(c.st.plusFest / cfg.festivo || 0) + ' d\u00eda \u00d7 ' + cfg.festivo + '\u20ac', appVals.festivo, realVals.festivo)
       : '<div class="nomcomp-row" style="opacity:.5"><div class="nomcomp-row-left"><div class="nomcomp-row-lbl">Plus festivo guardia</div><div class="nomcomp-row-sub">Sin festivos en guardia este mes</div></div><div class="nomcomp-row-right"><span class="nomcomp-badge nomcomp-badge-na">N/A</span></div></div>') +
@@ -5615,8 +5529,8 @@ function renderNomComp() {
 function recalcNomComp() {
   const y = liqYear, m = liqMes;
   const c = calcLiquido(y, m);
-  const appVals = { guardias: c.st.plusGuardia, festivo: c.st.plusFest, extras: c.stPrev.extrasEuros, liquido: c.liquido };
-  let allFilled = true;
+  const appVals = { guardias: c.plusGuardiaEsteMes, festivo: c.st.plusFest, extras: c.stPrev.extrasEuros, liquido: c.liquido };
+  let allFilled = true, bigDiff = null;
 
   for (const id of ['guardias','festivo','extras','liquido']) {
     const inp = document.getElementById('nc_' + id);
@@ -5627,6 +5541,7 @@ function recalcNomComp() {
     if (isNaN(real) || inp.value === '') { allFilled = false; bdg.innerHTML = '<span class="nomcomp-badge nomcomp-badge-na">\u2014</span>'; continue; }
     const d    = Math.abs(app - real);
     const sign = real > app ? '+' : '\u2212';
+    if (d >= 0.5 && id === 'liquido') bigDiff = app - real;
     bdg.innerHTML = d < 0.5
       ? '<span class="nomcomp-badge nomcomp-badge-ok">\u2713</span>'
       : '<span class="nomcomp-badge ' + (d < 10 ? 'nomcomp-badge-warn' : 'nomcomp-badge-err') + '">' + sign + d.toFixed(2) + '\u20ac</span>';
@@ -5636,38 +5551,19 @@ function recalcNomComp() {
   if (!vd) return;
   if (!allFilled) { vd.innerHTML = ''; return; }
 
-  // Recoger diferencias por concepto
-  const labels = { guardias: 'Guardias', festivo: 'Plus festivo', extras: 'Horas extras', liquido: 'L\u00edquido' };
-  const diffs = [];
-  for (const id of ['guardias','festivo','extras','liquido']) {
-    const inp = document.getElementById('nc_' + id);
-    if (!inp || inp.value === '') continue;
-    const real = parseFloat(inp.value);
-    const app  = appVals[id];
-    const d = app - real; // positivo = cobras menos, negativo = cobras más
-    if (Math.abs(d) >= 0.5) diffs.push({ id, lbl: labels[id], d });
-  }
-
-  if (diffs.length === 0) {
+  if (bigDiff === null) {
     vd.innerHTML = '<div class="nomcomp-veredicto" style="background:rgba(22,163,74,0.08)">' +
       '<div class="nomcomp-veredicto-icon">\u2713</div>' +
       '<div><div class="nomcomp-veredicto-title">La n\u00f3mina cuadra</div>' +
       '<div class="nomcomp-veredicto-sub">Todos los conceptos coinciden con la estimaci\u00f3n</div></div></div>';
   } else {
-    const liqDiff = diffs.find(x => x.id === 'liquido');
-    const bg   = liqDiff && liqDiff.d > 0 ? 'rgba(220,38,38,0.07)' : 'rgba(249,115,22,0.07)';
-    const icon = liqDiff && liqDiff.d > 0 ? '\u26a0' : '\u2139';
-    const titulo = liqDiff
-      ? 'Diferencia de ' + Math.abs(liqDiff.d).toFixed(2) + '\u20ac en el l\u00edquido'
-      : diffs.length + ' concepto' + (diffs.length > 1 ? 's' : '') + ' no coincide' + (diffs.length > 1 ? 'n' : '');
-    const detalles = diffs.map(x => {
-      const signo = x.d > 0 ? 'cobras menos' : 'cobras m\u00e1s';
-      return x.lbl + ': ' + signo + ' ' + Math.abs(x.d).toFixed(2) + '\u20ac';
-    }).join(' \u00b7 ');
+    const cobras = bigDiff > 0 ? 'cobras\u00a0menos\u00a0de\u00a0lo\u00a0estimado' : 'cobras\u00a0m\u00e1s\u00a0de\u00a0lo\u00a0estimado';
+    const bg     = bigDiff > 0 ? 'rgba(220,38,38,0.07)' : 'rgba(249,115,22,0.07)';
+    const icon   = bigDiff > 0 ? '\u26a0' : '\u2139';
     vd.innerHTML = '<div class="nomcomp-veredicto" style="background:' + bg + '">' +
       '<div class="nomcomp-veredicto-icon">' + icon + '</div>' +
-      '<div><div class="nomcomp-veredicto-title">' + titulo + '</div>' +
-      '<div class="nomcomp-veredicto-sub">' + detalles + '</div></div></div>';
+      '<div><div class="nomcomp-veredicto-title">Diferencia de ' + Math.abs(bigDiff).toFixed(2) + '\u20ac en el l\u00edquido</div>' +
+      '<div class="nomcomp-veredicto-sub">' + cobras.charAt(0).toUpperCase() + cobras.slice(1) + '. Revisa las filas marcadas.</div></div></div>';
   }
 }
 
@@ -5682,271 +5578,6 @@ function guardarNomComp() {
   guardarCompNomina(y, m, data);
   showToast('\u2713 Comparativa guardada');
   renderNomComp();
-}
-
-// ============================================================
-// MÓDULO HOJA DEL DÍA — Pycseca
-// ============================================================
-
-// ── IndexedDB ────────────────────────────────────────────────
-const _PDB_NAME = 'PycHorasDB', _PDB_VER = 1, _PDB_STORE = 'hojas_dia';
-function _abrirPycDB() {
-  return new Promise((res, rej) => {
-    const req = indexedDB.open(_PDB_NAME, _PDB_VER);
-    req.onupgradeneeded = e => e.target.result.createObjectStore(_PDB_STORE, { keyPath: 'fecha' });
-    req.onsuccess = e => res(e.target.result);
-    req.onerror = () => rej(req.error);
-  });
-}
-async function _guardarHojaDB(fecha, blob) {
-  try {
-    const db = await _abrirPycDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(_PDB_STORE, 'readwrite');
-      tx.objectStore(_PDB_STORE).put({ fecha, blob, ts: Date.now() });
-      tx.oncomplete = () => res(true); tx.onerror = () => rej(tx.error);
-    });
-  } catch(e) { return false; }
-}
-async function _leerHojaDB(fecha) {
-  try {
-    const db = await _abrirPycDB();
-    return new Promise((res, rej) => {
-      const req = db.transaction(_PDB_STORE, 'readonly').objectStore(_PDB_STORE).get(fecha);
-      req.onsuccess = () => res(req.result || null); req.onerror = () => res(null);
-    });
-  } catch(e) { return null; }
-}
-async function _listarFechasHojasDB() {
-  try {
-    const db = await _abrirPycDB();
-    return new Promise((res, rej) => {
-      const req = db.transaction(_PDB_STORE, 'readonly').objectStore(_PDB_STORE).getAllKeys();
-      req.onsuccess = () => res(req.result || []); req.onerror = () => res([]);
-    });
-  } catch(e) { return []; }
-}
-
-// ── Parser hoja jornada Pycseca ──────────────────────────────
-const _MESES_HOJA = {'enero':0,'febrero':1,'marzo':2,'abril':3,'mayo':4,'junio':5,'julio':6,'agosto':7,'septiembre':8,'octubre':9,'noviembre':10,'diciembre':11};
-
-function _parsearHojaJornada(text) {
-  const r = { fecha: null, fechaStr: null, inicio: null, fin: null, pausaMin: 0, gastos: [], ok: false };
-  const norm = text.replace(/\r/g, '').replace(/\s{2,}/g, ' ');
-
-  // ── Fecha ──
-  const fm = norm.match(/[Dd]\u00eda\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/);
-  if (fm) {
-    const d = parseInt(fm[1]), mi = _MESES_HOJA[fm[2].toLowerCase()], y = parseInt(fm[3]);
-    if (mi !== undefined) {
-      r.fecha = { y, m: mi, d };
-      r.fechaStr = y + '-' + String(mi+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-    }
-  }
-
-  // ── Inicio y fin jornada ──
-  // Busca HH:MM(:SS) cerca de INICIO JORNADA / FIN JORNADA
-  const horaRe = /\b(\d{1,2}:\d{2})(?::\d{2})?\b/g;
-  const lineas = text.split('\n');
-  for (const ln of lineas) {
-    if (/INICIO\s*JORNADA/i.test(ln)) {
-      const m = ln.match(/\b(\d{1,2}:\d{2})(?::\d{2})?/);
-      if (m) r.inicio = m[1];
-    }
-    if (/FIN\s*JORNADA/i.test(ln)) {
-      const todos = [...ln.matchAll(/\b(\d{1,2}:\d{2})(?::\d{2})?/g)];
-      if (todos.length) r.fin = todos[todos.length-1][1];
-    }
-  }
-  // Fallback: buscar en el texto completo si las líneas no funcionaron
-  if (!r.inicio) {
-    const m = norm.match(/(\d{1,2}:\d{2})(?::\d{2})?\s+INICIO\s*JORNADA/i)
-           || norm.match(/INICIO\s*JORNADA\s+(\d{1,2}:\d{2})(?::\d{2})?/i);
-    if (m) r.inicio = m[1];
-  }
-  if (!r.fin) {
-    const m = norm.match(/(\d{1,2}:\d{2})(?::\d{2})?\s+FIN\s*JORNADA/i)
-           || norm.match(/FIN\s*JORNADA[^0-9]*(\d{1,2}:\d{2})(?::\d{2})?/i);
-    if (m) r.fin = m[1];
-  }
-
-  // ── Pausa comida ──
-  for (const ln of lineas) {
-    // Línea de COMIDA (la fila del parte, no la sección de gastos)
-    if (/COMIDA[:\s]/i.test(ln) && !/COMIDAS\s+[\d]/i.test(ln)) {
-      const horas = [...ln.matchAll(/\b(\d{1,2}:\d{2})(?::\d{2})?/g)];
-      if (horas.length >= 2) {
-        const t2m = s => { const p=s.split(':'); return +p[0]*60 + +p[1]; };
-        const ini = t2m(horas[0][1]), fin2 = t2m(horas[horas.length-1][1]);
-        if (fin2 > ini) r.pausaMin = fin2 - ini;
-      }
-      break;
-    }
-  }
-
-  // ── Gastos ──
-  const parseEur = s => { const m = s.match(/([\d]+(?:[.,]\d+)?)\s*\u20ac/); return m ? parseFloat(m[1].replace(',','.')) : 0; };
-  for (const ln of lineas) {
-    const L = ln.toUpperCase();
-    if (L.includes('GASOLINA')) continue; // empresa paga siempre
-    if (L.includes('COMIDAS')) {
-      if (/TARJETA/i.test(ln)) continue; // tarjeta empresa → no registrar
-      const v = parseEur(ln); if (v > 0) r.gastos.push({ concepto: 'Comida', importe: v });
-    } else if (L.includes('PARKING')) {
-      const v = parseEur(ln); if (v > 0) r.gastos.push({ concepto: 'Parking', importe: v });
-    } else if (L.includes('MATERIALES')) {
-      const v = parseEur(ln); if (v > 0) r.gastos.push({ concepto: 'Materiales', importe: v });
-    } else if (L.includes('PEAJES')) {
-      const v = parseEur(ln); if (v > 0) r.gastos.push({ concepto: 'Peajes', importe: v });
-    } else if (/^OTROS/i.test(ln.trim())) {
-      const v = parseEur(ln); if (v > 0) r.gastos.push({ concepto: 'Otros', importe: v });
-    }
-  }
-
-  r.ok = !!(r.fecha && r.inicio && r.fin);
-  return r;
-}
-
-// ── Procesar hoja subida desde el chat ──────────────────────
-async function procesarHojaDia(input) {
-  const file = input.files[0]; input.value = '';
-  if (!file) return;
-
-  // Mostrar mensaje "procesando" en el chat
-  const tid = 'hoja_' + Date.now();
-  const tw = document.createElement('div'); tw.className = 'msg bot'; tw.id = tid;
-  tw.innerHTML = '<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
-  const mc = document.getElementById('msgs'); mc.appendChild(tw); mc.scrollTop = mc.scrollHeight;
-
-  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  let text = '';
-
-  try {
-    if (isPDF) {
-      if (!_initPdfJs()) throw new Error('pdf.js no disponible');
-      const buf = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-      for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const content = await page.getTextContent();
-        text += content.items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join('') + '\n';
-      }
-    } else {
-      const Tesseract = await _loadTesseract();
-      const { data } = await Tesseract.recognize(file, 'spa');
-      text = data.text;
-    }
-
-    const el = document.getElementById(tid); if (el) el.remove();
-    const datos = _parsearHojaJornada(text);
-    _mostrarConfirmHoja(datos, file);
-
-  } catch(e) {
-    const el = document.getElementById(tid); if (el) el.remove();
-    addMsg('bot', '\u274C Error al leer el archivo: ' + e.message);
-  }
-}
-
-// ── Mostrar tarjeta de confirmación en el chat ───────────────
-function _mostrarConfirmHoja(datos, blob) {
-  if (!datos.ok) {
-    addMsg('bot', '\u26A0\uFE0F No pude leer todos los datos de la hoja.<br><small style="color:var(--text3)">Aseg\u00farate de que la imagen es clara y muestra la hoja completa de Pycseca.</small>');
-    return;
-  }
-  const { fecha, inicio, fin, pausaMin, gastos } = datos;
-  const dow = ['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'][new Date(fecha.y, fecha.m, fecha.d).getDay()];
-  const MESES_N = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const totGasto = gastos.reduce((a,g) => a + g.importe, 0);
-  const gasStr = gastos.length
-    ? gastos.map(g => g.concepto + ' ' + g.importe.toFixed(2) + '\u20ac').join(' · ')
-    : 'Ninguno';
-
-  const uid = 'conf_' + Date.now();
-  const html = `<div class="hoja-confirm">
-    <div style="font-size:12px;font-weight:800;color:var(--acc);margin-bottom:10px;letter-spacing:.04em">HOJA DEL D\u00cdA DETECTADA</div>
-    <div class="hoja-confirm-row"><span class="hoja-confirm-lbl">Fecha</span><span class="hoja-confirm-val">${dow} ${fecha.d} ${MESES_N[fecha.m]} ${fecha.y}</span></div>
-    <div class="hoja-confirm-row"><span class="hoja-confirm-lbl">Inicio</span><span class="hoja-confirm-val">${inicio}</span></div>
-    <div class="hoja-confirm-row"><span class="hoja-confirm-lbl">Fin</span><span class="hoja-confirm-val">${fin}</span></div>
-    <div class="hoja-confirm-row"><span class="hoja-confirm-lbl">Pausa comida</span><span class="hoja-confirm-val">${pausaMin > 0 ? m2hm(pausaMin) + 'h' : 'Sin pausa'}</span></div>
-    <div class="hoja-confirm-row"><span class="hoja-confirm-lbl">Gastos</span><span class="hoja-confirm-val" style="font-size:11px">${gasStr}</span></div>
-    <div style="display:flex;gap:8px">
-      <button class="hoja-btn-cancel" onclick="_cancelarHoja('${uid}')">Cancelar</button>
-      <button class="hoja-btn-ok" onclick="_guardarDesdeHoja('${uid}')">✓ Guardar registro</button>
-    </div>
-  </div>`;
-
-  // Guardar datos temporalmente para recuperarlos al confirmar
-  window._hojaTemp = window._hojaTemp || {};
-  window._hojaTemp[uid] = { datos, blob };
-
-  const wrap = document.createElement('div'); wrap.className = 'msg bot'; wrap.id = uid;
-  const ts = new Date(); const tsStr = String(ts.getHours()).padStart(2,'0') + ':' + String(ts.getMinutes()).padStart(2,'0');
-  wrap.innerHTML = html + '<div class="msg-time">' + tsStr + '</div>';
-  const mc = document.getElementById('msgs'); mc.appendChild(wrap); mc.scrollTop = mc.scrollHeight;
-}
-
-function _cancelarHoja(uid) {
-  const el = document.getElementById(uid); if (el) el.remove();
-  if (window._hojaTemp) delete window._hojaTemp[uid];
-}
-
-async function _guardarDesdeHoja(uid) {
-  const temp = window._hojaTemp && window._hojaTemp[uid];
-  if (!temp) return;
-  const { datos, blob } = temp;
-  const { fecha, inicio, fin, pausaMin, gastos, fechaStr } = datos;
-
-  // Guardar registro en el sistema de la app
-  const o = gD(fecha.y, fecha.m, fecha.d) || {};
-  const tramos = inicio + '-' + fin;
-  const nuevo = { ...o, tipo: 'laboral', tramos_txt: tramos };
-  if (pausaMin > 0) nuevo.pausa_min = pausaMin;
-  if (gastos.length > 0) {
-    nuevo.gasto = gastos.reduce((a, g) => a + g.importe, 0);
-    nuevo.concepto = gastos.map(g => g.concepto).join(', ');
-  }
-  sD(fecha.y, fecha.m, fecha.d, nuevo);
-
-  // Guardar archivo original en IndexedDB
-  await _guardarHojaDB(fechaStr, blob);
-
-  // Limpiar UI
-  const el = document.getElementById(uid); if (el) el.remove();
-  delete window._hojaTemp[uid];
-
-  // Confirmar
-  const dow = ['Dom','Lun','Mar','Mi\u00e9','Jue','Vie','S\u00e1b'][new Date(fecha.y, fecha.m, fecha.d).getDay()];
-  addMsg('bot', '\u2713 Registro guardado — ' + dow + ' ' + fecha.d + '<br><span class="pill">' + inicio + '</span> <span class="pill">' + fin + '</span>' + (pausaMin > 0 ? ' <span class="pill">pausa ' + m2hm(pausaMin) + '</span>' : '') + (gastos.length > 0 ? '<br>\uD83D\uDCB0 Gasto: ' + gastos.map(g => g.concepto + ' ' + g.importe.toFixed(2) + '\u20ac').join(', ') : ''));
-
-  renderJornada(); renderMesDatos();
-}
-
-// ── Ver hoja original guardada ───────────────────────────────
-async function verHojaDia(fechaStr) {
-  const reg = await _leerHojaDB(fechaStr);
-  if (!reg || !reg.blob) { showToast('Hoja no encontrada'); return; }
-  const url = URL.createObjectURL(reg.blob);
-  const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener';
-  document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
-}
-
-// ── Actualizar botones "Ver hoja" en tab Comparar ────────────
-async function _actualizarBotonesHoja(y, m, discDias) {
-  if (!discDias.length) return;
-  const fechas = await _listarFechasHojasDB();
-  const set = new Set(fechas);
-  discDias.forEach(d => {
-    const fechaStr = y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-    if (!set.has(fechaStr)) return;
-    const row = document.getElementById('compRow_' + d);
-    if (!row) return;
-    const btn = document.createElement('button');
-    btn.title = 'Ver hoja Pycseca de este d\u00eda';
-    btn.style.cssText = 'margin-left:6px;padding:2px 7px;font-size:9px;font-weight:800;background:rgba(37,99,235,0.1);color:#2563eb;border:1px solid rgba(37,99,235,0.2);border-radius:5px;cursor:pointer;white-space:nowrap;';
-    btn.textContent = '\uD83D\uDCC4 Hoja';
-    btn.onclick = () => verHojaDia(fechaStr);
-    row.appendChild(btn);
-  });
 }
 </script>
 </body>
