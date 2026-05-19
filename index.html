@@ -219,6 +219,7 @@ body{
 .dg-cell.und  .dg-fill{background:#FBBF24;}
 .dg-cell.norm .dg-fill{background:var(--acc);}
 .dg-cell.over .dg-fill{background:var(--acc-dk);}
+.dg-cell.fut  .dg-fill{background:var(--acc);}
 .dg-cell.fest .dg-fill,.dg-cell.wknd .dg-fill{background:#D1D5DB;}
 /* Hora y dots */
 .dg-time{font-size:8px;font-family:var(--mono);font-weight:700;color:var(--text3);line-height:1;}
@@ -2326,9 +2327,9 @@ function dayInfJornada(y, m, d) {
   const fds = isFDS(date), fest = isFest(dstr), fut = isFut(y, m, d);
   const o = gD(y, m, d);
   if (!o) {
-    if (fut)  return { tipo:'fut',    estado:'fut',  mins:480, tramos_txt:'', gasto:0, concepto:'', nota:'', fds, fest, fut, custom:false };
     if (fds)  return { tipo:'wknd',   estado:'wknd', mins:0,   tramos_txt:'', gasto:0, concepto:'', nota:'', fds, fest, fut, custom:false };
     if (fest) return { tipo:'fest',   estado:'fest', mins:0,   tramos_txt:'', gasto:0, concepto:'', nota:'', fds, fest, fut, custom:false };
+    if (fut)  return { tipo:'fut',    estado:'fut',  mins:480, tramos_txt:'', gasto:0, concepto:'', nota:'', fds, fest, fut, custom:false };
     return   { tipo:'laboral', estado:'norm', mins:480, tramos_txt:'', gasto:0, concepto:'', nota:'', fds, fest, fut, custom:false };
   }
   const tipo = o.tipo || 'laboral'; let mins = 0, estado = tipo;
@@ -4018,18 +4019,9 @@ function goMes(dir) {
 function goLiqMes(dir) {
   liqMes += dir; if (liqMes > 11) { liqMes = 0; liqYear++; } if (liqMes < 0) { liqMes = 11; liqYear--; }
   _mesSync.y = liqYear; _mesSync.m = liqMes;
-  // Resetear estado del PDF al cambiar de mes
+  // Resetear estado PDF al cambiar de mes — cada mes tiene su propio PDF
   const pdfLoaded = document.getElementById('pdfLoaded');
-  const pdfEmpty = document.getElementById('pdfEmpty');
   if (pdfLoaded) pdfLoaded.classList.remove('show');
-  if (pdfEmpty) pdfEmpty.classList.add('show');
-  // Cargar datos guardados del nuevo mes
-  const saved = cargarCompNomina(liqYear, liqMes);
-  if (saved) {
-    // Si hay datos guardados para este mes, mostrar el estado de cargado
-    if (pdfLoaded) pdfLoaded.classList.add('show');
-    if (pdfEmpty) pdfEmpty.classList.remove('show');
-  }
   renderLiquido();
 }
 
