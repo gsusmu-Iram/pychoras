@@ -193,7 +193,6 @@ body{
   background:transparent;border-color:transparent;
 }
 .dg-cell.emp{pointer-events:none;}
-.dg-cell.fut{opacity:.45;}
 .dg-cell.fest,.dg-cell.wknd{opacity:.45;}
 /* El número */
 .dg-num{
@@ -201,8 +200,11 @@ body{
   width:28px;height:28px;display:flex;align-items:center;justify-content:center;
   border-radius:50%;color:var(--text2);
 }
-.dg-cell.norm .dg-num,.dg-cell.over .dg-num{color:var(--text);font-weight:800;}
-/* HOY → círculo naranja */
+.dg-cell.norm .dg-num,.dg-cell.over .dg-num,.dg-cell.fut .dg-num{color:var(--text);font-weight:800;}
+.dg-cell.norm .dg-fill{background:var(--acc);}
+.dg-cell.over .dg-fill{background:var(--acc-dk);}
+.dg-cell.fut  .dg-fill{background:var(--acc);}
+.dg-cell.fest .dg-fill,.dg-cell.wknd .dg-fill{background:#D1D5DB;}
 .dg-cell.today .dg-num{
   background:var(--acc);color:white;font-weight:800;
   box-shadow:0 2px 8px rgba(249,115,22,0.4);
@@ -1364,8 +1366,7 @@ function actualizarFestSet(y) {
 }
 function isFest(s) {
   const y = parseInt(s.substring(0,4));
-  if (y !== _festAnio) actualizarFestSet(y);
-  return FEST_SET.has(s);
+  return new Set(getFestivos(y).map(f => f.d)).has(s);
 }
 function getFestNombre(s) {
   const y = parseInt(s.substring(0,4));
@@ -1390,7 +1391,6 @@ function buildGuardiaSet() {
 let DIAS_GUARDIA = buildGuardiaSet(); // rebuilt after loadAll via initGuardiaSet()
 
 function ds(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
-function isFest(s) { return FEST_SET.has(s); }
 function isFDS(dt) { const w = dt.getDay(); return w === 0 || w === 6; }
 function enGuardia(y, m, d) {
   const dstr = ds(y, m, d);
@@ -4637,46 +4637,8 @@ function _comprobarFinDeAnio() {
       }, 2000);
     }
   }
-
-  // Aviso en enero para confirmar festivos del nuevo año
-  if (mes === 0 && dia <= 7) {
-    const KEY_FEST = 'pyc_festivos_confirmados_' + anio;
-    if (!localStorage.getItem(KEY_FEST)) {
-      setTimeout(() => _mostrarWizardFestivos(anio), 3000);
-    }
-  }
 }
 
-function _mostrarWizardFestivos(anio) {
-  const festivos = getFestivos(anio);
-  const KEY_FEST = 'pyc_festivos_confirmados_' + anio;
-
-  const filas = festivos.map(f => {
-    const d = new Date(f.d + 'T12:00:00');
-    const dow = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()];
-    return `<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-      <span style="font-size:12px;font-family:var(--mono);color:var(--acc);width:70px">${d.getDate()}/${d.getMonth()+1} ${dow}</span>
-      <span style="flex:1;font-size:12px;color:var(--text-d2)">${f.n}</span>
-    </div>`;
-  }).join('');
-
-  const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)';
-  modal.innerHTML = `<div style="background:var(--dark2);border-radius:22px 22px 0 0;width:100%;max-width:480px;padding:22px 20px 28px;border:1px solid var(--border-d);max-height:80vh;display:flex;flex-direction:column">
-    <div style="font-size:17px;font-weight:900;color:var(--text-d);margin-bottom:4px">📅 Festivos ${anio}</div>
-    <div style="font-size:12px;color:var(--text-d3);margin-bottom:14px">Calculados automáticamente · Confirma si son correctos para Valencia</div>
-    <div style="flex:1;overflow-y:auto;margin-bottom:16px">${filas}</div>
-    <button onclick="localStorage.setItem('${KEY_FEST}','1');this.closest('[style*=fixed]').remove();showToast('✓ Festivos ${anio} confirmados');"
-      style="width:100%;padding:14px;background:linear-gradient(135deg,var(--acc),var(--acc-dk));border:none;border-radius:14px;color:white;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px">
-      ✓ Confirmar festivos ${anio}
-    </button>
-    <button onclick="this.closest('[style*=fixed]').remove();"
-      style="width:100%;padding:12px;background:transparent;border:1px solid var(--border-d);border-radius:14px;color:var(--text-d3);font-size:13px;font-weight:700;cursor:pointer">
-      Revisar más tarde
-    </button>
-  </div>`;
-  document.body.appendChild(modal);
-}
 function cambiarAnioAnual(dir) {
   const anioActual = new Date().getFullYear();
   if (dir > 0 && cY_datos >= anioActual) return;
