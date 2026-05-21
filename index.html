@@ -136,6 +136,11 @@ body{
 .chat-input{flex:1;padding:11px 15px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:22px;font-size:14px;font-family:var(--sans);color:var(--text-d);outline:none;line-height:1.3;}
 .chat-input::placeholder{color:var(--text-d3);}
 .chat-input:focus{border-color:rgba(249,115,22,0.4);}
+.hoja-btn{width:42px;height:42px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s;font-size:19px;line-height:1;}
+.hoja-btn:active{transform:scale(.92);background:rgba(255,255,255,0.14);}
+.hoja-confirm{background:white;border-radius:12px;padding:12px 14px;margin:4px 0;box-shadow:var(--sh-card);}
+.hoja-confirm-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.hoja-confirm-row:last-child{border-bottom:none;}
 .send-btn{width:42px;height:42px;background:var(--acc);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(249,115,22,0.35);flex-shrink:0;transition:all .15s;}
 .send-btn:active{transform:scale(.92);box-shadow:0 2px 6px rgba(249,115,22,0.2);}
 .send-btn svg{width:18px;height:18px;stroke:white;fill:none;stroke-width:2.3;}
@@ -886,6 +891,10 @@ body{
     <div class="chat-msgs" id="msgs"></div>
     <div class="suggestions" id="sugs"></div>
     <div class="input-bar">
+      <label class="hoja-btn" title="Subir hoja del día">
+        📷
+        <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="procesarHojaDia(this)">
+      </label>
       <input class="chat-input" id="chatIn" type="text" placeholder="inicio 7:30 · fin 15:40 · extras mes..." autocomplete="off">
       <button class="send-btn" id="sendBtn">
         <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -5532,6 +5541,94 @@ function guardarNomComp() {
   guardarCompNomina(y, m, data);
   showToast('\u2713 Comparativa guardada');
   renderNomComp();
+}
+
+// ── Foto jornada en chat ──────────────────────────────────────
+async function procesarHojaDia(input) {
+  const file = input.files[0]; if (!file) return;
+  input.value = '';
+  addMsg('user', '📷 Analizando hoja de jornada...');
+  const uid = 'hoja_' + Date.now();
+  addMsg('bot', `<div id="${uid}"><div style="color:var(--text-d3);font-size:13px">Procesando imagen...</div></div>`);
+  renderMsgs();
+  try {
+    let days = {};
+    const isPDF = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+    if (isPDF && _initPdfJs()) {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let txt = '';
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        txt += content.items.map(i => i.str).join(' ') + ' ';
+      }
+      days = _parsearTextoHoras(txt);
+    } else {
+      days = await _parsearImagenHoras(file, pct => {
+        const el = document.getElementById(uid);
+        if (el) el.innerHTML = `<div style="color:var(--text-d3);font-size:13px">OCR ${pct}%...</div>`;
+      });
+    }
+    const diasConDatos = Object.entries(days).filter(([d,v]) => !d.startsWith('_') && v.mins > 0);
+    if (!diasConDatos.length) {
+      const el = document.getElementById(uid);
+      if (el) el.innerHTML = '<div style="color:#ef4444;font-size:13px">No se detectaron horas. Prueba con una foto más clara.</div>';
+      return;
+    }
+    _mostrarConfirmHoja(uid, days, file.name);
+  } catch(e) {
+    console.error(e);
+    const el = document.getElementById(uid);
+    if (el) el.innerHTML = '<div style="color:#ef4444;font-size:13px">Error procesando la imagen.</div>';
+  }
+}
+
+function _mostrarConfirmHoja(uid, days, nombre) {
+  const diasConDatos = Object.entries(days)
+    .filter(([d,v]) => !d.startsWith('_') && v.mins > 0)
+    .sort((a,b) => +a[0]-+b[0]);
+  let h = `<div class="hoja-confirm">
+    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:8px">📋 ${diasConDatos.length} días detectados · ${nombre}</div>`;
+  diasConDatos.slice(0,8).forEach(([d,v]) => {
+    h += `<div class="hoja-confirm-row"><span>Día ${d}</span><span style="font-weight:700;color:var(--acc)">${v.totalStr}</span></div>`;
+  });
+  if (diasConDatos.length > 8) h += `<div style="font-size:11px;color:var(--text3);padding-top:4px">+ ${diasConDatos.length-8} días más</div>`;
+  h += `<div style="display:flex;gap:8px">
+    <button class="hoja-btn-cancel" onclick="_cancelarHoja('${uid}')">Cancelar</button>
+    <button class="hoja-btn-ok" onclick="_guardarDesdeHoja('${uid}')">✓ Guardar en comparativa</button>
+  </div></div>`;
+  const el = document.getElementById(uid);
+  if (el) { el.innerHTML = h; el._hojaDays = days; }
+}
+
+function _cancelarHoja(uid) {
+  const el = document.getElementById(uid);
+  if (el) el.innerHTML = '<div style="color:var(--text3);font-size:13px">Cancelado.</div>';
+}
+
+function _guardarDesdeHoja(uid) {
+  const el = document.getElementById(uid);
+  if (!el || !el._hojaDays) return;
+  const days = el._hojaDays;
+  const hoy = new Date();
+  const y = cY_datos || hoy.getFullYear();
+  const m = cM_datos !== undefined ? cM_datos : hoy.getMonth();
+  const existing = cargarCompHoras(y, m) || {};
+  const merged = {};
+  for (const d in existing) { if (!d.startsWith('_')) merged[d] = existing[d]; }
+  for (const d in days) {
+    if (d.startsWith('_')) continue;
+    const nuevo = days[d]; const viejo = merged[d];
+    if (!viejo || (nuevo.mins > 0 && (!viejo.mins || nuevo.mins > viejo.mins))) merged[d] = nuevo;
+  }
+  if (days._totalOficial) merged._totalOficial = days._totalOficial;
+  if (days._totGastos)    merged._totGastos    = days._totGastos;
+  const n = Object.keys(merged).filter(d => !d.startsWith('_') && merged[d].mins > 0).length;
+  localStorage.setItem(_compHorasKey(y, m), JSON.stringify({ days: merged, guardada: new Date().toISOString() }));
+  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  el.innerHTML = `<div style="color:var(--green);font-size:13px;font-weight:700">\u2713 ${n} días guardados en comparativa de ${MESES_C[m]}</div>`;
+  showToast('\u2713 Hoja guardada en comparativa');
 }
 </script>
 </body>
