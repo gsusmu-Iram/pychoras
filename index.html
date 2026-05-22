@@ -1244,7 +1244,7 @@ let frasesOcultas = {};
 let proState = {};
 let msgs = [];
 
-let ctxConv = { inicioPendiente: null, ultimaFecha: null, ultimaConsulta: null, ultimaBotMsg: null, ultimaBotCat: null };
+let ctxConv = { inicioPendiente: null, ultimaFecha: null, ultimaConsulta: null, ultimaBotMsg: null, ultimaBotCat: null, pausaPendiente: 0 };
 
 // Variables específicas de mi cuenta
 let liqMes = new Date().getMonth();
@@ -3658,7 +3658,7 @@ function responder(int_){
 
   // INICIO
   if(accion==='inicio'){
-    ctxConv.inicioPendiente=int_.hora;ctxConv.ultimaFecha=int_.fecha||fechaHoy;
+    ctxConv.inicioPendiente=int_.hora;ctxConv.ultimaFecha=int_.fecha||fechaHoy;ctxConv.pausaPendiente=0;
     const hhmm=m2hhmm(int_.hora);
     const _t=getCtxTemporal();
     const f=frase('inicio',{hhmm,..._t})||`Entrada ${hhmm} \u2705`;
@@ -3674,10 +3674,10 @@ function responder(int_){
     const finMin=int_.hora;
     if(finMin<=inicioMin)return`La salida (${m2hhmm(finMin)}) es anterior a la entrada (${m2hhmm(inicioMin)}). Para nocturno: <span class="pill">22:00-02:30</span>`;
     const o=gD(fecha.y,fecha.m,fecha.d)||{};
-    const pausaExtra=int_.pausaMins||0;
+    const pausaExtra=int_.pausaMins||(ctxConv.pausaPendiente||0);
     const pausa=(o.pausa_min||0)+pausaExtra;const mins=Math.max(0,finMin-inicioMin-pausa);const ext=mins-BASE_MIN;
     sD(fecha.y,fecha.m,fecha.d,{...o,tipo:'laboral',tramos_txt:m2hhmm(inicioMin)+'-'+m2hhmm(finMin),pausa_min:pausa||undefined});
-    ctxConv.inicioPendiente=null;ctxConv.ultimaFecha=fecha;
+    ctxConv.inicioPendiente=null;ctxConv.ultimaFecha=fecha;ctxConv.pausaPendiente=0; // resetear pausa tras guardar
     const st=mesStats(fecha.y,fecha.m);
     const _t2=getCtxTemporal();
     const ctx_={totalStr:m2str(mins),extStr:(ext>=0?'+':'\u2212')+m2str(Math.abs(ext)),ext,mesExtStr:(st.ext>=0?'+':'\u2212')+m2str(Math.abs(st.ext)),hhmm_fin:m2hhmm(finMin),..._t2};
@@ -3735,6 +3735,7 @@ function responder(int_){
     }
     sD(fecha.y,fecha.m,fecha.d,{...o,tramos_txt:nuevoTxt,pausa_min:nuevoPausaMin||undefined});
     ctxConv.ultimaFecha=fecha;
+    ctxConv.pausaPendiente=(ctxConv.pausaPendiente||0)+mins; // acumular pausa para cuando diga "Fin"
     const totalMinsDia=totalTramos(parsearTramos(nuevoTxt))-(nuevoPausaMin||0);
     const ext=totalMinsDia-BASE_MIN;
     const f=frase('pausa',{pausaStr:m2str(mins)})||`Pausa ${desc} apuntada \u2705`;
@@ -4869,13 +4870,64 @@ function _loadTesseract() {
 }
 
 // ── Parser imagen: OCR con Tesseract.js ──────────────────────
-async function _parsearImagenHoras(file, onPct, onRaw) {
+async function _parsearImagenHoras(file, onPct) {
   const Tesseract = await _loadTesseract();
-  const { data: { text } } = await Tesseract.recognize(file, 'spa', {
+
+  // Pre-procesar imagen: si tiene fondo oscuro, invertir colores para mejorar OCR
+  const processedFile = await _prepararImagenOCR(file);
+
+  const { data: { text } } = await Tesseract.recognize(processedFile, 'spa', {
     logger: m => { if (m.status==='recognizing text' && onPct) onPct(Math.round(m.progress*100)); }
   });
-  if (onRaw) onRaw(text);
   return _parsearTextoHoras(text);
+}
+
+async function _prepararImagenOCR(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      // Comprobar si el fondo es oscuro (muestra píxeles del borde)
+      const sample = ctx.getImageData(0, 0, Math.min(50, img.width), Math.min(50, img.height));
+      let totalBrightness = 0;
+      for (let i = 0; i < sample.data.length; i += 4) {
+        totalBrightness += (sample.data[i] + sample.data[i+1] + sample.data[i+2]) / 3;
+      }
+      const avgBrightness = totalBrightness / (sample.data.length / 4);
+
+      if (avgBrightness < 128) {
+        // Fondo oscuro → invertir colores
+        const full = ctx.getImageData(0, 0, img.width, img.height);
+        for (let i = 0; i < full.data.length; i += 4) {
+          full.data[i]   = 255 - full.data[i];
+          full.data[i+1] = 255 - full.data[i+1];
+          full.data[i+2] = 255 - full.data[i+2];
+        }
+        ctx.putImageData(full, 0, 0);
+      }
+
+      // Escalar a tamaño óptimo para Tesseract (mín 1000px de ancho)
+      const targetW = Math.max(1200, img.width);
+      if (img.width < targetW) {
+        const scale = targetW / img.width;
+        const canvas2 = document.createElement('canvas');
+        canvas2.width = targetW;
+        canvas2.height = Math.round(img.height * scale);
+        canvas2.getContext('2d').drawImage(canvas, 0, 0, canvas2.width, canvas2.height);
+        canvas2.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, 'image/png');
+      } else {
+        canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, 'image/png');
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
 }
 
 // ── Detectar mes/año del texto OCR ───────────────────────────
@@ -5549,39 +5601,173 @@ async function procesarHojaDia(input) {
   input.value = '';
   addMsg('user', '📷 Analizando hoja de jornada...');
   const uid = 'hoja_' + Date.now();
-  addMsg('bot', `<div id="${uid}"><div style="color:var(--text-d3);font-size:13px">Procesando imagen...</div></div>`);
+  addMsg('bot', `<div id="${uid}"><div style="color:var(--text-d3);font-size:13px">Procesando...</div></div>`);
   renderMsgs();
   try {
-    let days = {};
     const isPDF = file.type === 'application/pdf' || file.name.endsWith('.pdf');
-    if (isPDF && _initPdfJs()) {
-      const buf = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+
+    if (isPDF) {
+      // PDF — extraer texto y detectar formato
       let txt = '';
-      for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const content = await page.getTextContent();
-        txt += content.items.map(i => i.str).join(' ') + ' ';
+      if (_initPdfJs()) {
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p);
+          const content = await page.getTextContent();
+          txt += content.items.map(i => i.str).join(' ') + ' ';
+        }
       }
-      days = _parsearTextoHoras(txt);
+
+      // Intentar como hoja diaria Pycseca
+      const diaria = _parsearHojaDiaria(txt);
+      if (diaria) {
+        _mostrarConfirmHojaDiaria(uid, diaria, file.name);
+        return;
+      }
+
+      // Si no, tratar como tabla mensual
+      const days = _parsearTextoHoras(txt);
+      const diasConDatos = Object.entries(days).filter(([d,v]) => !d.startsWith('_') && v.mins > 0);
+      if (!diasConDatos.length) {
+        const el = document.getElementById(uid);
+        if (el) el.innerHTML = '<div style="color:#ef4444;font-size:13px">No se detectaron horas en el PDF.</div>';
+        return;
+      }
+      _mostrarConfirmHoja(uid, days, file.name);
+
     } else {
-      days = await _parsearImagenHoras(file, pct => {
+      // Imagen — OCR con Tesseract (tabla mensual)
+      const days = await _parsearImagenHoras(file, pct => {
         const el = document.getElementById(uid);
         if (el) el.innerHTML = `<div style="color:var(--text-d3);font-size:13px">OCR ${pct}%...</div>`;
       });
+      const diasConDatos = Object.entries(days).filter(([d,v]) => !d.startsWith('_') && v.mins > 0);
+      if (!diasConDatos.length) {
+        const el = document.getElementById(uid);
+        if (el) el.innerHTML = '<div style="color:#ef4444;font-size:13px">No se detectaron horas. Prueba con una foto más clara.</div>';
+        return;
+      }
+      _mostrarConfirmHoja(uid, days, file.name);
     }
-    const diasConDatos = Object.entries(days).filter(([d,v]) => !d.startsWith('_') && v.mins > 0);
-    if (!diasConDatos.length) {
-      const el = document.getElementById(uid);
-      if (el) el.innerHTML = '<div style="color:#ef4444;font-size:13px">No se detectaron horas. Prueba con una foto más clara.</div>';
-      return;
-    }
-    _mostrarConfirmHoja(uid, days, file.name);
   } catch(e) {
-    console.error(e);
+    console.error('procesarHojaDia error:', e);
     const el = document.getElementById(uid);
-    if (el) el.innerHTML = '<div style="color:#ef4444;font-size:13px">Error procesando la imagen.</div>';
+    if (el) el.innerHTML = `<div style="color:#ef4444;font-size:13px">Error: ${e.message||'inténtalo de nuevo'}</div>`;
   }
+}
+
+function _parsearHojaDiaria(txt) {
+  if (!/INICIO JORNADA|FIN JORNADA|Horas Totales/i.test(txt)) return null;
+
+  const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fechaM = txt.match(/[Dd][íi]a\s+(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/i);
+  if (!fechaM) return null;
+
+  const dia = parseInt(fechaM[1]);
+  const mes = MESES_ES.findIndex(m => fechaM[2].toLowerCase().includes(m));
+  const anio = parseInt(fechaM[3]);
+  if (mes < 0) return null;
+
+  const inicioM = txt.match(/(\d{2}:\d{2})(?::\d{2})?\s+INICIO JORNADA/i);
+  const finM    = txt.match(/FIN JORNADA\s+(\d{2}:\d{2})(?::\d{2})?/i);
+
+  // Tiempo comida (en horas decimales)
+  const comidaM = txt.match(/Tiempo Comida\s+([\d.]+)\s*hrs/i);
+  const comidaMins = comidaM ? Math.round(parseFloat(comidaM[1]) * 60) : 0;
+
+  // Total horas (ya descontadas por Pycseca)
+  const totalM = txt.match(/Horas Totales\s+([\d.]+)\s*hrs/i);
+  let mins = 0;
+  if (totalM) {
+    mins = Math.round(parseFloat(totalM[1]) * 60);
+  } else if (inicioM && finM) {
+    const ini = t2m(inicioM[1]), fin = t2m(finM[1]);
+    mins = Math.max(0, fin - ini - comidaMins);
+  }
+  if (!mins) return null;
+
+  // Gastos — excluir gasolina y comidas con tarjeta empresa
+  let gastos = [];
+
+  // Gasolina: solo registrar si NO pone "Tarjeta"
+  const gasoM = txt.match(/GASOLINA\s+([\d.,]+)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
+  if (gasoM && parseFloat(gasoM[1].replace(',','.')) > 0 && !gasoM[2]) {
+    gastos.push({ concepto: 'Gasolina', importe: parseFloat(gasoM[1].replace(',','.')) });
+  }
+
+  // Comidas: solo registrar si NO pone "Tarjeta"
+  const comM = txt.match(/COMIDAS\s+([\d.,]+)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
+  if (comM && parseFloat(comM[1].replace(',','.')) > 0 && !comM[2]) {
+    gastos.push({ concepto: 'Comida', importe: parseFloat(comM[1].replace(',','.')) });
+  }
+
+  // Parking, Peajes, Materiales, Otros — siempre registrar si > 0
+  [
+    [/PARKING\s+([\d.,]+)/i, 'Parking'],
+    [/PEAJES\s+([\d.,]+)/i, 'Peajes'],
+    [/MATERIALES\s+([\d.,]+)/i, 'Materiales'],
+    [/OTROS\s+([\d.,]+)/i, 'Otros'],
+  ].forEach(([re, nombre]) => {
+    const m = txt.match(re);
+    if (m && parseFloat(m[1].replace(',','.')) > 0) {
+      gastos.push({ concepto: nombre, importe: parseFloat(m[1].replace(',','.')) });
+    }
+  });
+
+  const inicio = inicioM ? inicioM[1] : '';
+  const fin    = finM    ? finM[1]    : '';
+
+  return { dia, mes, anio, mins, inicio, fin, comidaMins, gastos, totalStr: m2hm(mins) };
+}
+
+function _mostrarConfirmHojaDiaria(uid, data, nombre) {
+  const { dia, mes, anio, mins, inicio, fin, comidaMins, gastos, totalStr } = data;
+  const MESES_N = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const ext = mins - BASE_MIN;
+  let h = `<div class="hoja-confirm">
+    <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:8px">📋 Hoja de jornada · ${dia} ${MESES_N[mes]} ${anio}</div>
+    <div class="hoja-confirm-row"><span>Entrada</span><span style="font-weight:700">${inicio||'—'}</span></div>
+    <div class="hoja-confirm-row"><span>Salida</span><span style="font-weight:700">${fin||'—'}</span></div>`;
+  if (comidaMins > 0) h += `<div class="hoja-confirm-row"><span>Comida</span><span style="font-weight:700;color:#ef4444">−${m2hm(comidaMins)}</span></div>`;
+  h += `<div class="hoja-confirm-row"><span>Total</span><span style="font-weight:700;color:var(--acc)">${totalStr}</span></div>
+    <div class="hoja-confirm-row"><span>vs 8h</span><span style="font-weight:700;color:${ext>=0?'var(--green)':'#ef4444'}">${ext>=0?'+':'−'}${m2hm(Math.abs(ext))}</span></div>`;
+  if (gastos.length > 0) {
+    const totGasto = gastos.reduce((a,g) => a+g.importe, 0);
+    h += `<div class="hoja-confirm-row"><span>Gastos</span><span style="font-weight:700;color:var(--acc)">${totGasto.toFixed(2)}€</span></div>`;
+    gastos.forEach(g => { h += `<div class="hoja-confirm-row" style="padding-left:12px"><span style="color:var(--text3);font-size:11px">${g.concepto}</span><span style="font-size:11px;color:var(--text3)">${g.importe.toFixed(2)}€</span></div>`; });
+  } else {
+    h += `<div class="hoja-confirm-row"><span style="color:var(--text3);font-size:11px">Gastos empresa (tarjeta)</span><span style="font-size:11px;color:var(--text3)">no se registran</span></div>`;
+  }
+  h += `<div style="display:flex;gap:8px;margin-top:8px">
+    <button class="hoja-btn-cancel" onclick="_cancelarHoja('${uid}')">Cancelar</button>
+    <button class="hoja-btn-ok" onclick="_guardarDesdeHojaDiaria('${uid}')">✓ Guardar jornada</button>
+  </div></div>`;
+  const el = document.getElementById(uid);
+  if (el) { el.innerHTML = h; el._hojaDiaria = data; }
+}
+
+function _guardarDesdeHojaDiaria(uid) {
+  const el = document.getElementById(uid);
+  if (!el || !el._hojaDiaria) return;
+  const { dia, mes, anio, mins, inicio, fin, comidaMins, gastos } = el._hojaDiaria;
+  const o = gD(anio, mes, dia) || {};
+  // Tramo con pausa si hay comida
+  let tramoTxt = inicio && fin ? `${inicio}-${fin}` : '';
+  if (comidaMins > 0 && tramoTxt) tramoTxt += ` -${comidaMins}min`;
+  // Primer gasto personal (si hay)
+  const primerGasto = gastos[0];
+  sD(anio, mes, dia, {
+    ...o,
+    tipo: 'laboral',
+    tramos_txt: tramoTxt,
+    gasto: primerGasto ? primerGasto.importe : (o.gasto||0),
+    concepto: primerGasto ? primerGasto.concepto : (o.concepto||''),
+  });
+  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  el.innerHTML = `<div style="color:var(--green);font-size:13px;font-weight:700">✓ Jornada del ${dia} ${MESES_C[mes]} guardada · ${m2hm(mins)}</div>`;
+  showToast('✓ Jornada guardada');
+  renderJornada();
 }
 
 function _mostrarConfirmHoja(uid, days, nombre) {
