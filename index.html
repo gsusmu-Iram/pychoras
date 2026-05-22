@@ -5718,7 +5718,17 @@ function _parsearHojaDiaria(txt) {
   const inicio = inicioM ? inicioM[1] : '';
   const fin    = finM    ? finM[1]    : '';
 
-  return { dia, mes, anio, mins, inicio, fin, comidaMins, gastos, totalStr: m2hm(mins) };
+  // El inicio oficial es siempre 07:30 aunque se fiche antes
+  const INICIO_OFICIAL = '07:30';
+  const inicioReal = inicio && t2m(inicio) < t2m(INICIO_OFICIAL) ? INICIO_OFICIAL : inicio;
+
+  // Recalcular total desde inicio oficial si el PDF fichó antes
+  let minsFinales = mins;
+  if (inicio && t2m(inicio) < t2m(INICIO_OFICIAL) && finM) {
+    minsFinales = Math.max(0, t2m(fin) - t2m(INICIO_OFICIAL) - comidaMins);
+  }
+
+  return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, gastos, totalStr: m2hm(minsFinales) };
 }
 
 function _mostrarConfirmHojaDiaria(uid, data, nombre) {
