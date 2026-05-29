@@ -1058,6 +1058,7 @@ body{
           <div class="pdf-loaded" id="pdfLoaded">
             <span class="pdf-loaded-txt" id="pdfLoadedTxt">✓ Nómina cargada</span>
             <span class="pdf-loaded-btn" id="nuevoPdfBtn">Cambiar</span>
+            <span class="pdf-loaded-btn" id="borrarPdfBtn" onclick="borrarCompNomina(liqYear, liqMes)" style="margin-left:8px">Borrar</span>
           </div>
           <!-- Toggle collapse -->
           <button class="nomina-toggle-btn" id="nominaToggleBtn" onclick="toggleNominaForm()">
@@ -1111,6 +1112,7 @@ body{
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus festivo trabajado</div><div class="cfg-sub">Por día festivo con guardia</div></div><input class="cfg-input" id="cfgFestivo" type="number" step="1"><span class="cfg-unit">€</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Horas convenio mensual</div><div class="cfg-sub">Base cálculo de extras</div></div><input class="cfg-input" id="cfgConvenio" type="number" step="1"><span class="cfg-unit">h</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Días vacaciones</div><div class="cfg-sub">5h 14min por día</div></div><input class="cfg-input" id="cfgVacDias" type="number" step="1"><span class="cfg-unit">días</span></div>
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Prorrata pagas extras</div><div class="cfg-sub">Base SS mensual · ver nómina</div></div><input class="cfg-input" id="cfgProrrata" type="number" step="0.01"><span class="cfg-unit">€</span></div>
           </div>
           <button class="btn-save" onclick="guardarConfig()">GUARDAR CONFIGURACIÓN</button>
         </div>
@@ -1236,7 +1238,7 @@ const KCH = 'pyc_comp_horas'; // prefix: KCH_2026_03
 const KCN = 'pyc_comp_nom';   // prefix: KCN_2026_03
 
 let dat = {};
-let cfg = { precioH: 13.53, guardia: 180, festivo: 70, convenio: 162, vacDias: 31 };
+let cfg = { precioH: 13.94, guardia: 180, festivo: 70, convenio: 162, vacDias: 31, prorrata: 275.98 };
 let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0 };
 let guardiasCambios = {};
 let frasesCustom = {};
@@ -1525,13 +1527,30 @@ function calcLiquido(y, m) {
   const plusGuardiaEsteMes = guardiasEsteMes * cfg.guardia;
   const variables = stPrev.extrasEuros + st.plusFest + plusGuardiaEsteMes;
   const totalDevengado = baseFija + variables;
-  const baseSSFija = baseFija - nomina.transporte - nomina.vestuario - nomina.prima;
-  const deduSS = parseFloat((baseSSFija * 0.065).toFixed(2));
-  const deduExtSS = parseFloat((stPrev.extrasEuros * 0.047).toFixed(2));
-  const deduIRPF = parseFloat((totalDevengado * (nomina.irpf / 100)).toFixed(2));
-  const totalDedu = deduSS + deduExtSS + deduIRPF;
-  const liquido = totalDevengado - totalDedu;
-  return { baseFija, variables, totalDevengado, deduSS, deduExtSS, deduIRPF, totalDedu, liquido, st, stPrev, prevM, prevY, guardiasEsteMes, plusGuardiaEsteMes };
+  // === Modelo exacto Pycseca (validado contra nóminas reales 2026) ===
+  // Devengos sujetos a cot. común = todo lo salarial del mes MENOS horas extras
+  // (las extras cotizan aparte por contingencias profesionales)
+  const extrasEuros = stPrev.extrasEuros;
+  const remTotal = baseFija + st.plusFest + plusGuardiaEsteMes;
+  // Base SS (cont. comunes y MEI) = rem. total + prorrata pagas extras
+  const baseSS = parseFloat((remTotal + cfg.prorrata).toFixed(2));
+  // Base AT y Desempleo = base SS + importe horas extras
+  const baseAT = parseFloat((baseSS + extrasEuros).toFixed(2));
+  // Cotizaciones desglosadas (tipos = normativa estatal)
+  const deduCC   = parseFloat((baseSS * 0.0470).toFixed(2)); // contingencias comunes
+  const deduMEI  = parseFloat((baseSS * 0.0015).toFixed(2)); // mecanismo equidad intergen.
+  const deduForm = parseFloat((baseAT * 0.0010).toFixed(2)); // formación profesional
+  const deduDes  = parseFloat((baseAT * 0.0155).toFixed(2)); // desempleo
+  const deduExtSS = parseFloat((extrasEuros * 0.0470).toFixed(2)); // cot. adicional horas extra
+  const deduSS = parseFloat((deduCC + deduMEI + deduForm + deduDes).toFixed(2)); // total SS (sin extras)
+  // Descuento en especie (constante)
+  const dctoEspecie = nomina.prima;
+  // Base IRPF = total devengado - dcto. especie
+  const baseIRPF = parseFloat((totalDevengado - dctoEspecie).toFixed(2));
+  const deduIRPF = parseFloat((baseIRPF * (nomina.irpf / 100)).toFixed(2));
+  const totalDedu = parseFloat((deduSS + deduExtSS + deduIRPF + dctoEspecie).toFixed(2));
+  const liquido = parseFloat((totalDevengado - totalDedu).toFixed(2));
+  return { baseFija, variables, totalDevengado, remTotal, baseSS, baseAT, baseIRPF, extrasEuros, deduCC, deduMEI, deduForm, deduDes, deduSS, deduExtSS, deduIRPF, dctoEspecie, totalDedu, liquido, st, stPrev, prevM, prevY, guardiasEsteMes, plusGuardiaEsteMes };
 }
 
 function renderLiquido() {
@@ -1563,7 +1582,7 @@ function renderLiquido() {
     guardiaHeroEl.style.color = gVal > 0 ? 'var(--purple, #7C3AED)' : 'var(--text3)';
   }
 
-  document.getElementById('deduCard').innerHTML = `<div class="dedu-row"><div class="dedu-lbl">Cotiz. S.S. (6,50%)<small>Conting. comunes + MEI + paro + form.</small></div><div class="dedu-val">\u2212${c.deduSS.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Cotiz. horas extras (4,70%)<small>Solo sobre horas extras</small></div><div class="dedu-val">\u2212${c.deduExtSS.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.03)"><div class="dedu-lbl">IRPF (${nomina.irpf}%)<small>Variable · actualiza si cambia</small></div><div class="dedu-val" style="font-size:15px">\u2212${c.deduIRPF.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.06)"><div class="dedu-lbl" style="font-weight:800;color:var(--text)">Total deducciones</div><div class="dedu-val" style="font-size:15px">\u2212${c.totalDedu.toFixed(2)}€</div></div>`;
+  document.getElementById('deduCard').innerHTML = `<div class="dedu-row"><div class="dedu-lbl">Conting. comunes (4,70%)<small>Base SS ${c.baseSS.toFixed(2)}€</small></div><div class="dedu-val">\u2212${c.deduCC.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">MEI (0,15%)<small>Mec. equidad intergeneracional</small></div><div class="dedu-val">\u2212${c.deduMEI.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Desempleo (1,55%)<small>Base AT ${c.baseAT.toFixed(2)}€</small></div><div class="dedu-val">\u2212${c.deduDes.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Formación (0,10%)<small>Base AT</small></div><div class="dedu-val">\u2212${c.deduForm.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Cotiz. horas extras (4,70%)<small>Solo sobre horas extras</small></div><div class="dedu-val">\u2212${c.deduExtSS.toFixed(2)}€</div></div><div class="dedu-row"><div class="dedu-lbl">Dcto. en especie<small>Concepto fijo</small></div><div class="dedu-val">\u2212${c.dctoEspecie.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.03)"><div class="dedu-lbl">IRPF (${nomina.irpf}%)<small>Base ${c.baseIRPF.toFixed(2)}€</small></div><div class="dedu-val" style="font-size:15px">\u2212${c.deduIRPF.toFixed(2)}€</div></div><div class="dedu-row" style="background:rgba(220,38,38,0.06)"><div class="dedu-lbl" style="font-weight:800;color:var(--text)">Total deducciones</div><div class="dedu-val" style="font-size:15px">\u2212${c.totalDedu.toFixed(2)}€</div></div>`;
 
   const st = c.st;
   const stPrev = c.stPrev;
@@ -1780,6 +1799,18 @@ function parsearNominaPDF(txt, nombre) {
   // Parser específico para nómina Pycseca — formato real Abril 2026
   const num = (regex) => { const m = txt.match(regex); return m ? parseFloat(m[1].replace('.','').replace(',','.')) : null; };
 
+  // ── Detectar el mes del PDF por el periodo ("... a 31 MAY 26") ──
+  // No cambia nada automáticamente; solo avisa si no coincide con el mes en pantalla.
+  const MES_ABR = { ENE:0, FEB:1, MAR:2, ABR:3, MAY:4, JUN:5, JUL:6, AGO:7, SEP:8, OCT:9, NOV:10, DIC:11 };
+  const mPer = txt.match(/a\s+\d{1,2}\s+([A-Z]{3})\s+(\d{2})/i);
+  if (mPer) {
+    const mesPDF = MES_ABR[mPer[1].toUpperCase()];
+    const anioPDF = 2000 + parseInt(mPer[2]);
+    if (mesPDF !== undefined && (mesPDF !== liqMes || anioPDF !== liqYear)) {
+      showToast('\u26A0\uFE0F Esta nómina es de ' + MESES[mesPDF] + ' ' + anioPDF + ', pero tienes ' + MESES[liqMes] + ' seleccionado. Cambia de mes si quieres guardarla ahí.', 5000);
+    }
+  }
+
   // ── DEVENGOS ──────────────────────────────────────────────────
   const sal  = num(/\*SALARIO BASE\s+([\d.,]+)/i);
   const ant  = num(/\*ANTIG[ÜU]EDAD\s+([\d.,]+)/i);
@@ -1871,10 +1902,10 @@ function parsearNominaPDF(txt, nombre) {
   html += _sec('Deducciones');
   html += _fila('IRPF %', irpfPct, nomina.irpf, '%');
   html += _fila('IRPF €', irpfAmt, c.deduIRPF);
-  html += _fila('SS Cont. comunes', ssCom, undefined);
-  html += _fila('SS MEI', ssMEI, undefined);
-  html += _fila('SS Formación', ssForm, undefined);
-  html += _fila('SS Desempleo', ssDes, undefined);
+  html += _fila('SS Cont. comunes', ssCom, c.deduCC);
+  html += _fila('SS MEI', ssMEI, c.deduMEI);
+  html += _fila('SS Formación', ssForm, c.deduForm);
+  html += _fila('SS Desempleo', ssDes, c.deduDes);
   html += _fila('SS Horas extras', ssExt, c.deduExtSS);
   if (totalDeduPDF > 0) html += _fila('Total deducciones', totalDeduPDF, c.totalDedu);
 
@@ -1954,6 +1985,7 @@ function guardarConfig() {
   cfg.festivo = parseFloat(document.getElementById('cfgFestivo').value) || cfg.festivo;
   cfg.convenio = parseInt(document.getElementById('cfgConvenio').value) || cfg.convenio;
   cfg.vacDias = parseInt(document.getElementById('cfgVacDias').value) || cfg.vacDias;
+  const _pr = parseFloat(document.getElementById('cfgProrrata').value); if (!isNaN(_pr)) cfg.prorrata = _pr;
   saveCfg(); renderLiquido(); renderSaldo();
   showToast('✓ Configuración guardada');
 }
@@ -2346,6 +2378,7 @@ function renderAll() {
   document.getElementById('cfgFestivo').value = cfg.festivo;
   document.getElementById('cfgConvenio').value = cfg.convenio;
   document.getElementById('cfgVacDias').value = cfg.vacDias;
+  document.getElementById('cfgProrrata').value = cfg.prorrata;
 }
 
 // ============================================================
@@ -5012,6 +5045,20 @@ function cargarCompNomina(y, m) {
     if (!raw) return null;
     return JSON.parse(raw).data;
   } catch(e) { return null; }
+}
+
+function borrarCompNomina(y, m) {
+  if (!localStorage.getItem(_compNomKey(y, m))) { showToast('No hay comparativa guardada este mes'); return; }
+  if (!confirm('¿Borrar la comparativa de nómina de ' + MESES[m] + ' ' + y + '? Podrás volver a subir el PDF.')) return;
+  localStorage.removeItem(_compNomKey(y, m));
+  // Restaurar el área de subida
+  const loaded = document.getElementById('pdfLoaded');
+  const area = document.getElementById('pdfUploadArea');
+  if (loaded) loaded.classList.remove('show');
+  if (area) area.style.display = '';
+  const cmp = document.getElementById('pdfCompResumen'); if (cmp) cmp.innerHTML = '';
+  renderLiquido();
+  showToast('\uD83D\uDDD1 Comparativa de nómina eliminada');
 }
 
 function _detectarMesTexto(text) {
