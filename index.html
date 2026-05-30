@@ -4999,27 +4999,18 @@ async function _parsearPDFHoras(arrayBuffer) {
       items.push({ x: it.transform[4], y: it.transform[5], s: s.trim() });
     });
     if (!items.length) continue;
-    // Ordenar de forma consistente: primero por banda vertical (Y desc), luego X asc.
-    // Redondear Y a bandas evita comparaciones contradictorias del sort.
-    const banda = v => Math.round(v / 5);
-    items.sort((a, b) => {
-      const ba = banda(a.y), bb = banda(b.y);
-      if (ba !== bb) return bb - ba;       // banda superior primero (Y mayor)
-      return a.x - b.x;                     // dentro de la banda, izquierda→derecha
+    // Agrupar por línea usando Y redondeado al entero (las filas de la tabla
+    // están separadas ~7px; una banda gruesa las fusionaba). Banda fina = 1px.
+    const filasMap = {};
+    items.forEach(it => {
+      const k = Math.round(it.y);
+      (filasMap[k] = filasMap[k] || []).push(it);
     });
-    // Agrupar en filas: nueva fila cuando el salto de Y supera un umbral relativo
-    const filas = [];
-    let actual = null;
-    for (const it of items) {
-      if (actual === null || Math.abs(it.y - actual.y) > 4) {
-        actual = { y: it.y, items: [it] };
-        filas.push(actual);
-      } else {
-        actual.items.push(it);
-        // y de referencia = media para absorber pequeñas variaciones
-        actual.y = (actual.y + it.y) / 2;
-      }
-    }
+    // Ordenar filas de arriba (Y mayor) a abajo (Y menor)
+    const filas = Object.keys(filasMap)
+      .map(Number)
+      .sort((a, b) => b - a)
+      .map(k => ({ y: k, items: filasMap[k] }));
     filas.forEach(f => {
       const txt = f.items.sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
       if (txt) { lineas.push(txt); fullText += txt + '\n'; }
