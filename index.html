@@ -4991,19 +4991,29 @@ async function _parsearPDFHoras(arrayBuffer) {
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    const filas = [];  // [{y, items:[{x,s}]}]
+    // Recoger todos los items con su posición
+    const items = [];
     content.items.forEach(it => {
       const s = (it.str || '');
       if (!s.trim()) return;
-      const y = it.transform[5];
-      const x = it.transform[4];
-      // Buscar fila existente con Y cercana (tolerancia 3)
-      let fila = filas.find(f => Math.abs(f.y - y) <= 3);
-      if (!fila) { fila = { y, items: [] }; filas.push(fila); }
-      fila.items.push({ x, s });
+      items.push({ x: it.transform[4], y: it.transform[5], s: s.trim() });
     });
-    // Ordenar filas de arriba a abajo (Y mayor primero en coords PDF)
-    filas.sort((a, b) => b.y - a.y);
+    if (!items.length) continue;
+    // Ordenar de arriba a abajo (Y descendente en coords PDF), luego izq→der
+    items.sort((a, b) => (Math.abs(a.y - b.y) > 2 ? b.y - a.y : a.x - b.x));
+    // Agrupar en filas: nueva fila cuando el salto de Y supera un umbral relativo
+    const filas = [];
+    let actual = null;
+    for (const it of items) {
+      if (actual === null || Math.abs(it.y - actual.y) > 4) {
+        actual = { y: it.y, items: [it] };
+        filas.push(actual);
+      } else {
+        actual.items.push(it);
+        // y de referencia = media para absorber pequeñas variaciones
+        actual.y = (actual.y + it.y) / 2;
+      }
+    }
     filas.forEach(f => {
       const txt = f.items.sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
       if (txt) { lineas.push(txt); fullText += txt + '\n'; }
