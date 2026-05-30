@@ -5495,48 +5495,88 @@ function renderComparacion() {
     </div>`;
   }
 
-  // ── Resumen discrepancias al final ──────────────────────────
-  const discDays = [];
-  for (let dd = 1; dd <= dm; dd++) {
-    const dinf = dayInfoDatos(y, m, dd);
-    if (dinf.fds || dinf.fest || dinf.tipo==='fds' || dinf.tipo==='fest') continue;
-    const demp = _empresaDays[dd];
-    if (!demp) continue;
-    const ddiff = dinf.mins - demp.mins;
-    if (Math.abs(ddiff) > 2) discDays.push({ d:dd, diff:ddiff, appMins:dinf.mins, empStr:demp.totalStr||'—' });
-  }
-  if (discDays.length) {
-    discDays.sort((a,b) => Math.abs(b.diff)-Math.abs(a.diff));
-    rows += '<div class="comp-disc-section"><div class="comp-disc-hdr">' +
-      '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
-      discDays.length + ' diferencia' + (discDays.length>1?'s':'') + ' a revisar</div>';
-    for (const {d:dd, diff:ddiff, appMins:dapp, empStr:deStr} of discDays) {
-      const isNeg = ddiff < 0;
-      const absd  = Math.abs(ddiff);
-      const dcol  = absd > 15 ? '#dc2626' : '#B45309';
-      const dbg   = absd > 15 ? 'rgba(220,38,38,0.1)' : 'rgba(251,191,36,0.15)';
-      rows += '<div class="comp-disc-row" onclick="verDiscrepancia(' + y + ',' + m + ',' + dd + ')">' +
-        '<span class="comp-disc-day">' + dd + '</span>' +
-        '<span class="comp-disc-vals">App\u00a0' + m2hhmmFmt(dapp) + '\u00a0\u00b7\u00a0Empresa\u00a0' + deStr + '</span>' +
-        '<span class="comp-disc-diff" style="color:' + dcol + ';background:' + dbg + '">' +
-          (isNeg ? '\u2212' : '+') + m2hm(absd) + '</span>' +
-        '<span class="comp-disc-arrow">\u203a</span>' +
-        '</div>';
-    }
-    rows += '</div>';
-  }
-  rows += '<div class="comp-footer"></div>';
-
-  // Summary card
+  // Totales y extras (necesarios para el resumen de discrepancias y el summary)
   const totalDiff  = totApp - totEmp;
-  const diffSign   = totalDiff >= 0 ? '+' : '\u2212';
-  const diffCol    = Math.abs(totalDiff) <= 2 ? 'var(--green)' : totalDiff < 0 ? 'var(--red)' : 'var(--acc)';
-  // Extras de cada lado
   const convMin    = cfg.convenio * 60;
   const extApp     = totApp - convMin;
   const extEmp     = totEmp > 0 ? totEmp - convMin : null;
   const extDiff    = extEmp !== null ? extApp - extEmp : null;
   const extEuros   = extDiff !== null ? Math.abs(extDiff) / 60 * cfg.precioH : 0;
+
+  // ── Resumen discrepancias al final (estilo diagnóstico, como nómina) ──
+  const discDays = [];
+  const sinDato = [];
+  for (let dd = 1; dd <= dm; dd++) {
+    const dinf = dayInfoDatos(y, m, dd);
+    if (dinf.fds || dinf.fest || dinf.tipo==='fds' || dinf.tipo==='fest') continue;
+    const demp = _empresaDays[dd];
+    if (!demp) { if (gD(y, m, dd)) sinDato.push(dd); continue; }
+    const ddiff = dinf.mins - demp.mins;
+    if (Math.abs(ddiff) > 2) discDays.push({ d:dd, diff:ddiff, appMins:dinf.mins, empStr:demp.totalStr||'\u2014' });
+  }
+
+  if (discDays.length || sinDato.length || nOk > 0) {
+    discDays.sort((a,b) => Math.abs(b.diff)-Math.abs(a.diff));
+    rows += '<div class="comp-disc-section">';
+    // Contador de días que cuadran (confianza)
+    if (nOk > 0) {
+      rows += '<div style="padding:8px 12px;margin-bottom:8px;background:rgba(22,163,74,0.08);border-radius:8px;font-size:12px;font-weight:700;color:var(--green)">\u2713 ' +
+        nOk + ' d\u00eda' + (nOk>1?'s':'') + ' coinciden con la empresa</div>';
+    }
+    if (discDays.length) {
+      rows += '<div class="comp-disc-hdr">' +
+        '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+        discDays.length + ' diferencia' + (discDays.length>1?'s':'') + ' a revisar</div>';
+      for (const {d:dd, diff:ddiff, appMins:dapp, empStr:deStr} of discDays) {
+        const isNeg = ddiff < 0;
+        const absd  = Math.abs(ddiff);
+        const grave = absd > 15;
+        const dcol  = grave ? '#dc2626' : '#B45309';
+        const dbg   = grave ? 'rgba(220,38,38,0.1)' : 'rgba(251,191,36,0.15)';
+        // Etiqueta de tipo
+        const tipoTxt = grave ? 'REVISAR' : 'REDONDEO';
+        const tipoCol = grave ? 'var(--red)' : '#B45309';
+        rows += '<div class="comp-disc-row" onclick="verDiscrepancia(' + y + ',' + m + ',' + dd + ')">' +
+          '<span class="comp-disc-day">' + dd + '</span>' +
+          '<span style="font-size:8px;font-weight:900;letter-spacing:.06em;color:' + tipoCol + ';border:1px solid ' + tipoCol + ';border-radius:4px;padding:1px 4px;margin-right:4px">' + tipoTxt + '</span>' +
+          '<span class="comp-disc-vals">App\u00a0' + m2hhmmFmt(dapp) + '\u00a0\u00b7\u00a0Empresa\u00a0' + deStr + '</span>' +
+          '<span class="comp-disc-diff" style="color:' + dcol + ';background:' + dbg + '">' +
+            (isNeg ? '\u2212' : '+') + m2hm(absd) + '</span>' +
+          '<span class="comp-disc-arrow">\u203a</span>' +
+          '</div>';
+      }
+    }
+    // Días sin dato de empresa
+    if (sinDato.length) {
+      rows += '<div style="padding:8px 12px;margin-top:6px;background:rgba(107,114,128,0.06);border-radius:8px;font-size:11px;color:var(--text2)">' +
+        '<b>Sin dato empresa:</b> d\u00eda' + (sinDato.length>1?'s':'') + ' ' + sinDato.join(', ') +
+        '. Verifica si es correcto o un olvido en la hoja.</div>';
+    }
+    // Frase de cierre interpretada (veredicto razonado)
+    const graves = discDays.filter(x => Math.abs(x.diff) > 15);
+    let cierre;
+    if (Math.abs(totalDiff) <= 2 && !graves.length) {
+      cierre = 'Tu c\u00f3mputo y el de la empresa cuadran. Puedes firmar tranquilo.';
+    } else {
+      cierre = 'De ' + (totalDiff>=0?'+':'\u2212') + m2hm(Math.abs(totalDiff)) + ' de diferencia total en el mes, ';
+      if (graves.length) {
+        const dGraves = graves.map(g=>'d\u00eda '+g.d).join(', ');
+        cierre += (graves.length>1?'los ':'el ') + dGraves + ' necesita' + (graves.length>1?'n':'') + ' revisi\u00f3n; el resto son redondeos. \u2248 ' + extEuros.toFixed(2) + '\u20ac en extras.';
+      } else {
+        cierre += 'todo son diferencias de redondeo (inicio 7:30 / comida). Puedes firmar.';
+      }
+    }
+    rows += '<div style="margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--text2);line-height:1.5;font-style:italic">' + cierre + '</div>';
+    rows += '<div style="margin-top:6px;font-size:9px;color:var(--text3);line-height:1.5">' +
+      '<b style="color:#B45309">REDONDEO</b>: \u226415 min, normal \u00b7 ' +
+      '<b style="color:var(--red)">REVISAR</b>: >15 min, contr\u00e1stalo</div>';
+    rows += '</div>';
+  }
+  rows += '<div class="comp-footer"></div>';
+
+  // Summary card
+  const diffSign   = totalDiff >= 0 ? '+' : '\u2212';
+  const diffCol    = Math.abs(totalDiff) <= 2 ? 'var(--green)' : totalDiff < 0 ? 'var(--red)' : 'var(--acc)';
   // Veredicto texto
   let vTxt = '', vSub = '', vBg = '', vIcon = '';
   if (Math.abs(totalDiff) <= 2) {
