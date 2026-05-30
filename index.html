@@ -4992,38 +4992,38 @@ async function _parsearPDFHoras(arrayBuffer) {
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    // Recoger todos los items con su posición
+    // Recoger todos los items con su posición.
+    // OJO: en este PDF, transform[4] se comporta como la FILA (Y visual) y
+    // transform[5] como la COLUMNA (X visual) — van intercambiados respecto a lo habitual.
     const items = [];
     content.items.forEach(it => {
       const s = (it.str || '');
       if (!s.trim()) return;
-      items.push({ x: it.transform[4], y: it.transform[5], s: s.trim() });
+      items.push({ fila: it.transform[4], col: it.transform[5], s: s.trim() });
     });
     if (!items.length) continue;
-    // DIAGNÓSTICO: guardar coordenadas de los primeros items (solo página 1)
+    // DIAGNÓSTICO: coordenadas de los primeros items (solo página 1)
     if (p === 1 && lineas.length === 0) {
-      _pdfDebugCoords = items.slice(0, 12).map(it => Math.round(it.x) + ',' + Math.round(it.y) + ':' + it.s).join(' | ');
+      _pdfDebugCoords = items.slice(0, 12).map(it => Math.round(it.fila) + ',' + Math.round(it.col) + ':' + it.s).join(' | ');
     }
-    // pdf.js puede entregar items en orden de columna y con Y dispersas.
-    // Clusterizar por Y: ordenar por Y descendente y agrupar los que estén
-    // dentro de una tolerancia del anterior (filas reales de la tabla).
-    items.sort((a, b) => b.y - a.y);
-    const TOL_Y = 3.5;  // px de tolerancia para considerar misma fila
+    // Agrupar por FILA (transform[4]). Ordenar filas de arriba a abajo.
+    items.sort((a, b) => a.fila - b.fila);
+    const TOL = 3.5;
     const filas = [];
     let grupo = [items[0]];
-    let yRef = items[0].y;
+    let ref = items[0].fila;
     for (let i = 1; i < items.length; i++) {
-      if (Math.abs(items[i].y - yRef) <= TOL_Y) {
+      if (Math.abs(items[i].fila - ref) <= TOL) {
         grupo.push(items[i]);
       } else {
         filas.push(grupo);
         grupo = [items[i]];
-        yRef = items[i].y;
+        ref = items[i].fila;
       }
     }
     if (grupo.length) filas.push(grupo);
     filas.forEach(g => {
-      const txt = g.sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
+      const txt = g.sort((a, b) => a.col - b.col).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
       if (txt) { lineas.push(txt); fullText += txt + '\n'; }
     });
   }
