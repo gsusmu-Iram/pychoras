@@ -1,38 +1,31 @@
 {
-  "name": "PycHoras · Jornada Pycseca",
+  "name": "PycHoras",
   "short_name": "PycHoras",
-  "description": "Registro de jornada laboral y horas extras",
+  "description": "Jornada, Chat, Datos y Cuenta",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F97316",
-  "theme_color": "#FFFFFF",
-  "lang": "es",
+  "background_color": "#FFFFFF",
+  "theme_color": "#F97316",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "hoja",
+          "accept": ["application/pdf", ".pdf", "image/*"]
+        }
+      ]
     }
-  ]
+  }
 }
