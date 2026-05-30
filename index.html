@@ -4970,7 +4970,20 @@ function _parsearTextoHoras(text) {
 // ── Parser PDF Pycseca — reconstrucción por líneas (validado al minuto) ──
 async function _parsearPDFHoras(arrayBuffer) {
   if (!_initPdfJs()) throw new Error('pdf.js no disponible');
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  // disableWorker: más fiable offline y para PDFs de 1 página (no depende del CDN del worker).
+  // isEvalSupported:false y password vacío para PDFs de Adobe Sign con permisos.
+  let pdf;
+  try {
+    pdf = await pdfjsLib.getDocument({
+      data: arrayBuffer,
+      disableWorker: true,
+      isEvalSupported: false,
+      password: ''
+    }).promise;
+  } catch (e) {
+    // Reintento con worker por si disableWorker no está soportado en esta versión
+    pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  }
 
   // Reconstruir líneas reales agrupando items por su posición vertical (Y)
   let lineas = [];
@@ -4978,16 +4991,21 @@ async function _parsearPDFHoras(arrayBuffer) {
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    const filas = {};
+    const filas = [];  // [{y, items:[{x,s}]}]
     content.items.forEach(it => {
-      const y = Math.round(it.transform[5]); // coordenada Y
-      // Agrupar Y cercanas (tolerancia 3px) en la misma fila
-      let key = Object.keys(filas).find(k => Math.abs(k - y) <= 3);
-      if (key === undefined) key = y;
-      (filas[key] = filas[key] || []).push({ x: it.transform[4], s: it.str });
+      const s = (it.str || '');
+      if (!s.trim()) return;
+      const y = it.transform[5];
+      const x = it.transform[4];
+      // Buscar fila existente con Y cercana (tolerancia 3)
+      let fila = filas.find(f => Math.abs(f.y - y) <= 3);
+      if (!fila) { fila = { y, items: [] }; filas.push(fila); }
+      fila.items.push({ x, s });
     });
-    Object.keys(filas).sort((a, b) => b - a).forEach(k => {
-      const txt = filas[k].sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
+    // Ordenar filas de arriba a abajo (Y mayor primero en coords PDF)
+    filas.sort((a, b) => b.y - a.y);
+    filas.forEach(f => {
+      const txt = f.items.sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
       if (txt) { lineas.push(txt); fullText += txt + '\n'; }
     });
   }
@@ -5029,8 +5047,15 @@ async function _parsearPDFHoras(arrayBuffer) {
   const totalOficialMatch = fullText.match(/TOTALES?[^\n]*?(\d{3,4}:\d{2})/i);
   if (totalOficialMatch) days._totalOficial = hm2min(totalOficialMatch[1]);
 
-  console.log('[PycHoras] días detectados:', Object.values(days).filter(v => v && v.mins > 0).length,
+  const nDias = Object.values(days).filter(v => v && v.mins > 0).length;
+  console.log('[PycHoras] PDF: ' + lineas.length + ' líneas, ' + nDias + ' días con horas',
     days._totalOficial ? '· Total oficial: ' + days._totalOficial + 'min' : '');
+  // Guardar pista de diagnóstico para el mensaje de error
+  if (nDias === 0) {
+    days._diagnostico = fullText.trim().length === 0
+      ? 'No se pudo extraer texto del PDF (posible problema de lectura).'
+      : 'Se leyó el PDF pero no se reconoció el formato de jornada Pycseca.';
+  }
   return days;
 }
 function _detectarMesPDF(nombre) {
