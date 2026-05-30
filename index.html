@@ -733,6 +733,7 @@ body{
 .comp-row-fds{background:rgba(0,0,0,0.015);border-left-color:transparent;}
 .comp-row-base{background:rgba(249,115,22,0.04);border-left-color:rgba(249,115,22,0.3);}
 .comp-row-none{border-left-color:var(--border);}
+.comp-row-vac{background:rgba(124,58,237,0.06);border-left-color:var(--purple);}
 .comp-day{font-size:12px;font-weight:800;color:var(--text2);font-family:var(--mono);}
 .comp-cell{font-size:12px;font-family:var(--mono);font-weight:700;color:var(--text);text-align:center;}
 .comp-cell.muted{color:var(--text3);font-weight:400;}
@@ -741,6 +742,7 @@ body{
 .comp-badge-warn{color:#B45309;background:rgba(251,191,36,0.15);}
 .comp-badge-err{color:var(--red);background:rgba(220,38,38,0.1);}
 .comp-badge-none{color:var(--text3);}
+.comp-badge-vac{color:var(--purple);background:rgba(124,58,237,0.12);}
 .comp-tag{font-size:9px;font-weight:900;font-family:var(--mono);padding:2px 5px;border-radius:4px;letter-spacing:.04em;}
 .comp-tag-fds{color:var(--text3);background:var(--bg3);}
 .comp-tag-fest{color:var(--purple);background:rgba(124,58,237,0.08);}
@@ -875,7 +877,7 @@ body{
     <div class="hdr-icon" id="headerIcon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
     <div>
       <div class="hdr-title" id="headerTitle">PycHoras</div>
-      <div class="hdr-sub" id="headerSub">Pycseca · Nómina</div>
+      <div class="hdr-sub" id="headerSub">Mi empresa · Nómina</div>
     </div>
   </div>
   <div class="hdr-right">
@@ -1474,7 +1476,7 @@ function showModule(moduleName) {
   document.getElementById('navDatos').classList.remove('active');
   document.getElementById('navMicuenta').classList.remove('active');
   document.getElementById('nav' + moduleName.charAt(0).toUpperCase() + moduleName.slice(1)).classList.add('active');
-  const headers = { chat: { icon: '📝', sub: 'Iram · Asistente de jornada' }, jornada: { icon: '⏰', sub: 'Pycseca · Jornada' }, datos: { icon: '📊', sub: 'Pycseca · Datos' }, micuenta: { icon: '💰', sub: 'Pycseca · Nómina' } };
+  const headers = { chat: { icon: '📝', sub: 'Iram · Asistente de jornada' }, jornada: { icon: '⏰', sub: 'Mi empresa · Jornada' }, datos: { icon: '📊', sub: 'Mi empresa · Datos' }, micuenta: { icon: '💰', sub: 'Mi empresa · Nómina' } };
   const h = headers[moduleName]; if (h) { document.querySelector('.hdr-icon').textContent = h.icon; document.getElementById('headerSub').textContent = h.sub; }
   currentModule = moduleName;
   if (moduleName === 'jornada') updateHeaderJornada(); else if (moduleName === 'chat') updateHeaderChat(); else if (moduleName === 'datos') updateHeaderDatos(); else if (moduleName === 'micuenta') updateHeaderMicuenta();
@@ -1527,7 +1529,7 @@ function calcLiquido(y, m) {
   const plusGuardiaEsteMes = guardiasEsteMes * cfg.guardia;
   const variables = stPrev.extrasEuros + st.plusFest + plusGuardiaEsteMes;
   const totalDevengado = baseFija + variables;
-  // === Modelo exacto Pycseca (validado contra nóminas reales 2026) ===
+  // === Modelo exacto de nómina (validado contra nóminas reales 2026) ===
   // Devengos sujetos a cot. común = todo lo salarial del mes MENOS horas extras
   // (las extras cotizan aparte por contingencias profesionales)
   const extrasEuros = stPrev.extrasEuros;
@@ -1796,7 +1798,7 @@ async function cargarPDF(input) {
 }
 
 function parsearNominaPDF(txt, nombre) {
-  // Parser específico para nómina Pycseca — formato real Abril 2026
+  // Parser específico para nómina de empresa — formato real Abril 2026
   const num = (regex) => { const m = txt.match(regex); return m ? parseFloat(m[1].replace('.','').replace(',','.')) : null; };
 
   // ── Detectar el mes del PDF por el periodo ("... a 31 MAY 26") ──
@@ -3428,9 +3430,9 @@ const IRAM = {
     ctx => ctx.esViernes ? '🎉 \u00a1Viernes! Aqu\u00ed Iram, aguantando el tipo.' : null,
   ],
   quienEres: [
-    'Soy Iram 👩🏼‍💻 tu asistente de jornada en Pycseca. Registro horas, extras, guardias y gastos.',
+    'Soy Iram 👩🏼‍💻 tu asistente de jornada. Registro horas, extras, guardias y gastos.',
     'Me llamo Iram. Llevo el control de tu jornada para que t\u00fa no tengas que acordarte de todo 😉',
-    'Iram \u2014 asistente de Pycseca Seguridad. Sin papel, sin Excel manual, todo en el m\u00f3vil 📱',
+    'Iram \u2014 asistente de jornada. Sin papel, sin Excel manual, todo en el m\u00f3vil 📱',
     'Iram, a tus \u00f3rdenes. Registro tu tiempo para que puedas centrarte en el trabajo 👩🏼‍💻',
     'Soy Iram, el que recuerda tus horas cuando t\u00fa no puedes 😉',
   ],
@@ -3758,8 +3760,8 @@ function detectarIntencion(rawInput){
   if(/\bfestivo\b/.test(sl))return{accion:'qFestivos',mes:parseMes(sl)};
   if(/\bvacacion\b/.test(sl))return{accion:'qVac'};
 
-  // Comparativa Pycseca — detectar "pycseca mes horas X gastos Y saldo Z"
-  if(/\b(pycseca|pycse|hoja|empresa|comparar|compara|cotejar|coteja)\b/.test(sl)){
+  // Comparativa empresa — detectar "empresa mes horas X gastos Y saldo Z"
+  if(/\b(hoja|empresa|comparar|compara|cotejar|coteja)\b/.test(sl)){
     const mesP = parseMes(sl);
     // extraer horas: "horas 181:32" o "181:32 horas"
     const hM = raw.match(/horas?\s+(\d{1,3}):(\d{2})/i) || raw.match(/(\d{1,3}):(\d{2})\s+horas?/i);
@@ -3770,7 +3772,7 @@ function detectarIntencion(rawInput){
     const horasMin = hM ? parseInt(hM[1])*60 + parseInt(hM[2]) : null;
     const gastos   = gM ? parseFloat(gM[1].replace(',','.')) : null;
     const saldo    = sM ? parseFloat(sM[1].replace(',','.')) : null;
-    return{accion:'qPycseca', mes:mesP, y:hoy.getFullYear(), horasMin, gastos, saldo};
+    return{accion:'qEmpresa', mes:mesP, y:hoy.getFullYear(), horasMin, gastos, saldo};
   }
 
   return{accion:'unknown',raw};
@@ -4039,17 +4041,17 @@ function responder(int_){
     return`Vacaciones ${y}:<div class="res-card"><div class="res-row"><span class="res-lbl">Usadas</span><span class="res-val">${u} d\u00edas</span></div><div class="res-row"><span class="res-lbl">Restantes</span><span class="res-val ${rest>0?'pos':'neg'}">${rest} d\u00edas</span></div></div>`;
   }
 
-  if(accion==='qPycseca'){
+  if(accion==='qEmpresa'){
     const {mes, y, horasMin, gastos, saldo} = int_;
     const st = mesStats(y, mes);
     const mesNom = MESES[mes];
 
     // Si no nos dieron ningún dato, pedir
     if(horasMin===null && gastos===null && saldo===null){
-      return`Comparativa con Pycseca para <b>${mesNom}</b> 👩🏼‍💻<br><br>Dime los datos de la hoja:<br><span class="pill">pycseca ${mesNom.toLowerCase()} horas 181:32 gastos 46.70 saldo 9.38</span>`;
+      return`Comparativa con la empresa para <b>${mesNom}</b> 👩🏼‍💻<br><br>Dime los datos de la hoja:<br><span class="pill">empresa ${mesNom.toLowerCase()} horas 181:32 gastos 46.70 saldo 9.38</span>`;
     }
 
-    let h = `Comparativa <b>${mesNom}</b> — App vs Pycseca 👩🏼‍💻<div class="res-card">`;
+    let h = `Comparativa <b>${mesNom}</b> — App vs Empresa 👩🏼‍💻<div class="res-card">`;
 
     // HORAS
     if(horasMin !== null){
@@ -4453,7 +4455,7 @@ function renderMesDetalleBody() {
       body.innerHTML=`<div style="padding:32px 20px;text-align:center">
         <div style="font-size:40px;margin-bottom:12px">📄</div>
         <div style="font-size:15px;font-weight:800;color:#374151;margin-bottom:8px">Sin datos de empresa</div>
-        <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">Sube el PDF de la hoja de Pycseca para comparar</div>
+        <div style="font-size:13px;color:#94a3b8;margin-bottom:20px">Sube el PDF de la hoja de empresa para comparar</div>
         <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
           📄 Subir PDF empresa
           <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
@@ -4804,7 +4806,7 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
 
   renderSugs();
   if(msgs.length===0){
-    const bienvenida=`Hola! Soy Iram, tu asistente de jornada en Pycseca 👩🏼‍💻 👋<br><br><span class="pill">inicio 7:30</span> <span class="pill">fin 15:40</span><br><span class="pill">7:30-16:45</span> <span class="pill">comida 1 hora</span><br><span class="pill">extras mes</span> <span class="pill">próxima guardia</span><br><br><small style="color:var(--text3)">También puedes decirme si algo no te gusta de como respondo 😉</small>`;
+    const bienvenida=`Hola! Soy Iram, tu asistente de jornada 👩🏼‍💻 👋<br><br><span class="pill">inicio 7:30</span> <span class="pill">fin 15:40</span><br><span class="pill">7:30-16:45</span> <span class="pill">comida 1 hora</span><br><span class="pill">extras mes</span> <span class="pill">próxima guardia</span><br><br><small style="color:var(--text3)">También puedes decirme si algo no te gusta de como respondo 😉</small>`;
     addMsg('bot',bienvenida);
   } else {renderMsgs();}
 
@@ -4831,6 +4833,33 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
     });
   }
 })();
+
+// ── Recepción de hoja compartida desde otra app (Web Share Target) ──
+// Si la app se abre con ?compartido=1, recoge el PDF del caché temporal
+// que dejó el service worker y lo procesa como si lo hubieras subido.
+async function _recogerArchivoCompartido() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get('compartido') !== '1') return;
+    if (!('caches' in window)) return;
+    const tmp = await caches.open('pychoras-shared');
+    const resp = await tmp.match('shared-file');
+    if (!resp) return;
+    const blob = await resp.blob();
+    const nombre = decodeURIComponent(resp.headers.get('X-File-Name') || 'hoja.pdf');
+    const file = new File([blob], nombre, { type: blob.type || 'application/pdf' });
+    await tmp.delete('shared-file');                 // limpiar para no reprocesar
+    history.replaceState(null, '', './index.html');  // quitar el ?compartido de la URL
+
+    // Ir a Datos, abrir el detalle del mes y procesar el archivo
+    showToast('\ud83d\udcc4 Procesando hoja compartida\u2026');
+    if (typeof showModule === 'function') showModule('datos');
+    _mdTab = 'comp';
+    // cargarHojaEmpresa espera algo con .files[0] y .value
+    await cargarHojaEmpresa({ files: [file], value: '' });
+  } catch (e) { /* si falla, no pasa nada: el usuario puede subirlo a mano */ }
+}
+window.addEventListener('load', () => { setTimeout(_recogerArchivoCompartido, 600); });
 
 // ── Comprobación fin de año y nuevo año ──────────────────────
 function _comprobarFinDeAnio() {
@@ -4967,7 +4996,7 @@ function _parsearTextoHoras(text) {
   return days;
 }
 
-// ── Parser PDF Pycseca — reconstrucción por líneas (validado al minuto) ──
+// ── Parser PDF empresa — reconstrucción por líneas (validado al minuto) ──
 async function _parsearPDFHoras(arrayBuffer) {
   if (!_initPdfJs()) throw new Error('pdf.js no disponible');
   // disableWorker: más fiable offline y para PDFs de 1 página (no depende del CDN del worker).
@@ -5067,12 +5096,13 @@ async function _parsearPDFHoras(arrayBuffer) {
         i += 2;
       } else break;
     }
-    // Día especial (vacaciones/formación): un solo valor suelto < 9h
-    if (trabajado === 0 && horas.length === 1 && mins[0] < 9 * 60) trabajado = mins[0];
+    // Día especial (vacaciones/formación): un solo valor suelto < 9h, sin tramos inicio-fin
+    let esEspecial = false;
+    if (trabajado === 0 && horas.length === 1 && mins[0] < 9 * 60) { trabajado = mins[0]; esEspecial = true; }
 
     if (days[dia] === undefined || days[dia].mins < trabajado) {
       const totalStr = Math.floor(trabajado / 60) + ':' + String(trabajado % 60).padStart(2, '0');
-      days[dia] = { mins: trabajado, totalStr, inicio, fin };
+      days[dia] = { mins: trabajado, totalStr, inicio, fin, especial: esEspecial };
     }
   }
 
@@ -5528,6 +5558,7 @@ function renderComparacion() {
     const isFest = inf.tipo === 'fest' || inf.fest;
     const isVac  = inf.tipo === 'vac';
     const isBase = !gD(y, m, d) && !isFds && !isFest; // día sin editar = valor base 8h
+    const empEspecial = emp && emp.especial; // empresa marca vacaciones/formación
 
     if (!isFds && !isFest) totApp += appMin;
     if (empMin !== null && !isFds && !isFest) totEmp += empMin;
@@ -5539,6 +5570,14 @@ function renderComparacion() {
     if (isFds || isFest) {
       rowCls = 'comp-row-fds';
       badge  = '<span class="comp-badge comp-badge-none">\u2014</span>';
+    } else if (empEspecial && isVac) {
+      // Ambos coinciden: empresa marca vacaciones y tú también
+      rowCls = 'comp-row-ok'; nOk++;
+      badge  = '<span class="comp-badge comp-badge-ok">\u2713</span>';
+    } else if (empEspecial && !isVac) {
+      // Empresa marca vacaciones/formación pero tú NO lo registraste
+      rowCls = 'comp-row-vac'; nWarn++;
+      badge  = '<span class="comp-badge comp-badge-vac">VAC?</span>';
     } else if (empMin === null) {
       rowCls = 'comp-row-none'; nMissing++;
       badge  = '<span class="comp-badge comp-badge-none">\u2014</span>';
@@ -5952,7 +5991,7 @@ async function procesarHojaDia(input) {
         }
       }
 
-      // Intentar como hoja diaria Pycseca
+      // Intentar como hoja diaria de empresa
       const diaria = _parsearHojaDiaria(txt);
       if (diaria) {
         _mostrarConfirmHojaDiaria(uid, diaria, file.name);
@@ -6009,7 +6048,7 @@ function _parsearHojaDiaria(txt) {
   const comidaM = txt.match(/Tiempo Comida\s+([\d.]+)\s*hrs/i);
   const comidaMins = comidaM ? Math.round(parseFloat(comidaM[1]) * 60) : 0;
 
-  // Total horas (ya descontadas por Pycseca)
+  // Total horas (ya descontadas por la empresa)
   const totalM = txt.match(/Horas Totales\s+([\d.]+)\s*hrs/i);
   let mins = 0;
   if (totalM) {
