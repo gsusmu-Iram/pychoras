@@ -1088,8 +1088,8 @@ body{
       </div>
 
 
-      <!-- COMPARATIVA NÓMINA REAL -->
-      <div class="mc-group" id="nomCompGroup">
+      <!-- COMPARATIVA NÓMINA REAL — oculta: el bloque "Nómina PDF · Comparativa vs app" ya cubre esto -->
+      <div class="mc-group" id="nomCompGroup" style="display:none">
         <div class="mc-group-title">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           Comparativa nómina real
@@ -1250,7 +1250,7 @@ let ctxConv = { inicioPendiente: null, ultimaFecha: null, ultimaConsulta: null, 
 
 // Variables específicas de mi cuenta
 let liqMes = new Date().getMonth();
-let liqYear = 2026;
+let liqYear = new Date().getFullYear();
 
 // ============================================================
 // FUNCIONES DE PERSISTENCIA
@@ -1800,14 +1800,16 @@ function parsearNominaPDF(txt, nombre) {
   const num = (regex) => { const m = txt.match(regex); return m ? parseFloat(m[1].replace('.','').replace(',','.')) : null; };
 
   // ── Detectar el mes del PDF por el periodo ("... a 31 MAY 26") ──
-  // No cambia nada automáticamente; solo avisa si no coincide con el mes en pantalla.
+  // Avisa si no coincide con el mes en pantalla y evita guardar en el mes equivocado.
   const MES_ABR = { ENE:0, FEB:1, MAR:2, ABR:3, MAY:4, JUN:5, JUL:6, AGO:7, SEP:8, OCT:9, NOV:10, DIC:11 };
   const mPer = txt.match(/a\s+\d{1,2}\s+([A-Z]{3})\s+(\d{2})/i);
+  let mesCoincide = true; // si no se detecta, no bloqueamos
   if (mPer) {
     const mesPDF = MES_ABR[mPer[1].toUpperCase()];
     const anioPDF = 2000 + parseInt(mPer[2]);
     if (mesPDF !== undefined && (mesPDF !== liqMes || anioPDF !== liqYear)) {
-      showToast('\u26A0\uFE0F Esta nómina es de ' + MESES[mesPDF] + ' ' + anioPDF + ', pero tienes ' + MESES[liqMes] + ' seleccionado. Cambia de mes si quieres guardarla ahí.', 5000);
+      mesCoincide = false;
+      showToast('\u26A0\uFE0F Esta nómina es de ' + MESES[mesPDF] + ' ' + anioPDF + ', pero tienes ' + MESES[liqMes] + ' seleccionado. No se ha guardado: cambia a ' + MESES[mesPDF] + ' y vuelve a cargarla.', 6000);
     }
   }
 
@@ -1839,6 +1841,14 @@ function parsearNominaPDF(txt, nombre) {
 
   // ── Actualizar campos de nómina fijos ─────────────────────────
   let actualizados = 0;
+  // Si el mes del PDF no coincide con el seleccionado, no escribimos nada (evita
+  // machacar los campos del mes actual con datos de otro mes). El aviso ya se mostró.
+  if (!mesCoincide) {
+    document.getElementById('pdfLoaded').classList.remove('show');
+    document.getElementById('pdfUploadArea').style.display = '';
+    return;
+  }
+
   const _set = (id, val, field) => { if (val !== null) { document.getElementById(id).value = val; nomina[field] = val; actualizados++; } };
   _set('nSalario',     sal,  'salario');
   _set('nAntiguedad',  ant,  'antiguedad');
@@ -1937,14 +1947,145 @@ function parsearNominaPDF(txt, nombre) {
     resEl.id = 'pdfCompResumen';
     document.getElementById('pdfLoaded').insertAdjacentElement('afterend', resEl);
   }
+  // ── Motor de diagnóstico de diferencias (determinista) ──────────
+  // Clasifica cada diferencia: parámetro vs datos de origen. Sin atribuir culpa.
+  function _analizarDiferencias() {
+    const items = [];          // diferencias relevantes
+    let okCount = 0;           // conceptos que cuadran
+    const UMBRAL = 0.5;        // por debajo se considera redondeo
+
+    // Conceptos fijos
+    [['Salario base', sal, nomina.salario], ['Antigüedad', ant, nomina.antiguedad],
+     ['Beneficios', ben, nomina.beneficios], ['Complemento', com, nomina.complemento],
+     ['Plus transporte', tra, nomina.transporte], ['Plus vestuario', ves, nomina.vestuario],
+     ['Prima AT', pri, nomina.prima]
+    ].forEach(([lbl, pdfV, appV]) => {
+      if (pdfV === null) return;
+      const d = pdfV - appV;
+      if (Math.abs(d) < UMBRAL) { okCount++; return; }
+      items.push({ tipo: 'param', lbl, eur: d,
+        txt: lbl + ': la nómina muestra ' + pdfV.toFixed(2) + '€ pero tienes configurado ' + appV.toFixed(2) + '€. Revisa el concepto fijo.' });
+    });
+
+    // Guardias — diferencia de DATOS DE ORIGEN (semanas registradas vs pagadas)
+    if (gua !== null) {
+      const guardiaApp = c.plusGuardiaEsteMes;
+      const d = gua - guardiaApp;
+      if (Math.abs(d) < UMBRAL) { okCount++; }
+      else {
+        const semPDF = cfg.guardia ? (gua / cfg.guardia) : 0;
+        const semApp = cfg.guardia ? (guardiaApp / cfg.guardia) : 0;
+        items.push({ tipo: 'origen', lbl: 'Guardias', eur: d,
+          txt: 'La nómina paga ' + semPDF.toFixed(0) + ' sem. de guardia (' + gua.toFixed(2) + '€) pero registraste ' + semApp.toFixed(0) + ' sem. (' + guardiaApp.toFixed(2) + '€). Revisa tus semanas de guardia registradas o el cómputo de la empresa.' });
+      }
+    }
+
+    // Horas extras — diferencia de DATOS DE ORIGEN (la importante)
+    if (ext !== null) {
+      const d = ext - c.extrasEuros;
+      if (Math.abs(d) < UMBRAL) { okCount++; }
+      else {
+        const precio = cfg.precioH || 13.94;
+        const hPDF = ext / precio;
+        const hApp = c.extrasEuros / precio;
+        const hDif = hApp - hPDF;
+        const mesAnt = MESES[c.prevM];
+        items.push({ tipo: 'origen', lbl: 'Horas extras', eur: d,
+          txt: 'La nómina paga ' + hPDF.toFixed(2) + 'h (' + ext.toFixed(2) + '€) pero registraste ' + hApp.toFixed(2) + 'h en ' + mesAnt + ' (' +
+               (hDif > 0 ? '−' : '+') + Math.abs(hDif).toFixed(2) + 'h). No es un error de cálculo: revisa tu registro de ' + mesAnt + ' o el cómputo de la empresa.' });
+      }
+    }
+
+    // IRPF
+    if (irpfAmt !== null) {
+      const d = irpfAmt - c.deduIRPF;
+      if (Math.abs(d) < UMBRAL) okCount++;
+      else items.push({ tipo: 'deriv', lbl: 'IRPF', eur: -d,
+        txt: 'IRPF: ' + irpfAmt.toFixed(2) + '€ frente a ' + c.deduIRPF.toFixed(2) + '€ estimado. La base de IRPF varía con las horas extras; se ajustará cuando cuadren las horas.' });
+    }
+
+    // Cotizaciones SS — derivadas de la base (se mueven con las extras)
+    [['SS Formación', ssForm, c.deduForm], ['SS Desempleo', ssDes, c.deduDes], ['SS Horas extras', ssExt, c.deduExtSS]
+    ].forEach(([lbl, pdfV, appV]) => {
+      if (pdfV === null) return;
+      const d = pdfV - appV;
+      if (Math.abs(d) < UMBRAL) { okCount++; return; }
+      items.push({ tipo: 'deriv', lbl, eur: -d,
+        txt: lbl + ': ' + pdfV.toFixed(2) + '€ vs ' + appV.toFixed(2) + '€. Diferencia derivada de las horas extras; se corrige al cuadrar las horas.' });
+    });
+
+    // Ordenar por impacto absoluto en €
+    items.sort((a, b) => Math.abs(b.eur) - Math.abs(a.eur));
+
+    // Construir HTML
+    const COL = { param: 'var(--acc-dk)', origen: 'var(--red)', deriv: 'var(--text2)' };
+    const ETI = { param: 'Parámetro', origen: 'Datos de origen', deriv: 'Derivada' };
+    let h = '';
+    if (items.length === 0) {
+      h += '<div style="padding:10px 12px;background:rgba(22,163,74,0.08);border-radius:var(--rs);font-size:12px;color:var(--green);font-weight:700">✓ Todo cuadra. ' + okCount + ' conceptos verificados sin diferencias relevantes.</div>';
+    } else {
+      items.forEach(it => {
+        const signo = it.eur >= 0 ? '+' : '−';
+        const esVerde = it.eur >= 0;
+        const badgeBg = esVerde ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)';
+        const badgeCol = esVerde ? 'var(--green)' : 'var(--red)';
+        h += '<div style="padding:9px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+            '<span style="font-size:12px;font-weight:800;color:var(--text)">' + it.lbl + '</span>' +
+            '<span style="display:flex;align-items:center;gap:6px">' +
+              '<span style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:' + COL[it.tipo] + ';border:1px solid ' + COL[it.tipo] + ';border-radius:4px;padding:1px 5px">' + ETI[it.tipo] + '</span>' +
+              '<span style="font-family:var(--mono);font-size:12px;font-weight:900;color:' + badgeCol + ';background:' + badgeBg + ';padding:2px 7px;border-radius:6px">' + signo + Math.abs(it.eur).toFixed(2) + '€</span>' +
+            '</span>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--text2);line-height:1.4">' + it.txt + '</div>' +
+        '</div>';
+      });
+      // Resumen final estilo diagnóstico
+      const totalDif = (liquido !== null) ? (liquido - c.liquido) : null;
+      const origenItems = items.filter(i => i.tipo === 'origen');
+      if (totalDif !== null) {
+        let resumen = 'De ' + (totalDif >= 0 ? '+' : '−') + Math.abs(totalDif).toFixed(2) + '€ de diferencia total en el líquido, ';
+        if (origenItems.length) {
+          const eOrig = origenItems.reduce((a, b) => a + b.eur, 0);
+          const fuentes = origenItems.map(i => i.lbl.toLowerCase()).join(' y ');
+          resumen += (eOrig >= 0 ? '+' : '−') + Math.abs(eOrig).toFixed(2) + '€ vienen de ' + fuentes + ' y el resto son ajustes de cotización derivados.';
+        } else {
+          resumen += 'la mayor parte son redondeos de cotización.';
+        }
+        h += '<div style="margin-top:10px;padding:10px 12px;background:var(--bg);border-radius:var(--rs);font-size:11px;color:var(--text2);line-height:1.5;font-style:italic">' + resumen + '</div>';
+      }
+      h += '<div style="margin-top:8px;font-size:9px;color:var(--text3);line-height:1.5">' +
+        '<b style="color:' + COL.param + '">Parámetro</b>: revisable en ajustes · ' +
+        '<b style="color:' + COL.origen + '">Datos de origen</b>: registro vs empresa · ' +
+        '<b style="color:' + COL.deriv + '">Derivada</b>: depende de otra diferencia</div>';
+    }
+    return h;
+  }
+
   resEl.innerHTML = resHtml;
+  // Botón "Analizar diferencias" + contenedor desplegable
+  resEl.insertAdjacentHTML('beforeend',
+    '<div style="margin:10px 14px 0">' +
+      '<button onclick="toggleDiagPanel(this)" ' +
+        'style="width:100%;padding:11px;border:1px solid var(--acc);background:var(--acc-lt);color:var(--acc-dk);border-radius:var(--r);font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+        '<span class="diagLbl">Analizar diferencias</span></button>' +
+      '<div id="diagPanel" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px">' +
+        '<div style="font-size:9px;font-weight:900;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono);margin-bottom:8px">Análisis de diferencias</div>' +
+        _analizarDiferencias() +
+      '</div></div>');
 
   // ── Rellenar comparativa nómina automáticamente desde PDF ──
-  if (gua !== null || ext !== null || liquido !== null) {
+  // Solo si el mes del PDF coincide con el seleccionado (evita contaminar otro mes).
+  if (mesCoincide && (gua !== null || ext !== null || liquido !== null)) {
     const toSave = {
       guardias: gua !== null ? gua : undefined,
       extras:   ext !== null ? ext : undefined,
       liquido:  liquido !== null ? liquido : undefined,
+      // Datos completos del PDF para reconstruir el análisis al reabrir la app
+      pdf: { sal, ant, ben, com, tra, ves, pri, noct, irpfPct, irpfAmt,
+             ssCom, ssMEI, ssForm, ssDes, ssExt, gua, ext, liquido,
+             totalDeduPDF, nombre },
       _guardada: new Date().toISOString(),
     };
     guardarCompNomina(liqYear, liqMes, toSave);
@@ -2021,9 +2162,10 @@ function importarBackupCompleto(input) {
 // ── EXCEL EXPORT ─────────────────────────────────────
 function exportarExcel() {
   if (typeof XLSX === 'undefined') { showToast('Cargando librería...'); return; }
+  const aE = new Date().getFullYear(); // año de exportación
   const wb = XLSX.utils.book_new();
   const DSEM_FULL = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  const FESTIVOS_SET = new Set(getFestivos(new Date().getFullYear()).map(f => f.d));
+  const FESTIVOS_SET = new Set(getFestivos(aE).map(f => f.d));
 
   function guardiaDiasSet() {
     const s = new Set();
@@ -2042,19 +2184,19 @@ function exportarExcel() {
   for (let mi = 0; mi < 12; mi++) {
     const mesNombre = MESES[mi];
     const aoa = [];
-    aoa.push([`JORNADA 2026 — ${mesNombre.toUpperCase()}`, '', '', '', '', '', '', '', '', '', '']);
+    aoa.push([`JORNADA ${aE} — ${mesNombre.toUpperCase()}`, '', '', '', '', '', '', '', '', '', '']);
     aoa.push(['DÍA','SEM.','INICIO','FIN','COMIDA','TOTAL','TIPO','GUARDIA','GASTO €','CONCEPTO','NOTA']);
 
-    const dm = new Date(2026, mi+1, 0).getDate();
+    const dm = new Date(aE, mi+1, 0).getDate();
     let totMins = 0, totGas = 0;
 
     for (let d = 1; d <= dm; d++) {
-      const fecha = new Date(2026, mi, d);
-      const dstr  = `2026-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const fecha = new Date(aE, mi, d);
+      const dstr  = `${aE}-${String(mi+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const fds   = fecha.getDay() === 0 || fecha.getDay() === 6;
       const fest  = FESTIVOS_SET.has(dstr);
       const guard = guardia_set.has(dstr);
-      const o     = gD(2026, mi, d);
+      const o     = gD(aE, mi, d);
 
       let inicio='', fin='', comida='', total='', tipo='', gasto='', concepto='', nota='';
       let mins = 0;
@@ -2117,11 +2259,11 @@ function exportarExcel() {
   }
 
   // ── HOJA RESUMEN ─────────────────────────────────────
-  const resAoa = [['RESUMEN JORNADA 2026','','','','','','','','']];
+  const resAoa = [['RESUMEN JORNADA ${aE}','','','','','','','','']];
   resAoa.push(['MES','DÍAS TRAB.','HORAS REALES','HORAS CONV.','EXTRAS','GASTOS €','GUARDIAS','€/HORA','IMPORTE €']);
   let totY=0,extY=0,labY=0,gasY=0,impY=0,gSemsY=0;
   for (let mi = 0; mi < 12; mi++) {
-    const st = mesStats(2026, mi);
+    const st = mesStats(aE, mi);
     // Contar guardias: base (vacías por diseño) + extras añadidas por usuario
     let gSems = st.guardiasMes; // mesStats ya cuenta ambas correctamente
     gSemsY += gSems;
@@ -2129,25 +2271,25 @@ function exportarExcel() {
     resAoa.push([MESES[mi],st.lab,minsToHHMM(st.tot),minsToHHMM(cfg.convenio*60),(e>=0?'+':'')+minsToHHMM(e),st.gas>0?parseFloat(st.gas.toFixed(2)):'',gSems>0?gSems+' sem.':'',cfg.precioH,imp]);
     totY+=st.tot; extY+=e; labY+=st.lab; gasY+=st.gas; impY+=imp;
   }
-  resAoa.push(['TOTAL 2026',labY,minsToHHMM(totY),minsToHHMM(cfg.convenio*60*12),(extY>=0?'+':'')+minsToHHMM(extY),gasY>0?parseFloat(gasY.toFixed(2)):'',gSemsY>0?gSemsY+' sem.':'',cfg.precioH,parseFloat(impY.toFixed(2))]);
+  resAoa.push(['TOTAL '+aE+'',labY,minsToHHMM(totY),minsToHHMM(cfg.convenio*60*12),(extY>=0?'+':'')+minsToHHMM(extY),gasY>0?parseFloat(gasY.toFixed(2)):'',gSemsY>0?gSemsY+' sem.':'',cfg.precioH,parseFloat(impY.toFixed(2))]);
   const wsRes = XLSX.utils.aoa_to_sheet(resAoa);
   wsRes['!cols'] = [{wch:14},{wch:10},{wch:13},{wch:12},{wch:9},{wch:9},{wch:9},{wch:7},{wch:11}];
-  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen 2026');
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen ' + aE);
 
   // ── HOJA NÓMINA ──────────────────────────────────────
-  const nomAoa = [['NÓMINA 2026','','','','','','','','','','','','']];
+  const nomAoa = [['NÓMINA ' + aE + '','','','','','','','','','','','','']];
   nomAoa.push(['MES','S.BASE','ANTIGÜED.','BENEFIC.','TRANSP.','VESTUAR.','COMPLEM.','PRIMA AT','NOCT.','HRS EXT','IRPF %','LÍQUIDO','OBSERV.']);
   for (let mi = 0; mi < 12; mi++) {
-    const st = mesStats(2026, mi);
+    const st = mesStats(aE, mi);
     const extEuros = parseFloat((Math.max(0,st.ext)/60*cfg.precioH).toFixed(2));
     nomAoa.push([MESES[mi],nomina.salario,nomina.antiguedad,nomina.beneficios,nomina.transporte,nomina.vestuario,nomina.complemento,nomina.prima,nomina.nocturnidad,extEuros||'',nomina.irpf,'','']);
   }
   const wsNom = XLSX.utils.aoa_to_sheet(nomAoa);
   wsNom['!cols'] = Array(13).fill({wch:10});
-  XLSX.utils.book_append_sheet(wb, wsNom, 'Nómina 2026');
+  XLSX.utils.book_append_sheet(wb, wsNom, 'Nómina ' + aE);
 
   // ── HOJA GUARDIAS ─────────────────────────────────────
-  const gAoa = [['GUARDIAS 2026','','','','']];
+  const gAoa = [['GUARDIAS ' + aE + '','','','','']];
   gAoa.push(['INICIO','FIN','DÍAS LAB.','PLUS €','ESTADO']);
   let totG=0;
   GUARDIAS_2026.forEach(g=>{
@@ -2156,7 +2298,7 @@ function exportarExcel() {
     const cambio=guardiasCambios[key];
     const estado=cambio==='cancelada'?'Cambiada':fin<new Date()?'Completada':g<=new Date()&&fin>=new Date()?'En curso':'Pendiente';
     let lab=0;for(let i=0;i<7;i++){const d=new Date(g);d.setDate(d.getDate()+i);if(d.getDay()>0&&d.getDay()<6)lab++;}
-    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/2026`,`${fin.getDate()}/${fin.getMonth()+1}/2026`,lab,cfg.guardia,estado]);
+    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/${aE}`,`${fin.getDate()}/${fin.getMonth()+1}/${aE}`,lab,cfg.guardia,estado]);
     totG+=cfg.guardia;
   });
   // ── Guardias extra añadidas por el usuario ──
@@ -2166,25 +2308,25 @@ function exportarExcel() {
     const fin=new Date(g);fin.setDate(fin.getDate()+6);
     const estado=fin<new Date()?'Completada':g<=new Date()&&fin>=new Date()?'En curso':'Pendiente';
     let lab=0;for(let i=0;i<7;i++){const d=new Date(g);d.setDate(d.getDate()+i);if(d.getDay()>0&&d.getDay()<6)lab++;}
-    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/2026`,`${fin.getDate()}/${fin.getMonth()+1}/2026`,lab,cfg.guardia,estado+' (+extra)']);
+    gAoa.push([`${g.getDate()}/${g.getMonth()+1}/${aE}`,`${fin.getDate()}/${fin.getMonth()+1}/${aE}`,lab,cfg.guardia,estado+' (+extra)']);
     totG+=cfg.guardia;
   });
   gAoa.push(['TOTAL','','',totG,'']);
   const wsG = XLSX.utils.aoa_to_sheet(gAoa);
   wsG['!cols'] = [{wch:12},{wch:12},{wch:10},{wch:8},{wch:12}];
-  XLSX.utils.book_append_sheet(wb, wsG, 'Guardias 2026');
+  XLSX.utils.book_append_sheet(wb, wsG, 'Guardias ' + aE);
 
   // ── Hojas de comparativas guardadas ───────────────────────
   for (let mi = 0; mi < 12; mi++) {
-    const chRaw = localStorage.getItem(KCH + '_2026_' + String(mi+1).padStart(2,'0'));
+    const chRaw = localStorage.getItem(KCH + '_' + aE + '_' + String(mi+1).padStart(2,'0'));
     if (!chRaw) continue;
     try {
       const { days } = JSON.parse(chRaw);
-      const dm2 = new Date(2026, mi+1, 0).getDate();
-      const chAoa = [['COMPARATIVA HORAS · ' + MESES[mi].toUpperCase() + ' 2026','','','','']];
+      const dm2 = new Date(aE, mi+1, 0).getDate();
+      const chAoa = [['COMPARATIVA HORAS · ' + MESES[mi].toUpperCase() + ' ' + aE,'','','','']];
       chAoa.push(['DÍA','MI REGISTRO','EMPRESA','DIFERENCIA','ESTADO']);
       for (let d = 1; d <= dm2; d++) {
-        const inf = dayInfoDatos(2026, mi, d);
+        const inf = dayInfoDatos(aE, mi, d);
         const emp = days[d];
         if (inf.fds || inf.fest) continue;
         const empMin = emp ? emp.mins : null;
@@ -2198,15 +2340,15 @@ function exportarExcel() {
     } catch(e) {}
   }
   // ── Hoja comparativa nóminas ────────────────────────────────
-  const cnAoa = [['COMPARATIVA NÓMINAS 2026','','','','']];
+  const cnAoa = [['COMPARATIVA NÓMINAS '+aE+'','','','','']];
   cnAoa.push(['MES NÓMINA','CONCEPTO','APP ESTIMA','NÓMINA REAL','DIFERENCIA']);
   let hasCN = false;
   for (let mi = 0; mi < 12; mi++) {
-    const cnRaw = localStorage.getItem(KCN + '_2026_' + String(mi+1).padStart(2,'0'));
+    const cnRaw = localStorage.getItem(KCN + '_' + aE + '_' + String(mi+1).padStart(2,'0'));
     if (!cnRaw) continue;
     try {
       const { data: n } = JSON.parse(cnRaw);
-      const c = calcLiquido(2026, mi);
+      const c = calcLiquido(aE, mi);
       const pairs = [
         ['Líquido', c.liquido, n.liquido],
         ['Guardias', c.st.plusGuardia, n.guardias],
@@ -2461,7 +2603,7 @@ function renderJornada() {
     cell.appendChild(tm);
     if ((inf.gasto || 0) > 0) { const dot = document.createElement('div'); dot.className = 'dg-gasto'; cell.appendChild(dot); }
     if (enGuardia(y, m, d))  { const dot = document.createElement('div'); dot.className = 'dg-guard'; cell.appendChild(dot); }
-    if (!inf.fut) cell.addEventListener('click', () => openModalJornada(y, m, d));
+    cell.addEventListener('click', () => openModalJornada(y, m, d));
     grid.appendChild(cell);
   }
 }
@@ -4099,6 +4241,11 @@ function goLiqMes(dir) {
   // Resetear estado PDF al cambiar de mes — cada mes tiene su propio PDF
   const pdfLoaded = document.getElementById('pdfLoaded');
   if (pdfLoaded) pdfLoaded.classList.remove('show');
+  const pdfArea = document.getElementById('pdfUploadArea');
+  if (pdfArea) pdfArea.style.display = '';
+  // Limpiar la comparativa + análisis del mes anterior (evita mostrar datos de otro mes)
+  const resEl = document.getElementById('pdfCompResumen');
+  if (resEl) resEl.remove();
   renderLiquido();
 }
 
@@ -4820,95 +4967,70 @@ function _parsearTextoHoras(text) {
   return days;
 }
 
-// ── Parser PDF Pycseca — token a token ───────────────────────
+// ── Parser PDF Pycseca — reconstrucción por líneas (validado al minuto) ──
 async function _parsearPDFHoras(arrayBuffer) {
   if (!_initPdfJs()) throw new Error('pdf.js no disponible');
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
+  // Reconstruir líneas reales agrupando items por su posición vertical (Y)
+  let lineas = [];
   let fullText = '';
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    fullText += content.items.map(i => i.str).join(' ') + ' ';
+    const filas = {};
+    content.items.forEach(it => {
+      const y = Math.round(it.transform[5]); // coordenada Y
+      // Agrupar Y cercanas (tolerancia 3px) en la misma fila
+      let key = Object.keys(filas).find(k => Math.abs(k - y) <= 3);
+      if (key === undefined) key = y;
+      (filas[key] = filas[key] || []).push({ x: it.transform[4], s: it.str });
+    });
+    Object.keys(filas).sort((a, b) => b - a).forEach(k => {
+      const txt = filas[k].sort((a, b) => a.x - b.x).map(o => o.s).join(' ').replace(/\s+/g, ' ').trim();
+      if (txt) { lineas.push(txt); fullText += txt + '\n'; }
+    });
   }
 
+  const hm2min = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
   const days = {};
 
-  const limpio = fullText
-    .replace(/SALDO INICIAL[^0-9]*/gi, ' ')
-    .replace(/PARCIAL[^0-9A-Z]*/gi, ' ')
-    .replace(/TOTALES?[^0-9]*/gi, ' ')
-    .replace(/VACACIONES[\s\d]*/gi, ' ')
-    .replace(/\bIT\b[\s\d]*/gi, ' ')
-    .replace(/TARJETA/gi, ' ')
-    .replace(/INSTALADOR[^0-9]*/gi, ' ')
-    .replace(/GASOIL|DIETAS|PEAJES|MATERIAL|PARKING|HOTELES|VARIOS|FONDOS|VEHICUL|PUBLIC|RELAC\./gi, ' ')
-    .replace(/INICIO|FIN|TOTAL|EXTR|PROV|SALDO|HOR[A]?\b/gi, ' ')
-    .replace(/DIA\b/gi, ' ')
-    .replace(/T[ÉE]CNICOS/gi, ' ')
-    .replace(/MES\s*:/gi, ' ');
+  for (const ln of lineas) {
+    const md = ln.match(/^(\d{1,2})\b/);
+    if (!md) continue;
+    const dia = +md[1];
+    if (dia < 1 || dia > 31) continue;
+    const horas = ln.match(/\d{1,2}:\d{2}/g);
+    if (!horas) continue;
+    if (horas.length === 1 && horas[0] === '0:00') { if (days[dia] === undefined) days[dia] = { mins: 0, totalStr: '0:00' }; continue; }
 
-  const tokens = limpio.split(/\s+/).filter(Boolean);
-  const esHora = t => { const m=t.match(/^(\d{1,2}):(\d{2})$/); if(!m) return false; return +m[1]<=23&&+m[2]<=59; };
-  const esDia  = t => /^\d{1,2}$/.test(t) && +t>=1 && +t<=31;
-
-  let i=0;
-  while(i<tokens.length){
-    const tok=tokens[i];
-    if(!esDia(tok)){i++;continue;}
-    let dia=+tok;
-
-    // pdf.js a veces parte "11" en "1"+"1", "12" en "1"+"2", etc.
-    // Si el token es un solo dígito y el siguiente también, intentar combinarlos
-    const next=tokens[i+1];
-    if(tok.length===1 && next && /^\d$/.test(next)) {
-      const combined = +(tok+next);
-      if(combined>=10 && combined<=31 && days[combined]===undefined) {
-        dia=combined;
-        i++; // consumir el segundo dígito
-      }
+    // Reconstruir horas trabajadas desde pares inicio-fin (mañana + tarde)
+    const mins = horas.map(hm2min);
+    let trabajado = 0, i = 0, inicio = null, fin = null;
+    while (i + 1 < mins.length) {
+      const ini = mins[i], f = mins[i + 1];
+      if (f > ini && (f - ini) < 18 * 60) { // tramo laboral plausible
+        trabajado += (f - ini);
+        if (inicio === null) inicio = horas[i];
+        fin = horas[i + 1];
+        i += 2;
+      } else break;
     }
+    // Día especial (vacaciones/formación): un solo valor suelto < 9h
+    if (trabajado === 0 && horas.length === 1 && mins[0] < 9 * 60) trabajado = mins[0];
 
-    // Guardia Pycseca es siempre >= 10. Solo saltar si next es guardia plausible
-    const next2=tokens[i+1];
-    if(next2&&esDia(next2)&&+next2>=10&&days[dia]!==undefined){i++;dia=+tokens[i];}
-    else if(next2&&esDia(next2)&&+next2>=10&&days[+next2]===undefined&&days[dia]!==undefined){i++;dia=+tokens[i];}
-
-    const seg=[];let j=i+1;
-    while(j<tokens.length){
-      const t=tokens[j];
-      if(esDia(t)&&seg.some(s=>esHora(s)))break;
-      seg.push(t);j++;
+    if (days[dia] === undefined || days[dia].mins < trabajado) {
+      const totalStr = Math.floor(trabajado / 60) + ':' + String(trabajado % 60).padStart(2, '0');
+      days[dia] = { mins: trabajado, totalStr, inicio, fin };
     }
-    const horas=seg.filter(esHora);
-    if(!horas.length){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
-    const totalStr=horas[horas.length-1];
-    const[th,tm]=totalStr.split(':').map(Number);
-    if(th===0&&tm===0){if(!days[dia])days[dia]={mins:0,totalStr:'0:00'};i=j;continue;}
-    const mins=th*60+tm;
-    if(!days[dia]||days[dia].mins<mins){
-      days[dia]={mins,totalStr,inicio:horas[0],fin:horas.length>=2?horas[horas.length-2]:horas[0]};
-    }
-    i=j;
   }
 
-  // Buscar el total oficial de horas del PDF (línea TOTALES ... HH:MM)
-  const totalOficialMatch = fullText.match(/TOTALES?[^0-9]*[\d.,\s-]*?(\d{3,4}:\d{2})/i)
-    || fullText.match(/(\d{3,4}:\d{2})\s*$/);
-  if(totalOficialMatch){
-    const[th,tm]=totalOficialMatch[1].split(':').map(Number);
-    days._totalOficial=th*60+tm;
-  }
+  // Total oficial de horas del PDF (línea TOTALES ... HHH:MM)
+  const totalOficialMatch = fullText.match(/TOTALES?[^\n]*?(\d{3,4}:\d{2})/i);
+  if (totalOficialMatch) days._totalOficial = hm2min(totalOficialMatch[1]);
 
-  // Extraer total de gastos — es el número antes de (prov_fondos)(saldo)(horas) al final de TOTALES
-  const totGastosMatch = fullText.match(/([\d.,]+)\s+[\d.,]+\s+-?[\d.,]+\s+\d{3,4}:\d{2}/);
-  if(totGastosMatch){
-    days._totGastos = parseFloat(totGastosMatch[1].replace(',','.'));
-  }
-
-  console.log('[PycHoras] días detectados:', Object.values(days).filter(v=>v&&v.mins>0).length,
-    days._totalOficial ? '· Total oficial: '+days._totalOficial+'min' : '',
-    days._totGastos ? '· Gastos: '+days._totGastos+'€' : '');
+  console.log('[PycHoras] días detectados:', Object.values(days).filter(v => v && v.mins > 0).length,
+    days._totalOficial ? '· Total oficial: ' + days._totalOficial + 'min' : '');
   return days;
 }
 function _detectarMesPDF(nombre) {
@@ -5037,6 +5159,13 @@ function borrarCompHoras(y, m) {
 
 function guardarCompNomina(y, m, data) {
   localStorage.setItem(_compNomKey(y, m), JSON.stringify({ data, guardada: new Date().toISOString() }));
+}
+
+function toggleDiagPanel(btn) {
+  const p = document.getElementById('diagPanel');
+  const lbl = btn.querySelector('.diagLbl');
+  if (p.style.display === 'none') { p.style.display = 'block'; if (lbl) lbl.textContent = 'Ocultar análisis'; }
+  else { p.style.display = 'none'; if (lbl) lbl.textContent = 'Analizar diferencias'; }
 }
 
 function cargarCompNomina(y, m) {
@@ -5607,7 +5736,6 @@ function renderNomComp() {
   const savedDate = saved && saved._guardada ? new Date(saved._guardada).toLocaleDateString('es-ES') : null;
 
   el.innerHTML =
-    '<div class="nomcomp-mes-lbl">\u2139 Esta n\u00f3mina paga las extras de <strong>' + mesPrev + ' ' + yprev + '</strong>. Escribe los valores reales de tu n\u00f3mina.</div>' +
     _row('guardias', 'Guardias', c.guardiasEsteMes + ' sem. \u00d7 ' + cfg.guardia + '\u20ac', appVals.guardias, realVals.guardias) +
     (c.st.plusFest > 0 || (saved && saved.festivo)
       ? _row('festivo', 'Plus festivo guardia', Math.round(c.st.plusFest / cfg.festivo || 0) + ' d\u00eda \u00d7 ' + cfg.festivo + '\u20ac', appVals.festivo, realVals.festivo)
