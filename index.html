@@ -5057,14 +5057,13 @@ async function _parsearPDFHoras(arrayBuffer) {
   const nDias = Object.values(days).filter(v => v && v.mins > 0).length;
   console.log('[PycHoras] PDF: ' + lineas.length + ' líneas, ' + nDias + ' días con horas',
     days._totalOficial ? '· Total oficial: ' + days._totalOficial + 'min' : '');
-  // Guardar pista de diagnóstico para el mensaje de error
-  if (nDias === 0) {
+  // Diagnóstico SIEMPRE: guardar muestra de las líneas reales que produjo pdf.js
+  days._numLineas = lineas.length;
+  days._muestra = (lineas.slice(0, 14).join(' ⏎ ') || '(sin texto)').slice(0, 600);
+  if (nDias <= 1) {
     days._diagnostico = fullText.trim().length === 0
-      ? 'No se pudo extraer texto del PDF (posible problema de lectura).'
-      : 'Se leyó el PDF pero no se reconoció el formato.';
-    // Muestra del texto crudo extraído (primeras líneas) para diagnóstico
-    days._muestra = (lineas.slice(0, 12).join(' | ') || '(sin texto)').slice(0, 400);
-    days._numLineas = lineas.length;
+      ? 'No se pudo extraer texto del PDF.'
+      : 'Leído pero solo ' + nDias + ' día reconocido. Revisa la muestra.';
   }
   return days;
 }
@@ -5269,16 +5268,16 @@ async function cargarHojaEmpresa(input) {
     const diasConHoras = Object.keys(days).filter(d => days[d].mins > 0);
     const n = diasConHoras.length;
 
-    if (n === 0) {
-      const diag = days._diagnostico || '';
+    if (n === 0 || (isPDF && n <= 2)) {
+      const diag = days._diagnostico || ('Solo ' + n + ' día(s) reconocido(s).');
       const muestra = days._muestra || '';
       const numL = days._numLineas != null ? days._numLineas : '?';
       if (body) body.innerHTML = `<div style="padding:40px 20px;text-align:center">
         <div style="font-size:32px;margin-bottom:12px">⚠️</div>
-        <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px">No se detectaron días</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">${isPDF ? 'Verifica que es la hoja de jornada de Pycseca.' : 'Prueba con una imagen más nítida o en horizontal.'}</div>
+        <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px">${n === 0 ? 'No se detectaron días' : 'Pocos días detectados (' + n + ')'}</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">${isPDF ? 'Diagnóstico de lectura del PDF:' : 'Prueba con una imagen más nítida o en horizontal.'}</div>
         ${isPDF && diag ? `<div style="font-size:11px;color:var(--acc);margin-bottom:8px;font-weight:700">${diag}</div>` : ''}
-        ${isPDF ? `<div style="font-size:10px;color:var(--text3);background:var(--bg);border-radius:8px;padding:10px;margin-bottom:16px;text-align:left;font-family:var(--mono);word-break:break-word">Líneas leídas: ${numL}<br>Muestra: ${muestra || '(vacío)'}</div>` : ''}
+        ${isPDF ? `<div style="font-size:9px;color:var(--text2);background:var(--bg);border-radius:8px;padding:10px;margin-bottom:16px;text-align:left;font-family:var(--mono);word-break:break-word;line-height:1.5">Líneas: ${numL}<br><br>${muestra || '(vacío)'}</div>` : ''}
         <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
           Intentar con otro archivo
           <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
