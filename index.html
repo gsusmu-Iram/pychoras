@@ -1268,12 +1268,31 @@ function loadAll() {
   try { const d = localStorage.getItem(KG); if (d) guardiasCambios = JSON.parse(d); } catch(e) {}
 }
 
-function saveDat() { try { localStorage.setItem(KD, JSON.stringify(dat)); } catch(e) {} }
-function saveMsgs() { try { localStorage.setItem(KC_MSG, JSON.stringify(msgs)); } catch(e) {} }
-function saveCfg() { try { localStorage.setItem(KC_FG, JSON.stringify(cfg)); } catch(e) {} }
-function saveNomina() { try { localStorage.setItem(KN, JSON.stringify(nomina)); } catch(e) {} }
-function saveFrases() { try { localStorage.setItem(KF, JSON.stringify({ custom: frasesCustom, ocultas: frasesOcultas })); } catch(e) {} }
-function saveProState() { try { localStorage.setItem(KP, JSON.stringify(proState)); } catch(e) {} }
+// Guardado seguro: detecta si localStorage está lleno y AVISA en vez de fallar en silencio
+let _avisoEspacioMostrado = false;
+function guardarSeguro(clave, valor) {
+  try {
+    localStorage.setItem(clave, valor);
+    return true;
+  } catch (e) {
+    // QuotaExceededError u otro fallo de almacenamiento
+    const esEspacio = e && (e.name === 'QuotaExceededError' || e.code === 22 || /quota|exceeded|espacio/i.test(e.message || ''));
+    if (esEspacio && !_avisoEspacioMostrado) {
+      _avisoEspacioMostrado = true;
+      try { showToast('\u26A0\uFE0F El almacenamiento está lleno. Exporta un backup (Ajustes) y borra meses antiguos para seguir guardando.', 8000); } catch(_) {}
+    } else if (!esEspacio) {
+      try { showToast('\u26A0\uFE0F No se pudo guardar. Haz un backup por si acaso.', 5000); } catch(_) {}
+    }
+    return false;
+  }
+}
+
+function saveDat() { guardarSeguro(KD, JSON.stringify(dat)); }
+function saveMsgs() { guardarSeguro(KC_MSG, JSON.stringify(msgs)); }
+function saveCfg() { guardarSeguro(KC_FG, JSON.stringify(cfg)); }
+function saveNomina() { guardarSeguro(KN, JSON.stringify(nomina)); }
+function saveFrases() { guardarSeguro(KF, JSON.stringify({ custom: frasesCustom, ocultas: frasesOcultas })); }
+function saveProState() { guardarSeguro(KP, JSON.stringify(proState)); }
 
 function gD(y, m, d) { return dat?.[y]?.[m]?.[d] || null; }
 function sD(y, m, d, v) {
@@ -1598,6 +1617,38 @@ function renderLiquido() {
   if (st.gas > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Gastos reembolsables<small>Para cotejar con empresa</small></div><div class="extra-val acc">${st.gas.toFixed(2)}€</div></div>`;
   evHtml += `<div class="extra-row total"><div class="extra-lbl" style="font-weight:800;color:var(--text)">Total variables</div><div class="extra-val pos" style="font-size:15px">+${(c.variables).toFixed(2)}€</div></div>`;
   document.getElementById('extraCard').innerHTML = evHtml;
+
+  // ── Reconstruir vista de la nómina PDF si hay comparativa guardada ──
+  _restaurarNominaPDF(y, m);
+}
+
+// Reconstruye el estado "PDF cargado" + resumen al reabrir un mes con comparativa guardada
+function _restaurarNominaPDF(y, m) {
+  const saved = cargarCompNomina(y, m);
+  const loaded = document.getElementById('pdfLoaded');
+  const uploadArea = document.getElementById('pdfUploadArea');
+  let resEl = document.getElementById('pdfCompResumen');
+
+  if (saved && saved.resumenHTML) {
+    // Marcar como cargado
+    if (loaded) loaded.classList.add('show');
+    if (uploadArea) uploadArea.style.display = 'none';
+    // Reinyectar el resumen guardado
+    if (!resEl) {
+      resEl = document.createElement('div');
+      resEl.id = 'pdfCompResumen';
+      if (loaded) loaded.insertAdjacentElement('afterend', resEl);
+    }
+    resEl.innerHTML = saved.resumenHTML;
+    // Restaurar la etiqueta de "Nómina cargada"
+    const nmEl = document.getElementById('pdfLoadedTxt');
+    if (nmEl) nmEl.textContent = '\u2713 Nómina cargada';
+  } else {
+    // Sin comparativa guardada este mes: estado limpio
+    if (loaded) loaded.classList.remove('show');
+    if (uploadArea) uploadArea.style.display = '';
+    if (resEl) resEl.innerHTML = '';
+  }
 }
 
 
@@ -2088,6 +2139,8 @@ function parsearNominaPDF(txt, nombre) {
       pdf: { sal, ant, ben, com, tra, ves, pri, noct, irpfPct, irpfAmt,
              ssCom, ssMEI, ssForm, ssDes, ssExt, gua, ext, liquido,
              totalDeduPDF, nombre },
+      // HTML del resumen ya renderizado, para volver a pintarlo tal cual al reabrir
+      resumenHTML: resEl.innerHTML,
       _guardada: new Date().toISOString(),
     };
     guardarCompNomina(liqYear, liqMes, toSave);
@@ -5239,7 +5292,7 @@ function _compNomKey(y, m)   { return KCN + '_' + y + '_' + String(m+1).padStart
 function guardarCompHoras(y, m) {
   if (!_compCargado || !Object.keys(_empresaDays).length) return;
   const data = { days: _empresaDays, nombre: _empresaMes, guardada: new Date().toISOString() };
-  localStorage.setItem(_compHorasKey(y, m), JSON.stringify(data));
+  guardarSeguro(_compHorasKey(y, m), JSON.stringify(data));
 }
 
 function cargarCompHoras(y, m) {
@@ -5267,7 +5320,7 @@ function borrarCompHoras(y, m) {
 }
 
 function guardarCompNomina(y, m, data) {
-  localStorage.setItem(_compNomKey(y, m), JSON.stringify({ data, guardada: new Date().toISOString() }));
+  guardarSeguro(_compNomKey(y, m), JSON.stringify({ data, guardada: new Date().toISOString() }));
 }
 
 function toggleDiagPanel(btn) {
