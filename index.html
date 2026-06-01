@@ -1110,6 +1110,7 @@ body{
         <div class="sec" style="margin-bottom:0">
           <div class="cfg-card">
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Precio hora extra</div><div class="cfg-sub">Convenio seguridad privada</div></div><input class="cfg-input" id="cfgPrecioH" type="number" step="0.01"><span class="cfg-unit">€/h</span></div>
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Precio hora nocturna</div><div class="cfg-sub">A partir de las 22:00</div></div><input class="cfg-input" id="cfgPrecioNoct" type="number" step="0.001"><span class="cfg-unit">€/h</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus guardia semana</div><div class="cfg-sub">Fijo por semana completa</div></div><input class="cfg-input" id="cfgGuardia" type="number" step="1"><span class="cfg-unit">€</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus festivo trabajado</div><div class="cfg-sub">Por día festivo con guardia</div></div><input class="cfg-input" id="cfgFestivo" type="number" step="1"><span class="cfg-unit">€</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Horas convenio mensual</div><div class="cfg-sub">Base cálculo de extras</div></div><input class="cfg-input" id="cfgConvenio" type="number" step="1"><span class="cfg-unit">h</span></div>
@@ -1240,7 +1241,7 @@ const KCH = 'pyc_comp_horas'; // prefix: KCH_2026_03
 const KCN = 'pyc_comp_nom';   // prefix: KCN_2026_03
 
 let dat = {};
-let cfg = { precioH: 13.94, guardia: 180, festivo: 70, convenio: 162, vacDias: 31, prorrata: 275.98 };
+let cfg = { precioH: 13.94, precioNoct: 1.652, guardia: 180, festivo: 70, convenio: 162, vacDias: 31, prorrata: 275.98 };
 let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0 };
 let guardiasCambios = {};
 let frasesCustom = {};
@@ -1466,16 +1467,29 @@ function mesStats(y, m) {
     if (g.getFullYear() === y && g.getMonth() === m) guardiasMes++;
   }
   plusGuardia = guardiasMes * cfg.guardia;
+  let noctMin = 0; // minutos de nocturnidad del mes (tramo posterior a las 22:00)
   for (let d = 1; d <= dm; d++) {
     const dstr = ds(y, m, d), date = new Date(y, m, d), fds = isFDS(date), fest = isFest(dstr);
     const o = gD(y, m, d); let mins = 0;
     if (!o) { if (!fds && !fest) { mins = 480; lab++; } }
-    else { const tipo = o.tipo || 'laboral'; if (tipo === 'vac') { mins = VAC_M; lab++; } else if (tipo === 'fest' || tipo === 'ausencia') mins = 0; else { const _tr = parsearTramos(o.tramos_txt || ''); const _pausaInline = _tr.reduce((a,t)=>a+t.pausa,0); mins = totalTramos(_tr); if (o.pausa_min && !_pausaInline) mins -= o.pausa_min; if (mins > 0) lab++; } gas += o.gasto || 0; if (fest && mins > 0) plusFest += cfg.festivo; }
+    else { const tipo = o.tipo || 'laboral'; if (tipo === 'vac') { mins = VAC_M; lab++; } else if (tipo === 'fest' || tipo === 'ausencia') mins = 0; else { const _tr = parsearTramos(o.tramos_txt || ''); const _pausaInline = _tr.reduce((a,t)=>a+t.pausa,0); mins = totalTramos(_tr); if (o.pausa_min && !_pausaInline) mins -= o.pausa_min; if (mins > 0) lab++; noctMin += minsNocturnos(_tr); } gas += o.gasto || 0; if (fest && mins > 0) plusFest += cfg.festivo; }
     tot += mins;
   }
   const ext = tot - CONV_MIN;
   const extrasEuros = Math.max(0, ext) / 60 * cfg.precioH;
-  return { tot, ext, lab, gas, plusFest, plusGuardia, extrasEuros, guardiasMes, totalVariables: extrasEuros + plusFest + plusGuardia };
+  return { tot, ext, lab, gas, plusFest, plusGuardia, extrasEuros, guardiasMes, noctMin, totalVariables: extrasEuros + plusFest + plusGuardia };
+}
+
+// Minutos de nocturnidad: parte de cada tramo que cae después de las 22:00 (regla confirmada)
+function minsNocturnos(tramos) {
+  const N = 22 * 60; // 22:00 en minutos
+  let n = 0;
+  (tramos || []).forEach(t => {
+    if (t.oMin != null && t.oMin > N) {
+      n += t.oMin - Math.max(t.iMin, N);
+    }
+  });
+  return Math.max(0, n);
 }
 
 // ============================================================
@@ -2020,6 +2034,27 @@ function parsearNominaPDF(txt, nombre) {
         txt: lbl + ': la nómina muestra ' + pdfV.toFixed(2) + '€ pero tienes configurado ' + appV.toFixed(2) + '€. Revisa el concepto fijo.' });
     });
 
+    // Nocturnidad — se paga con desfase de 1 mes (confirmado). Cruzar con mes anterior.
+    if (noct !== null) {
+      const pm = liqMes === 0 ? 11 : liqMes - 1;
+      const py = liqMes === 0 ? liqYear - 1 : liqYear;
+      const stPrevN = mesStats(py, pm);
+      const noctMinPrev = stPrevN.noctMin || 0;
+      const noctEurPrev = noctMinPrev / 60 * (cfg.precioNoct || 1.652);
+      const d = noct - noctEurPrev;
+      const MESES_C = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      if (Math.abs(d) < UMBRAL) {
+        okCount++;
+        if (noct > 0.005) {
+          items.push({ tipo: 'ok', lbl: 'Nocturnidad', eur: 0,
+            txt: 'Te han pagado ' + noct.toFixed(2) + '€ de nocturnidad, que cuadran con ' + m2hm(noctMinPrev) + ' nocturnas de ' + MESES_C[pm] + ' (a partir de las 22:00).' });
+        }
+      } else {
+        items.push({ tipo: 'origen', lbl: 'Nocturnidad', eur: d,
+          txt: 'La nómina paga ' + noct.toFixed(2) + '€ de nocturnidad, pero registraste ' + m2hm(noctMinPrev) + ' nocturnas en ' + MESES_C[pm] + ' (\u2248 ' + noctEurPrev.toFixed(2) + '€). Revisa los tramos después de las 22:00.' });
+      }
+    }
+
     // Guardias — diferencia de DATOS DE ORIGEN (semanas registradas vs pagadas)
     if (gua !== null) {
       const guardiaApp = c.plusGuardiaEsteMes;
@@ -2071,23 +2106,27 @@ function parsearNominaPDF(txt, nombre) {
     items.sort((a, b) => Math.abs(b.eur) - Math.abs(a.eur));
 
     // Construir HTML
-    const COL = { param: 'var(--acc-dk)', origen: 'var(--red)', deriv: 'var(--text2)' };
-    const ETI = { param: 'Parámetro', origen: 'Datos de origen', deriv: 'Derivada' };
+    const COL = { param: 'var(--acc-dk)', origen: 'var(--red)', deriv: 'var(--text2)', ok: 'var(--green)' };
+    const ETI = { param: 'Parámetro', origen: 'Datos de origen', deriv: 'Derivada', ok: 'Verificado' };
     let h = '';
     if (items.length === 0) {
       h += '<div style="padding:10px 12px;background:rgba(22,163,74,0.08);border-radius:var(--rs);font-size:12px;color:var(--green);font-weight:700">✓ Todo cuadra. ' + okCount + ' conceptos verificados sin diferencias relevantes.</div>';
     } else {
       items.forEach(it => {
+        const esOk = it.tipo === 'ok';
         const signo = it.eur >= 0 ? '+' : '−';
         const esVerde = it.eur >= 0;
         const badgeBg = esVerde ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)';
         const badgeCol = esVerde ? 'var(--green)' : 'var(--red)';
+        const badgeEur = esOk
+          ? '<span style="font-family:var(--mono);font-size:12px;font-weight:900;color:var(--green)">✓</span>'
+          : '<span style="font-family:var(--mono);font-size:12px;font-weight:900;color:' + badgeCol + ';background:' + badgeBg + ';padding:2px 7px;border-radius:6px">' + signo + Math.abs(it.eur).toFixed(2) + '€</span>';
         h += '<div style="padding:9px 0;border-bottom:1px solid var(--border)">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
             '<span style="font-size:12px;font-weight:800;color:var(--text)">' + it.lbl + '</span>' +
             '<span style="display:flex;align-items:center;gap:6px">' +
               '<span style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:' + COL[it.tipo] + ';border:1px solid ' + COL[it.tipo] + ';border-radius:4px;padding:1px 5px">' + ETI[it.tipo] + '</span>' +
-              '<span style="font-family:var(--mono);font-size:12px;font-weight:900;color:' + badgeCol + ';background:' + badgeBg + ';padding:2px 7px;border-radius:6px">' + signo + Math.abs(it.eur).toFixed(2) + '€</span>' +
+              badgeEur +
             '</span>' +
           '</div>' +
           '<div style="font-size:11px;color:var(--text2);line-height:1.4">' + it.txt + '</div>' +
@@ -2177,6 +2216,7 @@ function guardarNomina() {
 
 function guardarConfig() {
   cfg.precioH = parseFloat(document.getElementById('cfgPrecioH').value) || cfg.precioH;
+  cfg.precioNoct = parseFloat(document.getElementById('cfgPrecioNoct').value) || cfg.precioNoct;
   cfg.guardia = parseFloat(document.getElementById('cfgGuardia').value) || cfg.guardia;
   cfg.festivo = parseFloat(document.getElementById('cfgFestivo').value) || cfg.festivo;
   cfg.convenio = parseInt(document.getElementById('cfgConvenio').value) || cfg.convenio;
@@ -2571,6 +2611,7 @@ function renderAll() {
   document.getElementById('nIRPF').value = nomina.irpf;
   document.getElementById('nNocturnidad').value = nomina.nocturnidad;
   document.getElementById('cfgPrecioH').value = cfg.precioH;
+  document.getElementById('cfgPrecioNoct').value = cfg.precioNoct;
   document.getElementById('cfgGuardia').value = cfg.guardia;
   document.getElementById('cfgFestivo').value = cfg.festivo;
   document.getElementById('cfgConvenio').value = cfg.convenio;
@@ -2812,9 +2853,9 @@ function dayInfoDatos(y, m, d) {
     mins=totalTramos(tr)-(pausaTramos ? 0 : pausaMin); // si ya hay pausa inline no restar pausaMin encima
     if(tr.length){inicio=tr[0].inicio;fin=tr[tr.length-1].fin;}
     else{inicio='07:30';fin='15:30';}
-    return{tipo,mins,inicio,fin,pausa,numTramos:tr.length,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
+    return{tipo,mins,inicio,fin,pausa,numTramos:tr.length,tramos:tr,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
   }
-  return{tipo,mins,inicio,fin,pausa:pausaMin,numTramos:0,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
+  return{tipo,mins,inicio,fin,pausa:pausaMin,numTramos:0,tramos:[],gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
 }
 
 function guardiaDelMesDatos(y, m) {
@@ -2917,12 +2958,26 @@ function renderTablaDatos() {
 
     html+=`<div class="t-row ${cls}${hoy?' today':''}" onclick="openModalJornada(${y},${m},${d})" style="${hoy?'box-shadow:inset 0 0 0 1.5px var(--acc)':''}">
       <div class="td dia">${d}</div>
-      <div class="td">${inicioTxt}</div>
-      <div class="td">${finTxt}</div>
+      <div class="td">${multiTramo?`<span style="color:var(--purple);font-size:11px;font-weight:700">${inf.numTramos} tramos</span>`:inicioTxt}</div>
+      <div class="td">${multiTramo?'':finTxt}</div>
       <div class="td">${pausaTxt}</div>
       <div class="td" style="display:flex;align-items:center;gap:0">${totalTxt}${extTxt}</div>
       <div class="td gasto">${gastoBadge}</div>
     </div>`;
+
+    // Sub-filas: un renglón por cada tramo cuando hay más de uno
+    if (multiTramo && inf.tramos) {
+      inf.tramos.forEach((t, i) => {
+        html += `<div class="t-row ${cls}" onclick="openModalJornada(${y},${m},${d})" style="opacity:.75">
+          <div class="td dia" style="font-size:9px;color:var(--purple)">└${i+1}</div>
+          <div class="td"><span style="font-family:var(--mono);font-size:11px">${t.inicio}</span></div>
+          <div class="td"><span style="font-family:var(--mono);font-size:11px">${t.fin}</span></div>
+          <div class="td"><span style="color:var(--text3)">—</span></div>
+          <div class="td"><span style="font-family:var(--mono);font-size:11px;color:var(--text2)">${m2hhmmFmt(t.mins)}</span></div>
+          <div class="td gasto"><span style="color:var(--text3)">—</span></div>
+        </div>`;
+      });
+    }
   }
 
   document.getElementById('tablaBody').innerHTML=html;
@@ -4904,13 +4959,37 @@ async function _recogerArchivoCompartido() {
     await tmp.delete('shared-file');                 // limpiar para no reprocesar
     history.replaceState(null, '', './index.html');  // quitar el ?compartido de la URL
 
-    // Ir a Datos, abrir el detalle del mes y procesar el archivo
-    showToast('\ud83d\udcc4 Procesando hoja compartida\u2026');
-    if (typeof showModule === 'function') showModule('datos');
-    _mdTab = 'comp';
-    // cargarHojaEmpresa espera algo con .files[0] y .value
-    await cargarHojaEmpresa({ files: [file], value: '' });
-  } catch (e) { /* si falla, no pasa nada: el usuario puede subirlo a mano */ }
+    // Detectar tipo de PDF leyendo su texto: parte diario vs hoja mensual de empresa
+    let tipo = 'mensual';
+    try {
+      if ((file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) && _initPdfJs()) {
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
+        let txt = '';
+        const page = await pdf.getPage(1);
+        const content = await page.getTextContent();
+        txt = content.items.map(i => i.str).join(' ');
+        // Parte diario: tiene INICIO/FIN JORNADA. Hoja mensual: INSTALADOR + TOTALES
+        if (/INICIO JORNADA|FIN JORNADA/i.test(txt) && !/INSTALADOR/i.test(txt)) tipo = 'parte';
+        // Reconstruir el File porque arrayBuffer lo consumió
+      }
+    } catch(_) {}
+
+    const file2 = new File([blob], nombre, { type: blob.type || 'application/pdf' });
+
+    if (tipo === 'parte') {
+      // Parte diario → procesarlo en el chat como jornada
+      showToast('\ud83d\udcc4 Procesando parte diario\u2026');
+      if (typeof showModule === 'function') showModule('chat');
+      await procesarHojaDia({ files: [file2], value: '' });
+    } else {
+      // Hoja mensual → comparativa en Datos
+      showToast('\ud83d\udcc4 Procesando hoja de empresa\u2026');
+      if (typeof showModule === 'function') showModule('datos');
+      _mdTab = 'comp';
+      await cargarHojaEmpresa({ files: [file2], value: '' });
+    }
+  } catch (e) { /* si falla, el usuario puede subirlo a mano */ }
 }
 window.addEventListener('load', () => { setTimeout(_recogerArchivoCompartido, 600); });
 
@@ -6195,24 +6274,56 @@ function _guardarHojaNode(btn) {
   if (!confirm) return;
   try {
     const data = JSON.parse(decodeURIComponent(confirm.dataset.hoja));
-    const { dia, mes, anio, mins, inicio, fin, comidaMins, gastos } = data;
+    const { dia, mes, anio, mins, inicio, fin, comidaMins } = data;
     const o = gD(anio, mes, dia) || {};
-    let tramoTxt = inicio && fin ? `${inicio}-${fin}` : '';
-    if (comidaMins > 0 && tramoTxt) tramoTxt += ` -${comidaMins}min`;
-    const primerGasto = gastos[0];
-    sD(anio, mes, dia, { ...o, tipo:'laboral', tramos_txt:tramoTxt, gasto:primerGasto?primerGasto.importe:(o.gasto||0), concepto:primerGasto?primerGasto.concepto:(o.concepto||'') });
-    const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    const wrap = confirm.parentElement;
-    if (wrap) {
-      wrap.innerHTML = `<div style="color:var(--green);font-size:13px;font-weight:700">\u2713 Jornada del ${dia} ${MESES_C[mes]} guardada \u00b7 ${m2hm(mins)}</div>`;
-      // Actualizar en historial
-      const uid = wrap.id;
-      const idx = msgs.findIndex(m => m.html && m.html.includes(`id="${uid}"`));
-      if (idx >= 0) { msgs[idx].html = wrap.outerHTML; saveMsgs(); }
+
+    // ¿Ya hay una jornada laboral con horas registrada este día?
+    const trExist = parsearTramos(o.tramos_txt || '');
+    const yaHayJornada = (o.tipo === 'laboral' || trExist.length > 0) && totalTramos(trExist) > 0;
+    let tramoNuevo = inicio && fin ? `${inicio}-${fin}` : '';
+    if (comidaMins > 0 && tramoNuevo) tramoNuevo += ` -${comidaMins}min`;
+
+    if (yaHayJornada && tramoNuevo) {
+      const minsExist = totalTramos(trExist);
+      const elegir = document.createElement('div');
+      elegir.style.cssText = 'margin-top:10px;padding:12px;background:var(--bg2);border:1px solid var(--acc);border-radius:var(--r)';
+      elegir.innerHTML =
+        '<div style="font-size:12px;color:var(--text);font-weight:700;margin-bottom:4px">Ya hay jornada este día (' + m2hm(minsExist) + ')</div>' +
+        '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">¿Segunda jornada o salida de guardia?</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="hoja-btn-ok" style="flex:1">\u2795 Sumar (' + m2hm(minsExist + mins) + ')</button>' +
+          '<button class="hoja-btn-cancel" style="flex:1">\u21bb Reemplazar</button>' +
+        '</div>';
+      confirm.appendChild(elegir);
+      btn.style.display = 'none';
+      const botones = elegir.querySelectorAll('button');
+      botones[0].onclick = () => _persistirHoja(confirm, data, o, tramoNuevo, true);
+      botones[1].onclick = () => _persistirHoja(confirm, data, o, tramoNuevo, false);
+      return;
     }
-    showToast('\u2713 Jornada guardada');
-    renderJornada();
+    _persistirHoja(confirm, data, o, tramoNuevo, false);
   } catch(e) { console.error(e); }
+}
+
+function _persistirHoja(confirm, data, o, tramoNuevo, sumar) {
+  const { dia, mes, anio, gastos } = data;
+  let tramoFinal = tramoNuevo;
+  if (sumar && o.tramos_txt) tramoFinal = o.tramos_txt + ', ' + tramoNuevo;
+  const primerGasto = gastos[0];
+  sD(anio, mes, dia, { ...o, tipo:'laboral', tramos_txt:tramoFinal,
+    gasto: primerGasto ? primerGasto.importe : (o.gasto||0),
+    concepto: primerGasto ? primerGasto.concepto : (o.concepto||'') });
+  const totalMins = totalTramos(parsearTramos(tramoFinal));
+  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const wrap = confirm.parentElement;
+  if (wrap) {
+    wrap.innerHTML = `<div style="color:var(--green);font-size:13px;font-weight:700">\u2713 Jornada del ${dia} ${MESES_C[mes]} guardada \u00b7 ${m2hm(totalMins)}${sumar ? ' (sumada)' : ''}</div>`;
+    const uid = wrap.id;
+    const idx = msgs.findIndex(m => m.html && m.html.includes(`id="${uid}"`));
+    if (idx >= 0) { msgs[idx].html = wrap.outerHTML; saveMsgs(); }
+  }
+  showToast('\u2713 Jornada guardada');
+  renderJornada();
 }
 
 function _cancelarHojaNode(btn) {
