@@ -6255,9 +6255,12 @@ function _mostrarConfirmHojaDiaria(uid, data, nombre) {
   } else {
     h += `<div class="hoja-confirm-row"><span style="color:var(--text3);font-size:11px">Gastos empresa (tarjeta)</span><span style="font-size:11px;color:var(--text3)">no se registran</span></div>`;
   }
-  h += `<div style="display:flex;gap:8px;margin-top:8px">
-    <button class="hoja-btn-cancel" onclick="_cancelarHojaNode(this)">Cancelar</button>
-    <button class="hoja-btn-ok" onclick="_guardarHojaNode(this)">✓ Guardar jornada</button>
+  h += `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+    <button class="hoja-btn-ok" onclick="_guardarHojaNode(this, false)">✓ Guardar jornada</button>
+    <div style="display:flex;gap:8px">
+      <button class="hoja-btn-cancel" style="flex:1" onclick="_guardarHojaNode(this, true)">➕ Sumar tramo</button>
+      <button class="hoja-btn-cancel" style="flex:1" onclick="_cancelarHojaNode(this)">Cancelar</button>
+    </div>
   </div></div>`;
   const el = document.getElementById(uid);
   if (el) {
@@ -6269,39 +6272,21 @@ function _mostrarConfirmHojaDiaria(uid, data, nombre) {
 }
 
 // Guardar/cancelar usando el nodo DOM (sin depender de variable global)
-function _guardarHojaNode(btn) {
+function _guardarHojaNode(btn, sumar) {
   const confirm = btn.closest('[data-hoja]');
   if (!confirm) return;
   try {
     const data = JSON.parse(decodeURIComponent(confirm.dataset.hoja));
-    const { dia, mes, anio, mins, inicio, fin, comidaMins } = data;
-    const o = gD(anio, mes, dia) || {};
-
-    // ¿Ya hay una jornada laboral con horas registrada este día?
-    const trExist = parsearTramos(o.tramos_txt || '');
-    const yaHayJornada = (o.tipo === 'laboral' || trExist.length > 0) && totalTramos(trExist) > 0;
+    const { inicio, fin, comidaMins } = data;
+    const o = gD(data.anio, data.mes, data.dia) || {};
     let tramoNuevo = inicio && fin ? `${inicio}-${fin}` : '';
     if (comidaMins > 0 && tramoNuevo) tramoNuevo += ` -${comidaMins}min`;
 
-    if (yaHayJornada && tramoNuevo) {
-      const minsExist = totalTramos(trExist);
-      const elegir = document.createElement('div');
-      elegir.style.cssText = 'margin-top:10px;padding:12px;background:var(--bg2);border:1px solid var(--acc);border-radius:var(--r)';
-      elegir.innerHTML =
-        '<div style="font-size:12px;color:var(--text);font-weight:700;margin-bottom:4px">Ya hay jornada este día (' + m2hm(minsExist) + ')</div>' +
-        '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">¿Segunda jornada o salida de guardia?</div>' +
-        '<div style="display:flex;gap:8px">' +
-          '<button class="hoja-btn-ok" style="flex:1">\u2795 Sumar (' + m2hm(minsExist + mins) + ')</button>' +
-          '<button class="hoja-btn-cancel" style="flex:1">\u21bb Reemplazar</button>' +
-        '</div>';
-      confirm.appendChild(elegir);
-      btn.style.display = 'none';
-      const botones = elegir.querySelectorAll('button');
-      botones[0].onclick = () => _persistirHoja(confirm, data, o, tramoNuevo, true);
-      botones[1].onclick = () => _persistirHoja(confirm, data, o, tramoNuevo, false);
-      return;
-    }
-    _persistirHoja(confirm, data, o, tramoNuevo, false);
+    // "Sumar tramo" solo añade si ya hay una jornada REAL guardada (tramos_txt con contenido).
+    // Si no hay jornada real (solo previsión), suma = guardar normal.
+    const trExist = parsearTramos(o.tramos_txt || '');
+    const hayJornadaReal = trExist.length > 0 && totalTramos(trExist) > 0;
+    _persistirHoja(confirm, data, o, tramoNuevo, sumar && hayJornadaReal);
   } catch(e) { console.error(e); }
 }
 
