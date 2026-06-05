@@ -1513,6 +1513,22 @@ function showModule(moduleName) {
   const h = headers[moduleName]; if (h) { document.querySelector('.hdr-icon').textContent = h.icon; document.getElementById('headerSub').textContent = h.sub; }
   currentModule = moduleName;
   if (moduleName === 'jornada') updateHeaderJornada(); else if (moduleName === 'chat') updateHeaderChat(); else if (moduleName === 'datos') updateHeaderDatos(); else if (moduleName === 'micuenta') updateHeaderMicuenta();
+  // Al entrar al chat, si ha pasado un rato desde el último proactivo, mostrar uno nuevo
+  if (moduleName === 'chat') _quizaProactivoAlVolver();
+}
+
+// Muestra un proactivo al volver al chat, si han pasado >30 min desde el último mensaje
+let _ultimoProactivoTs = 0;
+function _quizaProactivoAlVolver() {
+  const ahora = Date.now();
+  // Evitar spam: solo si han pasado 30+ min desde el último proactivo de esta sesión
+  if (ahora - _ultimoProactivoTs < 30 * 60 * 1000) return;
+  setTimeout(() => {
+    try {
+      const pro = generarProactivo();
+      if (pro) { addMsg('bot', pro); _ultimoProactivoTs = Date.now(); }
+    } catch(e) {}
+  }, 800);
 }
 
 function showToast(msg, dur = 2200) { const e = document.getElementById('toastEl'); e.textContent = msg; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), dur); }
@@ -3263,7 +3279,10 @@ const FRASES_DEFAULT = {
     'No veo inicio de jornada hoy — ¿todo bien?',
     'Hmm 🤔 no encuentro tu entrada de hoy',
     '¿Hoy libras o se te olvidó fichar? 😉',
-    'No hay registro de entrada hoy — ¿empezamos?'
+    'No hay registro de entrada hoy — ¿empezamos?',
+    'Buenas! ¿Ya estás en faena o aún arrancando? ☕',
+    'Imagino que ya habrás entrado — dímelo cuando puedas 😉',
+    '¿Café antes de fichar? 😄 cuéntame cuándo empezaste'
   ],
 
   // PROACTIVO: SIN PAUSA
@@ -3272,7 +3291,11 @@ const FRASES_DEFAULT = {
     'Acuérdate de apuntar la comida si has parado',
     'Que no se te olvide la pausa 😉',
     '¿Comida registrada? No veo pausa hoy',
-    'Oye, ¿has parado a comer? Dímelo si es así 🍴'
+    'Oye, ¿has parado a comer? Dímelo si es así 🍴',
+    'Imagino que habrás comido algo 🍴 ¿lo apunto?',
+    'Espero que hayas parado a comer aunque sea algo rápido 😅',
+    'A ver si te vas a quedar sin comer... ¿pausa hoy? 🍽️',
+    'No me has dicho nada de la comida — ¿hoy de tirón?'
   ],
 
   // PROACTIVO: SUGERENCIA SALIDA
@@ -3281,7 +3304,10 @@ const FRASES_DEFAULT = {
     ctx => `Si sales ahora sumas ${ctx.extStr} sobre las 8h`,
     ctx => `Hoy llevas ${ctx.totalStr} — ${ctx.ext > 0 ? 'vas bien de extras' : 'un poco corto aún'}`,
     ctx => `⏱️ ${ctx.totalStr} en el contador hoy`,
-    ctx => `Hoy llevas ${ctx.totalStr} — ¿ya casi terminaste?`
+    ctx => `Hoy llevas ${ctx.totalStr} — ¿ya casi terminaste?`,
+    ctx => `${ctx.totalStr} ya hoy 👀 ¿queda mucho?`,
+    ctx => `Buena jornada llevas (${ctx.totalStr}) — no te pases eh 😅`,
+    ctx => `¿Aún por ahí? ${ctx.totalStr} llevas hoy`
   ],
 
   // PROACTIVO: MUCHAS EXTRAS
@@ -3304,7 +3330,10 @@ const FRASES_DEFAULT = {
     '🛡️ Semana de guardia — paciencia',
     'Esta semana estás de guardia 🛡️',
     '🛡️ Guardia activa esta semana. Todo controlado.',
-    'Semana de guardia 🛡️ ¡Ánimo!'
+    'Semana de guardia 🛡️ ¡Ánimo!',
+    'De guardia esta semana 🛡️ que no te llamen mucho 😅',
+    'Semana de guardia — a ver si cae tranquila 🤞',
+    '🛡️ Toca guardia. Ojalá noches tranquilas'
   ],
 
   // PROACTIVO: FIN DE MES
@@ -3313,6 +3342,53 @@ const FRASES_DEFAULT = {
     ctx => `Casi cerramos ${ctx.mes} — ${ctx.mesExtStr} de balance`,
     ctx => `📅 Fin de mes cerca — ${ctx.mesExtStr} acumuladas`,
     ctx => `${ctx.diasFin} días para cerrar ${ctx.mes} 📊`
+  ],
+
+  // PROACTIVO: FASE DEL MES (sitúa en qué punto del mes estás, con precisión)
+  faseMes: [
+    ctx => ctx.faseMes==='inicio'
+      ? `🌱 Arrancando ${ctx.mes} — semana 1, ${ctx.mesHorasStr} de momento`
+      : ctx.faseMes==='mitad'
+      ? `🗓️ Ya vamos por la mitad de ${ctx.mes} — ${ctx.mesExtStr} de balance`
+      : ctx.faseMes==='final'
+      ? `🏁 Última semana de ${ctx.mes} — ${ctx.mesExtStr} acumuladas`
+      : `📆 ${ctx.mes} en marcha — semana ${ctx.semanaMes}, ${ctx.mesHorasStr}`,
+    ctx => ctx.diasFin===0
+      ? `🎯 Último día de ${ctx.mes}! Cierre: ${ctx.mesHorasStr}, ${ctx.mesExtStr}`
+      : ctx.diasFin<=5
+      ? `⏳ Quedan ${ctx.diasFin} días de ${ctx.mes} — ${ctx.mesExtStr}`
+      : ctx.diasFin<=10
+      ? `📅 Te quedan ${ctx.diasFin} días para cerrar ${ctx.mes}`
+      : `🗓️ Vamos por el día ${ctx.diaMes} de ${ctx.mes}`,
+    ctx => ctx.faseMes==='inicio'
+      ? `Empezamos mes nuevo 💪 a por ${ctx.mes}`
+      : ctx.faseMes==='final'
+      ? `Recta final de ${ctx.mes} 🏁 ${ctx.diasFin} días para el cierre`
+      : `Semana ${ctx.semanaMes} de ${ctx.mes} — ${ctx.diasTrab} días trabajados`
+  ],
+
+  // PROACTIVO: HITOS / LOGROS (y el "vete a casa ya")
+  hito: [
+    ctx => `😅 Llevas ${ctx.totalStr} hoy... vete a casa ya, que ha sido suficiente`,
+    ctx => `🛑 ${ctx.totalStr} hoy — para ya, hombre, que mañana hay más`,
+    ctx => `Madre mía, ${ctx.totalStr} hoy 😴 a descansar, te lo has ganado`,
+    ctx => `🏠 ${ctx.totalStr} clavados hoy. En serio, a casa ya`,
+    ctx => `Jornada maratón 🔥 ${ctx.totalStr}. Desconecta un rato, va`
+  ],
+
+  // PROACTIVO: RESUMEN DE MES (cifras reales, rota destacando un dato distinto)
+  resumenMes: [
+    ctx => `📊 Resumen de ${ctx.mes}: llevas ${ctx.mesHorasStr} en ${ctx.diasTrab} días trabajados`,
+    ctx => `⏱️ Este mes acumulas ${ctx.mesHorasStr} — ${ctx.mesExtStr} sobre el convenio`,
+    ctx => `💰 Gastos de ${ctx.mes}: ${ctx.mesGastos.toFixed(2)}€ registrados hasta hoy`,
+    ctx => `💪 Vas por ${ctx.mesExtStr} de extra — unos ${ctx.extrasEuros.toFixed(0)}€ aprox.`,
+    ctx => `📅 Día ${ctx.diaMes} de ${ctx.mes}: ${ctx.diasTrab} días trabajados, ${ctx.mesHorasStr}`,
+    ctx => ctx.noctMin > 0
+      ? `🌙 Este mes llevas ${m2str(ctx.noctMin)} de nocturnidad acumulada`
+      : `📊 ${ctx.mes} en marcha: ${ctx.mesHorasStr} y ${ctx.mesExtStr} de balance`,
+    ctx => ctx.mesGastos > 0
+      ? `🧾 Resumen ${ctx.mes}: ${ctx.mesHorasStr} trabajadas y ${ctx.mesGastos.toFixed(2)}€ en gastos`
+      : `⏱️ ${ctx.mes}: ${ctx.mesHorasStr} acumuladas en ${ctx.diasTrab} días`
   ],
 
   // NO ENTENDIDO
@@ -3467,17 +3543,30 @@ function getCtxPro(){
   if(o&&o.tramos_txt){const _tr=parsearTramos(o.tramos_txt);const _pi=_tr.reduce((a,t)=>a+t.pausa,0);minsHoy=totalTramos(_tr)-(o.pausa_min&&!_pi?o.pausa_min:0);}
   const extraHoy=minsHoy-BASE_MIN;
   const diasFin=new Date(y,m+1,0).getDate()-d;
+  const _dStr=ds(y,m,d);
   return{
     hayJornada:!!o&&!!o.tramos_txt,
     tieneInicio:ctxConv.inicioPendiente!==null,
     tienePausa:o?.pausa_min>0,
     minsHoy,extraHoy,hora:hoy.getHours(),
+    fds:isFDS(new Date(y,m,d)),fest:isFest(_dStr),
     totalStr:m2str(minsHoy),
     extStr:(extraHoy>=0?'+':'\u2212')+m2str(Math.abs(extraHoy)),
     mesExt:st.ext,
     mesExtStr:(st.ext>=0?'+':'\u2212')+m2str(Math.abs(st.ext)),
     enGuardia:enGuardiaHoy(),
-    diasFin,mes:MESES[m]
+    diasFin,mes:MESES[m],
+    // Datos para resúmenes de mes
+    mesHorasStr:m2str(st.tot),
+    mesGastos:st.gas||0,
+    diasTrab:st.lab||0,
+    diaMes:d,
+    extrasEuros:st.extrasEuros||0,
+    noctMin:st.noctMin||0,
+    // Fase del mes (calculada con precisión)
+    semanaMes:Math.ceil(d/7),
+    totalDiasMes:new Date(y,m+1,0).getDate(),
+    faseMes:(()=>{ const tot=new Date(y,m+1,0).getDate(); if(d<=7)return 'inicio'; if(d>tot-7)return 'final'; if(d>=Math.floor(tot/2)-2&&d<=Math.floor(tot/2)+2)return 'mitad'; return 'medio'; })()
   };
 }
 
@@ -3485,14 +3574,21 @@ function generarProactivo(){
   const c=getCtxPro();
   const candidatos=[];
 
-  // Reglas con horarios y anti-spam
-  if(!c.hayJornada&&!c.tieneInicio&&c.hora>=8&&c.hora<=11&&puedeMostrar('inicioFalta',12))
+  // Reglas con horarios y anti-spam (ajustadas a jornada real: entrada ~7:30)
+  // Falta fichar: solo por la mañana temprano (7:00–10:00), cuando de verdad debería haber entrado
+  if(!c.hayJornada&&!c.tieneInicio&&c.hora>=7&&c.hora<10&&!c.fds&&!c.fest&&puedeMostrar('inicioFalta',12))
     candidatos.push({tipo:'inicioFalta',peso:3});
 
-  if(c.hayJornada&&!c.tienePausa&&c.hora>=13&&c.hora<=16&&puedeMostrar('sinPausa',8))
+  // Sin pausa de comida: solo en franja de comida real (13:30–15:30) y si lleva ya horas
+  if(c.hayJornada&&!c.tienePausa&&c.minsHoy>5*60&&c.hora>=13&&c.hora<16&&puedeMostrar('sinPausa',8))
     candidatos.push({tipo:'sinPausa',peso:2});
 
-  if(c.hayJornada&&c.minsHoy>6*60&&c.hora>=14&&puedeMostrar('sugerenciaSalida',3))
+  // Hito "vete a casa": jornada muy larga (+11h) y ya es tarde (18h+). Prioridad alta ese momento.
+  if(c.hayJornada&&c.minsHoy>11*60&&c.hora>=18&&c.hora<23&&puedeMostrar('hito',6))
+    candidatos.push({tipo:'hito',peso:5});
+
+  // Sugerencia de salida: solo a partir de las 15h y antes de las 21h, con jornada larga ya
+  if(c.hayJornada&&c.minsHoy>7*60&&c.hora>=15&&c.hora<21&&puedeMostrar('sugerenciaSalida',4))
     candidatos.push({tipo:'sugerenciaSalida',peso:3});
 
   if(c.mesExt>10*60&&puedeMostrar('muchasExtras',24*7))
@@ -3506,6 +3602,14 @@ function generarProactivo(){
 
   if(c.diasFin<=3&&puedeMostrar('findeMes',24))
     candidatos.push({tipo:'findeMes',peso:2});
+
+  // Resumen de mes: a partir del día 5, si hay datos, cada 48h como máximo. Peso bajo (no insistente).
+  if(c.diaMes>=5&&c.diasTrab>=2&&puedeMostrar('resumenMes',48))
+    candidatos.push({tipo:'resumenMes',peso:2});
+
+  // Fase del mes: toque ocasional de contexto temporal (cada 72h). Peso bajo.
+  if(c.diasTrab>=1&&puedeMostrar('faseMes',72))
+    candidatos.push({tipo:'faseMes',peso:1});
 
   if(!candidatos.length)return null;
 
@@ -4914,13 +5018,15 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
 
   renderSugs();
   if(msgs.length===0){
-    const bienvenida=`Hola! Soy Iram, tu asistente de jornada 👩🏼‍💻 👋<br><br><span class="pill">inicio 7:30</span> <span class="pill">fin 15:40</span><br><span class="pill">7:30-16:45</span> <span class="pill">comida 1 hora</span><br><span class="pill">extras mes</span> <span class="pill">próxima guardia</span><br><br><small style="color:var(--text3)">También puedes decirme si algo no te gusta de como respondo 😉</small>`;
+    const _hb=new Date().getHours();
+    const _saludoH = _hb<6 ? 'Buenas noches 🌙' : _hb<12 ? 'Buenos días ☀️' : _hb<20 ? 'Buenas tardes 👋' : 'Buenas noches 🌙';
+    const bienvenida=`${_saludoH} Soy Iram, tu asistente de jornada 👩🏼‍💻<br><br><span class="pill">inicio 7:30</span> <span class="pill">fin 15:40</span><br><span class="pill">7:30-16:45</span> <span class="pill">comida 1 hora</span><br><span class="pill">extras mes</span> <span class="pill">próxima guardia</span><br><br><small style="color:var(--text3)">También puedes decirme si algo no te gusta de como respondo 😉</small>`;
     addMsg('bot',bienvenida);
   } else {renderMsgs();}
 
   setTimeout(()=>{
     const pro=generarProactivo();
-    if(pro) addMsg('bot',pro);
+    if(pro){ addMsg('bot',pro); _ultimoProactivoTs=Date.now(); }
   },1800);
 
   // Init jornada data
