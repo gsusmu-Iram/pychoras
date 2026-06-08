@@ -1114,7 +1114,7 @@ body{
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus guardia semana</div><div class="cfg-sub">Fijo por semana completa</div></div><input class="cfg-input" id="cfgGuardia" type="number" step="1"><span class="cfg-unit">€</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Plus festivo trabajado</div><div class="cfg-sub">Por día festivo con guardia</div></div><input class="cfg-input" id="cfgFestivo" type="number" step="1"><span class="cfg-unit">€</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Horas convenio mensual</div><div class="cfg-sub">Base cálculo de extras</div></div><input class="cfg-input" id="cfgConvenio" type="number" step="1"><span class="cfg-unit">h</span></div>
-            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Días vacaciones</div><div class="cfg-sub">5h 14min por día</div></div><input class="cfg-input" id="cfgVacDias" type="number" step="1"><span class="cfg-unit">días</span></div>
+            <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Horas por día de vacaciones</div><div class="cfg-sub" id="cfgVacDiasInfo">31 días/año · 162h ÷ 31</div></div><input class="cfg-input" id="cfgVacHoras" type="text" inputmode="numeric" placeholder="5:14"><span class="cfg-unit">h</span></div>
             <div class="cfg-row"><div class="cfg-left"><div class="cfg-label">Prorrata pagas extras</div><div class="cfg-sub">Base SS mensual · ver nómina</div></div><input class="cfg-input" id="cfgProrrata" type="number" step="0.01"><span class="cfg-unit">€</span></div>
           </div>
           <button class="btn-save" onclick="guardarConfig()">GUARDAR CONFIGURACIÓN</button>
@@ -1241,7 +1241,7 @@ const KCH = 'pyc_comp_horas'; // prefix: KCH_2026_03
 const KCN = 'pyc_comp_nom';   // prefix: KCN_2026_03
 
 let dat = {};
-let cfg = { precioH: 13.94, precioNoct: 1.652, guardia: 180, festivo: 70, convenio: 162, vacDias: 31, prorrata: 275.98 };
+let cfg = { precioH: 13.94, precioNoct: 1.652, guardia: 180, festivo: 70, convenio: 162, vacDias: 31, vacMinDia: 314, prorrata: 275.98 };
 let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0 };
 let guardiasCambios = {};
 let frasesCustom = {};
@@ -1453,7 +1453,7 @@ function isFut(y, m, d) { const t = new Date(y, m, d).setHours(0,0,0,0); const n
 
 function mesStats(y, m) {
   const CONV_MIN = cfg.convenio * 60;
-  const VAC_M = Math.round(cfg.convenio / cfg.vacDias * 60);
+  const VAC_M = (cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60));
   const dm = new Date(y, m + 1, 0).getDate();
   let tot = 0, lab = 0, gas = 0, plusFest = 0, plusGuardia = 0, guardiasMes = 0;
   for (const g of GUARDIAS_2026) {
@@ -2236,7 +2236,14 @@ function guardarConfig() {
   cfg.guardia = parseFloat(document.getElementById('cfgGuardia').value) || cfg.guardia;
   cfg.festivo = parseFloat(document.getElementById('cfgFestivo').value) || cfg.festivo;
   cfg.convenio = parseInt(document.getElementById('cfgConvenio').value) || cfg.convenio;
-  cfg.vacDias = parseInt(document.getElementById('cfgVacDias').value) || cfg.vacDias;
+  // Horas por día de vacaciones (formato H:MM o decimal) → minutos
+  const _vh = (document.getElementById('cfgVacHoras').value || '').trim();
+  if (_vh) {
+    let _vmin = null;
+    if (_vh.includes(':')) { const [h,m] = _vh.split(':').map(n=>parseInt(n)||0); _vmin = h*60+m; }
+    else { const f = parseFloat(_vh.replace(',','.')); if (!isNaN(f)) _vmin = Math.round(f*60); }
+    if (_vmin && _vmin > 0) cfg.vacMinDia = _vmin;
+  }
   const _pr = parseFloat(document.getElementById('cfgProrrata').value); if (!isNaN(_pr)) cfg.prorrata = _pr;
   saveCfg(); renderLiquido(); renderSaldo();
   showToast('✓ Configuración guardada');
@@ -2320,7 +2327,7 @@ function exportarExcel() {
         const t = o.tipo || 'laboral';
         if (t === 'vac') {
           tipo = 'VAC';
-          mins = Math.round(cfg.convenio / cfg.vacDias * 60);
+          mins = (cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60));
           total = minsToHHMM(mins);
         } else if (t === 'fest') {
           tipo = 'FEST';
@@ -2631,7 +2638,10 @@ function renderAll() {
   document.getElementById('cfgGuardia').value = cfg.guardia;
   document.getElementById('cfgFestivo').value = cfg.festivo;
   document.getElementById('cfgConvenio').value = cfg.convenio;
-  document.getElementById('cfgVacDias').value = cfg.vacDias;
+  const _vm = cfg.vacMinDia || (cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60));
+  document.getElementById('cfgVacHoras').value = Math.floor(_vm/60) + ':' + String(_vm%60).padStart(2,'0');
+  const _info = document.getElementById('cfgVacDiasInfo');
+  if (_info) _info.textContent = cfg.vacDias + ' días/año · ' + cfg.convenio + 'h ÷ ' + cfg.vacDias;
   document.getElementById('cfgProrrata').value = cfg.prorrata;
 }
 
@@ -2661,7 +2671,7 @@ function dayInfJornada(y, m, d) {
     return   { tipo:'laboral', estado:'norm', mins:480, tramos_txt:'', gasto:0, concepto:'', nota:'', fds, fest, fut, custom:false };
   }
   const tipo = o.tipo || 'laboral'; let mins = 0, estado = tipo;
-  if (tipo === 'vac') { mins = Math.round(cfg.convenio / cfg.vacDias * 60); estado = 'vac'; }
+  if (tipo === 'vac') { mins = (cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60)); estado = 'vac'; }
   else if (tipo === 'fest' || tipo === 'ausencia') { mins = 0; estado = 'fest'; }
   else {
     const tramos = parsearTramos(o.tramos_txt || '');
@@ -2791,7 +2801,7 @@ function updSec() {
 function recalcJornada() {
   const cb = document.getElementById('calcBoxJornada');
   if (mT === 'vac') {
-    const vacMins = Math.round(cfg.convenio / cfg.vacDias * 60);
+    const vacMins = (cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60));
     document.getElementById('calcTramosJornada').innerHTML = '';
     document.getElementById('cTotJornada').textContent = m2str(vacMins);
     document.getElementById('cDetJornada').textContent = 'Día de vacaciones';
@@ -2860,7 +2870,7 @@ function dayInfoDatos(y, m, d) {
   }
   const tipo=o.tipo||'laboral'; let mins=0,inicio='-',fin='-';
   const pausaMin=o.pausa_min||0;
-  if(tipo==='vac') mins=Math.round(cfg.convenio/cfg.vacDias*60);
+  if(tipo==='vac') mins=(cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60));
   else if(tipo==='fest'||tipo==='ausencia') mins=0;
   else {
     const tr=parsearTramos(o.tramos_txt||'');
