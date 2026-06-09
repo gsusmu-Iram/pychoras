@@ -20,6 +20,7 @@
 :root{
   /* Acento */
   --acc:#F97316;--acc-dk:#EA580C;--acc-lt:rgba(249,115,22,0.12);--acc-mid:#FDBA74;
+  --liq-grad:linear-gradient(160deg,#1e293b 0%,#334155 55%,#9a3412 100%);
   /* Fondos oscuros (header/nav) */
   --dark1:#0F172A;--dark2:#1E293B;--dark3:#334155;
   /* Fondos claros (contenido) */
@@ -393,11 +394,11 @@ body{
 /* ── MI CUENTA ── */
 .scroll-body#micuentaBody{padding-bottom:calc(var(--nav-h)+14px);}
 .liquido-card{
-  background:linear-gradient(160deg,var(--dark2) 0%,var(--dark3) 60%,rgba(249,115,22,0.15) 100%);
-  border:1px solid rgba(249,115,22,0.2);
+  background:var(--liq-grad,linear-gradient(160deg,#1e293b 0%,#334155 55%,#9a3412 100%));
+  border:1px solid rgba(255,255,255,0.12);
   border-radius:var(--r);padding:20px 16px 18px;margin-bottom:20px;
   position:relative;overflow:hidden;
-  box-shadow:0 8px 28px rgba(0,0,0,0.25),0 2px 8px rgba(249,115,22,0.15);
+  box-shadow:0 8px 28px rgba(0,0,0,0.25),0 2px 8px rgba(0,0,0,0.1);
 }
 .liquido-card::before{
   content:'';position:absolute;top:-30%;right:-10%;
@@ -1472,7 +1473,7 @@ function mesStats(y, m) {
     const dstr = ds(y, m, d), date = new Date(y, m, d), fds = isFDS(date), fest = isFest(dstr);
     const o = gD(y, m, d); let mins = 0;
     if (!o) { if (!fds && !fest) { mins = 480; lab++; } }
-    else { const tipo = o.tipo || 'laboral'; if (tipo === 'vac') { mins = VAC_M; lab++; } else if (tipo === 'fest' || tipo === 'ausencia') mins = 0; else { const _tr = parsearTramos(o.tramos_txt || ''); const _pausaInline = _tr.reduce((a,t)=>a+t.pausa,0); mins = totalTramos(_tr); if (o.pausa_min && !_pausaInline) mins -= o.pausa_min; if (mins > 0) lab++; noctMin += minsNocturnos(_tr); } gas += o.gasto || 0; if (fest && mins > 0) plusFest += cfg.festivo; }
+    else { const tipo = o.tipo || 'laboral'; let esTrabajoReal = false; if (tipo === 'vac') { mins = VAC_M; lab++; } else if (tipo === 'fest' || tipo === 'ausencia') mins = 0; else { const _tr = parsearTramos(o.tramos_txt || ''); const _pausaInline = _tr.reduce((a,t)=>a+t.pausa,0); mins = totalTramos(_tr); if (o.pausa_min && !_pausaInline) mins -= o.pausa_min; if (mins > 0) { lab++; esTrabajoReal = true; } noctMin += minsNocturnos(_tr); } gas += o.gasto || 0; if (fest && esTrabajoReal && enGuardia(y, m, d)) plusFest += cfg.festivo; }
     tot += mins;
   }
   const ext = tot - CONV_MIN;
@@ -1576,13 +1577,15 @@ function calcLiquido(y, m) {
 
   const guardiasEsteMes = guardiasQueSeCobranEn(y, m);
   const plusGuardiaEsteMes = guardiasEsteMes * cfg.guardia;
-  const variables = stPrev.extrasEuros + st.plusFest + plusGuardiaEsteMes;
+  // Plus festivo se cobra el mes siguiente (igual que extras y nocturnidad) → usar mes anterior
+  const plusFestPrev = stPrev.plusFest || 0;
+  const variables = stPrev.extrasEuros + plusFestPrev + plusGuardiaEsteMes;
   const totalDevengado = baseFija + variables;
   // === Modelo exacto de nómina (validado contra nóminas reales 2026) ===
   // Devengos sujetos a cot. común = todo lo salarial del mes MENOS horas extras
   // (las extras cotizan aparte por contingencias profesionales)
   const extrasEuros = stPrev.extrasEuros;
-  const remTotal = baseFija + st.plusFest + plusGuardiaEsteMes;
+  const remTotal = baseFija + plusFestPrev + plusGuardiaEsteMes;
   // Base SS (cont. comunes y MEI) = rem. total + prorrata pagas extras
   const baseSS = parseFloat((remTotal + cfg.prorrata).toFixed(2));
   // Base AT y Desempleo = base SS + importe horas extras
@@ -1643,7 +1646,7 @@ function renderLiquido() {
   else if (stPrev.ext < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">D\u00e9ficit horas <small>${prevLabel} · ${m2str(stPrev.ext)} vs convenio</small></div><div class="extra-val neg">${(stPrev.ext / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
   else evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small>${prevLabel} · Exacto al convenio</small></div><div class="extra-val" style="color:var(--text3)">\u00b10€</div></div>`;
   if (c.guardiasEsteMes > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus guardia semana<small>${c.guardiasEsteMes} semana${c.guardiasEsteMes > 1 ? 's' : ''} × ${cfg.guardia}€</small></div><div class="extra-val purple">+${c.plusGuardiaEsteMes.toFixed(2)}€</div></div>`;
-  if (st.plusFest > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo trabajado<small>${st.plusFest / cfg.festivo} d\u00eda${st.plusFest / cfg.festivo > 1 ? 's' : ''} × ${cfg.festivo}€</small></div><div class="extra-val purple">+${st.plusFest.toFixed(2)}€</div></div>`;
+  if (c.stPrev && c.stPrev.plusFest > 0) { const _nd = c.stPrev.plusFest / cfg.festivo; const _mp = MESES[c.prevM].slice(0,3); evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo trabajado<small>${_mp} · ${_nd} día${_nd > 1 ? 's' : ''} × ${cfg.festivo}€</small></div><div class="extra-val purple">+${c.stPrev.plusFest.toFixed(2)}€</div></div>`; }
   if (st.gas > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Gastos reembolsables<small>Para cotejar con empresa</small></div><div class="extra-val acc">${st.gas.toFixed(2)}€</div></div>`;
   evHtml += `<div class="extra-row total"><div class="extra-lbl" style="font-weight:800;color:var(--text)">Total variables</div><div class="extra-val pos" style="font-size:15px">+${(c.variables).toFixed(2)}€</div></div>`;
   document.getElementById('extraCard').innerHTML = evHtml;
@@ -4438,6 +4441,15 @@ function aplicarTemaGlobal(n) {
   r.setProperty('--acc',t.acc);r.setProperty('--acc-dk',t.dk);
   r.setProperty('--acc-lt',t.lt);r.setProperty('--acc-mid',t.mid);
   r.setProperty('--hdr-grad',t.hdr);r.setProperty('--hdr-bdr',t.bdr);
+  // Degradado oscuro para la tarjeta de líquido (texto blanco encima) — tono del tema
+  const LIQ={
+    naranja:'linear-gradient(160deg,#1e293b 0%,#334155 55%,#9a3412 100%)',
+    azul:'linear-gradient(160deg,#0f2444 0%,#1e3a5f 55%,#1d4ed8 100%)',
+    verde:'linear-gradient(160deg,#052e16 0%,#166534 55%,#16a34a 100%)',
+    antracita:'linear-gradient(160deg,#111827 0%,#1f2937 55%,#374151 100%)',
+    rojo:'linear-gradient(160deg,#450a0a 0%,#7f1d1d 55%,#dc2626 100%)'
+  };
+  r.setProperty('--liq-grad',LIQ[n]||LIQ.naranja);
   try{localStorage.setItem(KT,n);}catch(e){}
   if(document.getElementById('paletaRowMicuenta'))renderPaletaMicuenta();
 }
@@ -6103,7 +6115,7 @@ function renderNomComp() {
   const saved = cargarCompNomina(y, m);
   const appVals = {
     guardias: c.plusGuardiaEsteMes,
-    festivo:  c.st.plusFest,
+    festivo:  c.stPrev ? c.stPrev.plusFest : 0,
     extras:   c.stPrev.extrasEuros,
     liquido:  c.liquido,
   };
@@ -6148,8 +6160,8 @@ function renderNomComp() {
 
   el.innerHTML =
     _row('guardias', 'Guardias', c.guardiasEsteMes + ' sem. \u00d7 ' + cfg.guardia + '\u20ac', appVals.guardias, realVals.guardias) +
-    (c.st.plusFest > 0 || (saved && saved.festivo)
-      ? _row('festivo', 'Plus festivo guardia', Math.round(c.st.plusFest / cfg.festivo || 0) + ' d\u00eda \u00d7 ' + cfg.festivo + '\u20ac', appVals.festivo, realVals.festivo)
+    ((c.stPrev && c.stPrev.plusFest > 0) || (saved && saved.festivo)
+      ? _row('festivo', 'Plus festivo guardia', Math.round((c.stPrev ? c.stPrev.plusFest : 0) / cfg.festivo || 0) + ' día × ' + cfg.festivo + '€ (de ' + mesPrev + ')', appVals.festivo, realVals.festivo)
       : '<div class="nomcomp-row" style="opacity:.5"><div class="nomcomp-row-left"><div class="nomcomp-row-lbl">Plus festivo guardia</div><div class="nomcomp-row-sub">Sin festivos en guardia este mes</div></div><div class="nomcomp-row-right"><span class="nomcomp-badge nomcomp-badge-na">N/A</span></div></div>') +
     _row('extras', 'Horas extras', 'De ' + mesPrev + ' \u00d7 ' + cfg.precioH + '\u20ac/h', appVals.extras, realVals.extras) +
     '<div class="nomcomp-divider"></div>' +
