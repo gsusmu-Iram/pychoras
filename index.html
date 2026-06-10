@@ -2457,7 +2457,7 @@ function exportarExcel() {
       }
       const wsCH = XLSX.utils.aoa_to_sheet(chAoa);
       wsCH['!cols'] = [{wch:5},{wch:13},{wch:13},{wch:12},{wch:8}];
-      XLSX.utils.book_append_sheet(wb, wsCH, 'Comp.Horas ' + MESES[mi].slice(0,3));
+      XLSX.utils.book_append_sheet(wb, wsCH, 'Comp.Horas ' + MESES[mi].slice(0,3) + ' ' + aE);
     } catch(e) {}
   }
   // ── Hoja comparativa nóminas ────────────────────────────────
@@ -2823,7 +2823,7 @@ function recalcJornada() {
   tramosEl.style.display = tramos.length > 1 ? '' : 'none';
   tramos.forEach((t, i) => {
     const row = document.createElement('div'); row.className = 'calc-tramo-row';
-    row.innerHTML = '<span class="calc-tramo-lbl">Tramo ' + (i+1) + ': ' + t.label + '</span><span class="calc-tramo-val">' + m2str(t.mins) + '</span>';
+    row.innerHTML = '<span class="calc-tramo-lbl">Tramo ' + (i+1) + ': ' + t.inicio + ' \u2192 ' + t.fin + '</span><span class="calc-tramo-val">' + m2str(t.mins) + '</span>';
     tramosEl.appendChild(row);
   });
   const total = totalTramos(tramos), ext = total - 480;
@@ -4923,6 +4923,46 @@ function renderMesDetalleBody() {
       ${[['#22c55e','Coincide'],['#ef4444','App > Empresa (verificar)'],['#f97316','Empresa > App']].map(([c,l])=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:#64748b"><div style="width:8px;height:8px;border-radius:2px;background:${c}"></div>${l}</div>`).join('')}
     </div>`;
 
+    // ── Saldo de la cartilla: continuidad e ingresos de fondos ──
+    const sIni = compData._saldoInicial;
+    const sFin = compData._saldoFinal;
+    const totIngresos = compData._totIngresos || 0;
+    const ingDias = compData._ingresosDias || {};
+    if (sIni !== undefined && sFin !== undefined) {
+      // Saldo final del mes anterior (para verificar continuidad)
+      const pm = m === 0 ? 11 : m - 1;
+      const py = m === 0 ? y - 1 : y;
+      const prevComp = cargarCompHoras(py, pm);
+      const sFinPrev = prevComp && prevComp._saldoFinal !== undefined ? prevComp._saldoFinal : null;
+      const continua = sFinPrev !== null ? Math.abs(sFinPrev - sIni) < 0.02 : null;
+
+      h+=`<div style="margin:0 14px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px">Saldo de la cartilla</div>`;
+      h+=`<div style="margin:0 14px 10px;background:white;border-radius:12px;box-shadow:var(--sh-card);overflow:hidden">`;
+      // Saldo inicial + verificación de continuidad
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f1f5f9">
+        <span style="font-size:12px;color:#374151">Saldo inicial</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px;font-weight:800;font-family:var(--mono);color:#1e293b">${sIni.toFixed(2)}\u20ac</span>
+          ${continua === true ? '<span style="font-size:9px;color:var(--green);font-weight:800">✓ enlaza</span>' : continua === false ? `<span style="font-size:9px;color:var(--red);font-weight:800">⚠ ${MESES[pm].slice(0,3)} acabó en ${sFinPrev.toFixed(2)}\u20ac</span>` : `<span style="font-size:9px;color:#94a3b8">sin ${MESES[pm].slice(0,3)}</span>`}
+        </span>
+      </div>`;
+      // Ingresos de fondos
+      if (totIngresos > 0.005) {
+        const diasIng = Object.keys(ingDias).map(Number).sort((a,b)=>a-b);
+        const detalle = diasIng.map(d=>`día ${d}: +${ingDias[d].toFixed(2)}\u20ac`).join(' · ');
+        h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f1f5f9;background:rgba(34,197,94,0.04)">
+          <span style="font-size:12px;color:#374151">💰 Ingreso de fondos<br><span style="font-size:10px;color:#94a3b8">${detalle}</span></span>
+          <span style="font-size:14px;font-weight:800;font-family:var(--mono);color:var(--green)">+${totIngresos.toFixed(2)}\u20ac</span>
+        </div>`;
+      }
+      // Saldo final
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px">
+        <span style="font-size:12px;color:#374151;font-weight:700">Saldo final</span>
+        <span style="font-size:14px;font-weight:900;font-family:var(--mono);color:${sFin<0?'#dc2626':'#1e293b'}">${sFin.toFixed(2)}\u20ac</span>
+      </div>`;
+      h+=`</div>`;
+    }
+
     // ── Gastos ────────────────────────────────────────────────
     // Total gastos empresa — leer del PDF guardado
     const totGasEmp = compData._totGastos || 0;
@@ -4961,6 +5001,26 @@ function renderMesDetalleBody() {
         </div>`;
       });
       h+=`</div>`;
+    }
+
+    // ── Gastos que la EMPRESA registra y tú NO tienes en la app ──
+    const diasAppGasto = new Set(gasRows.map(g => g.d));
+    const faltantes = Object.keys(gasEmpDias)
+      .map(Number)
+      .filter(d => !diasAppGasto.has(d) && gasEmpDias[d] > 0.005)
+      .sort((a,b)=>a-b);
+    if (faltantes.length) {
+      h+=`<div style="margin:12px 14px 0">
+        <div style="font-size:11px;font-weight:800;color:#dc2626;margin-bottom:6px">⚠️ La empresa registra estos gastos que tú no tienes:</div>
+        <div style="background:white;border-radius:10px;box-shadow:var(--sh-card);overflow:hidden;border-left:3px solid #dc2626">`;
+      faltantes.forEach((d,i)=>{
+        h+=`<div style="display:flex;align-items:center;padding:10px 12px;border-bottom:${i<faltantes.length-1?'1px solid #f1f5f9':'none'}">
+          <span style="width:28px;font-size:13px;font-weight:800;color:#1e293b">${d}</span>
+          <span style="flex:1;font-size:12px;color:#374151">Gasto de empresa (revisar)</span>
+          <span style="font-size:14px;font-weight:800;font-family:var(--mono);color:#dc2626">${gasEmpDias[d].toFixed(2)}\u20ac</span>
+        </div>`;
+      });
+      h+=`</div></div>`;
     }
 
     // ── Botón cambiar PDF ─────────────────────────────────────
@@ -5423,15 +5483,21 @@ async function _parsearPDFHoras(arrayBuffer) {
   const diasSaldo = Object.keys(saldoPorDia).map(Number).sort((a, b) => a - b);
   if (diasSaldo.length && saldoInicial !== null) {
     const gastos = {};
+    const ingresos = {};  // día -> importe ingresado (prov. fondos)
     let prev = saldoInicial;
-    let totalGastos = 0;
+    let totalGastos = 0, totalIngresos = 0;
     for (const d of diasSaldo) {
       const delta = prev - saldoPorDia[d];   // baja saldo => gasto positivo
       if (delta > 0.005) { gastos[d] = Math.round(delta * 100) / 100; totalGastos += gastos[d]; }
+      else if (delta < -0.005) { // sube saldo => ingreso de fondos
+        ingresos[d] = Math.round(-delta * 100) / 100; totalIngresos += ingresos[d];
+      }
       prev = saldoPorDia[d];
     }
     days._gastosDias = gastos;
     days._totGastos = Math.round(totalGastos * 100) / 100;
+    days._ingresosDias = ingresos;
+    days._totIngresos = Math.round(totalIngresos * 100) / 100;
     days._saldoInicial = saldoInicial;
     days._saldoFinal = saldoPorDia[diasSaldo[diasSaldo.length - 1]];
   }
@@ -6568,6 +6634,8 @@ function _guardarDesdeHoja(uid) {
   if (days._gastosDias)   merged._gastosDias   = days._gastosDias;
   if (days._saldoInicial !== undefined) merged._saldoInicial = days._saldoInicial;
   if (days._saldoFinal !== undefined)   merged._saldoFinal   = days._saldoFinal;
+  if (days._ingresosDias) merged._ingresosDias = days._ingresosDias;
+  if (days._totIngresos)  merged._totIngresos  = days._totIngresos;
   const n = Object.keys(merged).filter(d => !d.startsWith('_') && merged[d].mins > 0).length;
   localStorage.setItem(_compHorasKey(y, m), JSON.stringify({ days: merged, guardada: new Date().toISOString() }));
   const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
