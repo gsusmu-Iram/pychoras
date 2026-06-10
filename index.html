@@ -3669,7 +3669,7 @@ const IRAM = {
     'Llevo tu registro de horas, extras y gastos. Para lo dem\u00e1s, tendr\u00e1s que buscarte la vida 😄',
   ],
   ayuda: [
-    'Puedes decirme:<br><span class="pill">inicio 7:30</span> <span class="pill">fin 15:40</span><br><span class="pill">comida 1 hora</span> <span class="pill">vacaciones hoy</span><br><span class="pill">gasto 5 parking</span> <span class="pill">extras mes</span><br><span class="pill">pr\u00f3xima guardia</span> <span class="pill">festivos quedan</span>',
+    'Puedes decirme:<br><span class="pill">inicio 7:30</span> <span class="pill">fin 15:40</span><br><span class="pill">comida 1 hora</span> <span class="pill">vacaciones hoy</span><br><span class="pill">gasto 5 parking</span> <span class="pill">extras mes</span><br>O preguntarme:<br><span class="pill">dime las guardias</span> <span class="pill">festivos este mes</span><br><span class="pill">gastos del mes</span> <span class="pill">horas de mayo</span>',
     'Comandos principales:<br><span class="pill">inicio HH:MM</span> <span class="pill">fin HH:MM</span> <span class="pill">comida Xh</span><br><span class="pill">vacaciones hoy</span> <span class="pill">gasto X concepto</span><br><span class="pill">extras mes</span> <span class="pill">resumen mes</span>',
   ],
   gracias: [
@@ -4054,6 +4054,16 @@ function _detectar(raw,s_norm){
   if(/\b(resumen|c[o\u00f3]mo voy|balance|cu[a\u00e1]nto llevo)\b/.test(s))return{accion:'qResumen',mes:parseMes(s),y:hoy.getFullYear()};
   if(/\b(qu[e\u00e9] hice|ver el|jornada del?|c[o\u00f3]mo fue)\b/.test(s)){const fecha=parseFecha(s);if(fecha)return{accion:'qDia',fecha};}
   if(/\b(vacacion|cu[a\u00e1]ntas vac)\b/.test(s)&&/\b(quedan|tengo|libres)\b/.test(s))return{accion:'qVac'};
+
+  // Consultas de GUARDIAS
+  if(/\b(guardia|guardias)\b/.test(s)) {
+    if(/\b(este mes|tengo|hay|pr[o\u00f3]xima|cu[a\u00e1]ndo|qu[e\u00e9] d[ií]as?)\b/.test(s) || /^(dime|ver|muestra)/.test(s) || /\bguardias?\b/.test(s))
+      return{accion:'qGuardias',mes:parseMes(s),y:hoy.getFullYear()};
+  }
+
+  // Consultas de FESTIVOS
+  if(/\bfestivos?\b/.test(s))
+    return{accion:'qFestivos',mes:parseMes(s),soloMes:/\b(este mes|del? mes|este)\b/.test(s),y:hoy.getFullYear()};
   if(/\b(importe|sueldo|cobro|cobrar|l\u00edquido)\b/.test(s))return{accion:'qImporte',mes:parseMes(s),y:hoy.getFullYear()};
 
   if(/\b(festivo|festivos)\b/.test(s)){
@@ -4241,6 +4251,44 @@ function responder(int_){
     ctxConv.ultimaConsulta=int_;const st=mesStats(int_.y,int_.mes);
     const imp=(st.tot/60*cfg.precioH+st.plusFest+st.plusGuardia).toFixed(2);
     return`Resumen ${MESES[int_.mes]}:<div class="res-card"><div class="res-row"><span class="res-lbl">Horas</span><span class="res-val">${m2str(st.tot)}</span></div><div class="res-row"><span class="res-lbl">Extras</span><span class="res-val ${st.ext>=0?'pos':'neg'}">${st.ext>=0?'+':'\u2212'}${m2str(Math.abs(st.ext))}</span></div><div class="res-row"><span class="res-lbl">Gastos</span><span class="res-val">${st.gas.toFixed(2)}\u20ac</span></div><div class="res-row"><span class="res-lbl">Importe est.</span><span class="res-val pos">${imp}\u20ac</span></div></div>`;
+  }
+
+  if(accion==='qGuardias'){
+    ctxConv.ultimaConsulta=int_;
+    const extras=guardiasCambios._extra||[];
+    if(!extras.length) return`No tienes guardias registradas 🛡️<br><small style="color:var(--text3)">Puedes añadirlas en Jornada → Mis guardias</small>`;
+    // Filtrar guardias del mes consultado (que tengan algún día en ese mes)
+    const m=int_.mes, y=int_.y;
+    const guardiasMes=[], guardiasOtras=[];
+    extras.forEach(ini=>{
+      const dIni=new Date(ini+'T12:00:00'); const dFin=new Date(dIni); dFin.setDate(dFin.getDate()+6);
+      const enMes=(dIni.getMonth()===m&&dIni.getFullYear()===y)||(dFin.getMonth()===m&&dFin.getFullYear()===y);
+      const txt=`${dIni.getDate()}/${dIni.getMonth()+1} \u2192 ${dFin.getDate()}/${dFin.getMonth()+1}`;
+      if(enMes) guardiasMes.push(txt); else guardiasOtras.push(txt);
+    });
+    let h=`Guardias 🛡️<div class="res-card">`;
+    if(guardiasMes.length){ h+=`<div class="res-row"><span class="res-lbl"><b>${MESES[m]}</b></span><span class="res-val">${guardiasMes.length}</span></div>`; guardiasMes.forEach(t=>h+=`<div class="res-row"><span class="res-lbl">Semana</span><span class="res-val">${t}</span></div>`); }
+    else { h+=`<div class="res-row"><span class="res-lbl">${MESES[m]}</span><span class="res-val" style="color:var(--text3)">Sin guardias</span></div>`; }
+    if(guardiasOtras.length) h+=`<div class="res-row"><span class="res-lbl" style="color:var(--text3)">Otras (todo el año)</span><span class="res-val" style="color:var(--text3)">${extras.length} total</span></div>`;
+    h+=`</div>`;
+    return h;
+  }
+
+  if(accion==='qFestivos'){
+    ctxConv.ultimaConsulta=int_;
+    const fests=getFestivos(int_.y);
+    if(int_.soloMes){
+      const m=int_.mes;
+      const delMes=fests.filter(f=>{const dt=new Date(f.d+'T12:00:00');return dt.getMonth()===m;});
+      if(!delMes.length) return`No hay festivos en ${MESES[m]} 📅`;
+      let h=`Festivos de ${MESES[m]} 🎉<div class="res-card">`;
+      delMes.forEach(f=>{const dt=new Date(f.d+'T12:00:00');h+=`<div class="res-row"><span class="res-lbl">${dt.getDate()} ${MESES[m].slice(0,3)}</span><span class="res-val" style="font-size:12px">${f.n||'Festivo'}</span></div>`;});
+      h+=`</div>`; return h;
+    }
+    // Todos los festivos del año
+    let h=`Festivos ${int_.y} 🎉<div class="res-card" style="max-height:340px;overflow-y:auto">`;
+    fests.forEach(f=>{const dt=new Date(f.d+'T12:00:00');h+=`<div class="res-row"><span class="res-lbl">${dt.getDate()} ${MESES[dt.getMonth()].slice(0,3)}</span><span class="res-val" style="font-size:12px">${f.n||'Festivo'}</span></div>`;});
+    h+=`</div>`; return h;
   }
 
   if(accion==='qDia'){
