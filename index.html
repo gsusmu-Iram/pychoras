@@ -1642,8 +1642,8 @@ function renderLiquido() {
   const stPrev = c.stPrev;
   const prevLabel = MESES_C[c.prevM];
   let evHtml = '';
-  if (stPrev.ext > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small>${prevLabel} · +${m2str(stPrev.ext)} × ${cfg.precioH}€/h</small></div><div class="extra-val pos">+${stPrev.extrasEuros.toFixed(2)}€</div></div>`;
-  else if (stPrev.ext < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">D\u00e9ficit horas <small>${prevLabel} · ${m2str(stPrev.ext)} vs convenio</small></div><div class="extra-val neg">${(stPrev.ext / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
+  if (stPrev.ext > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small style="font-weight:800;color:var(--text2)">${prevLabel} · +${m2str(stPrev.ext)} × ${cfg.precioH}€/h</small></div><div class="extra-val pos">+${stPrev.extrasEuros.toFixed(2)}€</div></div>`;
+  else if (stPrev.ext < 0) evHtml += `<div class="extra-row"><div class="extra-lbl">D\u00e9ficit horas <small style="font-weight:800;color:var(--text2)">${prevLabel} · ${m2str(stPrev.ext)} vs convenio</small></div><div class="extra-val neg">${(stPrev.ext / 60 * cfg.precioH).toFixed(2)}€</div></div>`;
   else evHtml += `<div class="extra-row"><div class="extra-lbl">Horas extras <small>${prevLabel} · Exacto al convenio</small></div><div class="extra-val" style="color:var(--text3)">\u00b10€</div></div>`;
   if (c.guardiasEsteMes > 0) evHtml += `<div class="extra-row"><div class="extra-lbl">Plus guardia semana<small>${c.guardiasEsteMes} semana${c.guardiasEsteMes > 1 ? 's' : ''} × ${cfg.guardia}€</small></div><div class="extra-val purple">+${c.plusGuardiaEsteMes.toFixed(2)}€</div></div>`;
   if (c.stPrev && c.stPrev.plusFest > 0) { const _nd = c.stPrev.plusFest / cfg.festivo; const _mp = MESES[c.prevM].slice(0,3); evHtml += `<div class="extra-row"><div class="extra-lbl">Plus festivo trabajado<small>${_mp} · ${_nd} día${_nd > 1 ? 's' : ''} × ${cfg.festivo}€</small></div><div class="extra-val purple">+${c.stPrev.plusFest.toFixed(2)}€</div></div>`; }
@@ -2097,9 +2097,23 @@ function parsearNominaPDF(txt, nombre) {
         const hApp = c.extrasEuros / precio;
         const hDif = hApp - hPDF;
         const mesAnt = MESES[c.prevM];
+        // Cruce con la comparativa del mes al que pertenecen las extras (mes anterior).
+        let cruce = '';
+        const empTotPrev = _empTotalGuardado(c.prevY, c.prevM);
+        if (empTotPrev != null) {
+          const difMinEmp = c.stPrev.tot - empTotPrev;          // >0 = empresa registró menos horas
+          const eurEmp = Math.abs(difMinEmp) / 60 * precio;
+          const dir = difMinEmp > 0 ? 'menos' : (difMinEmp < 0 ? 'más' : 'igual');
+          cruce = (difMinEmp === 0)
+            ? ' La comparativa de ' + mesAnt + ' cuadra al minuto, así que este desfase no viene de las horas.'
+            : ' Según la comparativa de ' + mesAnt + ', la empresa te registró ' + m2hm(Math.abs(difMinEmp)) + ' ' + dir +
+              ' (\u2248' + eurEmp.toFixed(2) + '\u20ac). Aquí la n\u00f3mina cambia ' + Math.abs(d).toFixed(2) + '\u20ac \u00b7 compara los dos.';
+        } else {
+          cruce = ' Carga el PDF de empresa de ' + mesAnt + ' en Comparar para cotejar estos minutos.';
+        }
         items.push({ tipo: 'origen', lbl: 'Horas extras', eur: d,
           txt: 'La nómina paga ' + hPDF.toFixed(2) + 'h (' + ext.toFixed(2) + '€) pero registraste ' + hApp.toFixed(2) + 'h en ' + mesAnt + ' (' +
-               (hDif > 0 ? '−' : '+') + Math.abs(hDif).toFixed(2) + 'h). No es un error de cálculo: revisa tu registro de ' + mesAnt + ' o el cómputo de la empresa.' });
+               (hDif > 0 ? '−' : '+') + Math.abs(hDif).toFixed(2) + 'h).' + cruce });
       }
     }
 
@@ -4576,10 +4590,8 @@ function abrirMesDetalle(m) {
 
     let ver='';
     if(tieneComp&&diff!==null){
-      const nDisc=_discDias(compData,st,m,y);
-      ver=Math.abs(diff)<5
-        ?`<div style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">✓</span><span style="font-size:11px;color:#bbf7d0;font-weight:700">Registros coinciden con la empresa</span></div>`
-        :`<div style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">⚠</span><div><div style="font-size:11px;color:#fed7aa;font-weight:700">Empresa registra ${(diff>0?'\u2212':'+')+m2hm(Math.abs(diff))} vs tu cómputo</div>${nDisc>0?'<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px">'+nDisc+' días con diferencia</div>':''}</div></div>`;
+      // Sin banner aquí: el resumen blanco de abajo (neto + redondeo/revisar) es el veredicto único.
+      ver='';
     } else {
       ver=`<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">📄</span><span style="font-size:11px;color:rgba(255,255,255,0.45);font-weight:600">Sin PDF de empresa · sube la hoja para comparar</span></div>`;
     }
@@ -4618,6 +4630,17 @@ function _calcEmpresaTotal(compData) {
   // Si el PDF guardó el total oficial de TOTALES, usarlo
   if(compData._totalOficial) return compData._totalOficial;
   return Object.values(compData).filter(v=>v&&v.mins).reduce((a,v)=>a+(v.mins||0),0);
+}
+
+// Total de minutos de la empresa de un mes ya comparado (PDF guardado), o null si no hay.
+function _empTotalGuardado(py, pm) {
+  try {
+    const raw = localStorage.getItem(KCH + '_' + py + '_' + String(pm+1).padStart(2,'0'));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || !data.days) return null;
+    return _calcEmpresaTotal(data.days);
+  } catch(e){ return null; }
 }
 
 function _discDias(compData,st,m,y) {
