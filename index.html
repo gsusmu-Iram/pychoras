@@ -4579,7 +4579,7 @@ function abrirMesDetalle(m) {
       const nDisc=_discDias(compData,st,m,y);
       ver=Math.abs(diff)<5
         ?`<div style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">✓</span><span style="font-size:11px;color:#bbf7d0;font-weight:700">Registros coinciden con la empresa</span></div>`
-        :`<div style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">⚠</span><div><div style="font-size:11px;color:#fed7aa;font-weight:700">App registra ${(diff>=0?'+':'\u2212')+m2hm(Math.abs(diff))} vs empresa</div>${nDisc>0?'<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px">'+nDisc+' días con diferencia</div>':''}</div></div>`;
+        :`<div style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">⚠</span><div><div style="font-size:11px;color:#fed7aa;font-weight:700">Empresa registra ${(diff>0?'\u2212':'+')+m2hm(Math.abs(diff))} vs tu cómputo</div>${nDisc>0?'<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px">'+nDisc+' días con diferencia</div>':''}</div></div>`;
     } else {
       ver=`<div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px">📄</span><span style="font-size:11px;color:rgba(255,255,255,0.45);font-weight:600">Sin PDF de empresa · sube la hoja para comparar</span></div>`;
     }
@@ -4749,7 +4749,6 @@ function renderMesDetalleBody() {
     // ── Calcular totales y discrepancias ──────────────────────
     let totApp=0, totEmp=0, totGasApp=0;
     const discDias=[], gasRows=[];
-    const TRAMOS_PARTIDOS=new Set([15,16,22,28,29]); // días conocidos con tramo partido
 
     for(let d=1;d<=dim;d++){
       const o=gD(y,m,d);
@@ -4764,8 +4763,8 @@ function renderMesDetalleBody() {
       const empMin=empRegistra?empDay.mins:0;
       totApp+=appMin; totEmp+=empMin;
       const diff=appMin-empMin;
-      // Solo contar discrepancia si empresa registró ese día
-      if(empRegistra && Math.abs(diff)>3) discDias.push({d,appMin,empMin,diff});
+      // Guardar cualquier diferencia (incl. redondeo) si la empresa registró ese día
+      if(empRegistra && diff!==0) discDias.push({d,appMin,empMin,diff});
     }
 
     const CONV_MIN_MES = cfg.convenio * 60;
@@ -4775,25 +4774,31 @@ function renderMesDetalleBody() {
     const extEmp = totEmpOficial - CONV_MIN_MES;
     const diffExt = extApp - extEmp;
 
-    // ── Causas ────────────────────────────────────────────────
-    let minsPausas=0, nPausas=0, minsDuda=0, nDuda=0;
-    discDias.forEach(({d,diff})=>{
-      if(diff>0 && TRAMOS_PARTIDOS.has(d)){minsPausas+=diff;nPausas++;}
-      else if(diff>0){minsDuda+=diff;nDuda++;}
-    });
+    // ── Resumen honesto: redondeo vs a revisar ───────────────
+    // Convención de signo: empresa me registra MENOS = −  (app de más → −)
+    const fmtSigned = (mn)=> (mn>0?'\u2212':mn<0?'+':'') + m2hm(Math.abs(mn)); // mn>0 (app de más) → −
+    const redondeo = discDias.filter(x=>Math.abs(x.diff)<=3);
+    const revisar  = discDias.filter(x=>Math.abs(x.diff)>3);
+    const netoMin  = discDias.reduce((a,x)=>a+x.diff,0); // >0 = app de más = empresa de menos
 
     let causasTxt='';
-    if(nPausas>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nPausas} día${nPausas>1?'s':''} con pausa de comida sin registrar · <strong>${m2hm(minsPausas)}h</strong></span></div>`;
-    if(nDuda>0) causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${nDuda} día${nDuda>1?'s':''} con diferencia sin causa clara · <strong>${m2hm(minsDuda)}h</strong> — verificar</span></div>`;
-    discDias.filter(({diff})=>diff<0).forEach(({d,diff})=>{
-      causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#d35400;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">Día ${d}: empresa registra ${m2hm(Math.abs(diff))} más que la app</span></div>`;
-    });
+    if(redondeo.length>0){
+      causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)">${redondeo.length} día${redondeo.length>1?'s':''} con diferencia de redondeo (±1-3 min) · visto bueno</span></div>`;
+    }
+    if(revisar.length>0){
+      const lista = revisar.map(x=>`día ${x.d} (${fmtSigned(x.diff)})`).join(', ');
+      causasTxt+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:50%;background:#c0392b;flex-shrink:0"></div><span style="font-size:11px;color:var(--text2)"><strong>${revisar.length} a revisar</strong>: ${lista}</span></div>`;
+    }
 
     let h='';
-    if(causasTxt){
-      h+=`<div style="margin:10px 14px 8px;background:white;border-radius:12px;padding:12px 14px;box-shadow:var(--sh-card)">${causasTxt}</div>`;
-    } else {
+    if(discDias.length===0){
       h+=`<div style="margin:10px 14px 8px;padding:10px 14px;display:flex;align-items:center;gap:8px;background:rgba(34,197,94,0.06);border-radius:10px;border:1px solid rgba(34,197,94,0.2)"><span style="font-size:16px">✓</span><span style="font-size:12px;font-weight:700;color:var(--green)">Todos los registros coinciden</span></div>`;
+    } else {
+      const revOk = revisar.length===0;
+      const cab = revOk
+        ? `<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:15px">✓</span><span style="font-size:12px;font-weight:800;color:var(--green)">Cuadra · neto ${fmtSigned(netoMin)} (redondeo) · 0 a revisar</span></div>`
+        : `<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:15px">⚠</span><span style="font-size:12px;font-weight:800;color:#c0392b">Neto del mes ${fmtSigned(netoMin)}</span></div>`;
+      h+=`<div style="margin:10px 14px 8px;background:white;border-radius:12px;padding:12px 14px;box-shadow:var(--sh-card)">${cab}${causasTxt}</div>`;
     }
 
     // ── Tabla todos los días ──────────────────────────────────
@@ -4846,40 +4851,44 @@ function renderMesDetalleBody() {
       //   NO — aclaración: ROJO = app > empresa (trabajaste más de lo que pagan)
       //   NARANJA = empresa > app (empresa registra más, a tu favor)
       // Sin color = empresa no registra ese día en el PDF
-      const ok = absDiff<=3;
+      const ok = absDiff<=3;          // dentro de redondeo
+      const exacto = diff===0;        // clavado
       const sinRegistro = !empRegistra && appMin>0;
+
+      // Signo en convención "empresa me registra menos = −": app de más → −
+      const signo = diff>0 ? '\u2212' : '+';
 
       let borderCol, bg;
       if(ok || sinRegistro){
         borderCol = sinRegistro ? 'transparent' : '#22c55e';
         bg = 'transparent';
       } else if(diff>0){
-        // app > empresa → trabajaste más de lo que empresa registra → ROJO
         borderCol = '#c0392b';
         bg = 'rgba(192,57,43,0.05)';
       } else {
-        // empresa > app → empresa registra más → NARANJA
         borderCol = '#d35400';
         bg = 'rgba(211,84,0,0.05)';
       }
 
-      // Etiqueta
+      // Etiqueta solo cuando supera el redondeo (>3 min)
       let etiqueta='';
       if(!ok && !sinRegistro){
-        if(diff>0 && TRAMOS_PARTIDOS.has(d)){
-          etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(192,57,43,0.12);color:#c0392b;border-radius:4px;padding:1px 5px;margin-left:4px">Pausa</span>`;
-        } else if(diff>0){
+        if(diff>0){
           etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(192,57,43,0.12);color:#c0392b;border-radius:4px;padding:1px 5px;margin-left:4px">Verificar</span>`;
         } else {
           etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(211,84,0,0.12);color:#d35400;border-radius:4px;padding:1px 5px;margin-left:4px">+Empresa</span>`;
         }
       }
 
-      const diffCol = ok?'#1e8449':diff>0&&!sinRegistro?'#c0392b':'#d35400';
-      const diffStr = ok
+      // Diff: clavado → ✓ · redondeo (1-3) → número en verde apagado · >3 → número en color
+      const diffCol = diff>0 ? '#c0392b' : '#d35400';
+      const diffStr = sinRegistro
+        ? `<span style="color:#94a3b8;font-size:11px">\u2014</span>`
+        : exacto
         ? `<span style="color:#1e8449;font-size:14px;font-weight:900">✓</span>`
-        : sinRegistro ? `<span style="color:#94a3b8;font-size:11px">—</span>`
-        : `<span style="font-size:12px;font-weight:900;font-family:var(--mono);color:${diffCol}">${diff>0?'+':'\u2212'}${m2hm(absDiff)}</span>`;
+        : ok
+        ? `<span style="font-size:12px;font-weight:700;font-family:var(--mono);color:#16a34a">${signo}${m2hm(absDiff)}</span>`
+        : `<span style="font-size:12px;font-weight:900;font-family:var(--mono);color:${diffCol}">${signo}${m2hm(absDiff)}</span>`;
 
       // Fila entera coloreada (verde también)
       const rowBg = ok ? 'rgba(34,197,94,0.06)' : sinRegistro ? 'transparent' : diff>0 ? 'rgba(192,57,43,0.05)' : 'rgba(211,84,0,0.05)';
@@ -6194,8 +6203,8 @@ function verDiscrepancia(y, m, d) {
     '<div class="disc-hoja-lbl" style="margin-top:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Mi registro (app)</div>' +
     _filaHoja('APP', 'var(--acc)', inf.inicio !== '-' ? inf.inicio : '—', inf.fin !== '-' ? inf.fin : '—', appPausa, m2hhmmFmt(inf.mins), appTramos.length > 1 ? appTramos : null) +
     '<div class="disc-diff-row" style="color:' + dcol + ';background:' + dbg + ';border-radius:var(--rs);margin-bottom:8px">' +
-      (isNeg ? '\u2212' : '+') + m2hm(absd) + '\u00a0\u00b7\u00a0\u2248\u202f' + euros.toFixed(2) + '\u20ac\u00a0\u00b7\u00a0' +
-      (isNeg ? 'empresa registra m\u00e1s' : 'app registra m\u00e1s') +
+      (isNeg ? '+' : '\u2212') + m2hm(absd) + '\u00a0\u00b7\u00a0\u2248\u202f' + euros.toFixed(2) + '\u20ac\u00a0\u00b7\u00a0' +
+      (isNeg ? 'empresa te registra m\u00e1s' : 'empresa te registra menos') +
     '</div>' +
     '<div style="padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:4px">' +
       '<span style="font-size:9px;font-weight:900;color:var(--text3);font-family:var(--mono);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.1em">Posible causa</span>' +
@@ -6464,14 +6473,20 @@ function _parsearHojaDiaria(txt) {
   const inicio = inicioM ? inicioM[1] : '';
   const fin    = finM    ? finM[1]    : '';
 
-  // El inicio oficial es siempre 07:30 aunque se fiche antes
+  // El inicio oficial es 07:30 aunque se fiche un poco antes (fichaje + espera).
+  // PERO por debajo de las 07:00 es salida de ruta real (viaje largo): se respeta
+  // la hora real, porque la empresa también cuenta esa salida temprana.
   const INICIO_OFICIAL = '07:30';
-  const inicioReal = inicio && t2m(inicio) < t2m(INICIO_OFICIAL) ? INICIO_OFICIAL : inicio;
+  const LIMITE_CLAMP   = '07:00';
+  const aplicaClamp = inicio && t2m(inicio) >= t2m(LIMITE_CLAMP) && t2m(inicio) < t2m(INICIO_OFICIAL);
+  const inicioReal = aplicaClamp ? INICIO_OFICIAL : inicio;
 
-  // Recalcular total desde inicio oficial si el PDF fichó antes
+  // Total trabajado = fin − inicio (real o clampado) − comida.
+  // Se calcula así siempre que haya inicio y fin, para descontar la comida
+  // también en salidas tempranas (Horas Totales del parte es BRUTO: incluye comida).
   let minsFinales = mins;
-  if (inicio && t2m(inicio) < t2m(INICIO_OFICIAL) && finM) {
-    minsFinales = Math.max(0, t2m(fin) - t2m(INICIO_OFICIAL) - comidaMins);
+  if (inicio && fin) {
+    minsFinales = Math.max(0, t2m(fin) - t2m(inicioReal) - comidaMins);
   }
 
   return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, gastos, totalStr: m2hm(minsFinales) };
