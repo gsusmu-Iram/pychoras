@@ -4845,6 +4845,19 @@ function renderMesDetalleBody() {
       const diff=appMin-empMin;
       const absDiff=Math.abs(diff);
 
+      // ¿La discrepancia se explica por el tiempo de comida?
+      // Comida implícita de la empresa = (finEmp − inicioEmp) − totalEmp.
+      // Si inicio y fin casan (±2 min) pero el total no, el desajuste es de comida.
+      let causaComida=false;
+      if(empRegistra && empDay.inicio && empDay.fin && tr.length){
+        const appIni=tr[0].iMin, appFinM=tr[tr.length-1].oMin;
+        const appComida = pausaInline ? pausaInline : (o?.pausa_min||0);
+        const empIniM=t2m(empDay.inicio), empFinM=t2m(empDay.fin);
+        const empComida=Math.max(0,(empFinM-empIniM)-empMin);
+        const dIni=appIni-empIniM, dFin=appFinM-empFinM, dCom=appComida-empComida;
+        if(Math.abs(dIni)<=2 && Math.abs(dFin)<=2 && Math.abs(dCom)>=1) causaComida=true;
+      }
+
       // Colores:
       // Verde = coinciden (diff<=3)
       // ROJO = app < empresa (empresa registra MÁS → empresa > app → a tu favor en duda)
@@ -4873,7 +4886,9 @@ function renderMesDetalleBody() {
       // Etiqueta solo cuando supera el redondeo (>3 min)
       let etiqueta='';
       if(!ok && !sinRegistro){
-        if(diff>0){
+        if(causaComida){
+          etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(234,179,8,0.16);color:#a16207;border-radius:4px;padding:1px 5px;margin-left:4px">🍽 comida</span>`;
+        } else if(diff>0){
           etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(192,57,43,0.12);color:#c0392b;border-radius:4px;padding:1px 5px;margin-left:4px">Verificar</span>`;
         } else {
           etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(211,84,0,0.12);color:#d35400;border-radius:4px;padding:1px 5px;margin-left:4px">+Empresa</span>`;
