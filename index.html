@@ -415,6 +415,15 @@ body{
 .liq-label{font-size:10px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.18em;font-family:var(--mono);margin-bottom:7px;}
 .liq-amount{font-size:52px;font-weight:900;font-family:var(--mono);color:white;letter-spacing:-2px;line-height:1;}
 .liq-sub{font-size:11px;color:rgba(255,255,255,0.65);margin-top:6px;font-family:var(--mono);}
+.liq-real-row{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  margin-top:10px;padding:6px 14px;border-radius:20px;
+  background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.22);
+  position:relative;z-index:1;
+}
+.liq-real-lbl{font-size:9px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);font-weight:700;}
+.liq-real-val{font-size:14px;font-weight:900;color:white;font-family:var(--mono);}
+.liq-real-diff{font-size:11px;font-weight:800;font-family:var(--mono);}
 .liq-breakdown{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-top:1px solid rgba(255,255,255,0.25);padding-top:14px;position:relative;z-index:1;}
 .liq-item{text-align:center;}
 .liq-item-val{font-size:14px;font-weight:800;font-family:var(--mono);color:white;}
@@ -655,6 +664,15 @@ body{
   padding:7px 9px;font-size:15px;line-height:1;
 }
 .ge-btn.eliminar:active{background:rgba(220,38,38,0.18);}
+/* Nuevo: botón eliminar discreto, solo ✕ */
+.ge-btn-del{
+  background:none;border:none;
+  color:var(--text3);font-size:15px;font-weight:700;
+  padding:6px 8px;border-radius:var(--rs);cursor:pointer;flex-shrink:0;
+  transition:color .15s,background .15s;line-height:1;
+}
+.ge-btn-del:active{color:var(--red);background:rgba(220,38,38,0.08);}
+.ge-btn-del.confirmando{color:var(--red);background:rgba(220,38,38,0.12);font-weight:900;}
 .ge-btn.anadir{
   background:rgba(37,99,235,0.08);border-color:rgba(37,99,235,0.3);
   color:var(--blue);font-weight:800;font-size:13px;flex-shrink:0;
@@ -1020,6 +1038,11 @@ body{
           <div class="liq-label">Líquido estimado</div>
           <div class="liq-amount" id="liqAmount">&mdash;</div>
           <div class="liq-sub" id="liqSub">&mdash;</div>
+          <div class="liq-real-row" id="liqRealRow" style="display:none">
+            <span class="liq-real-lbl">Nómina real</span>
+            <span class="liq-real-val" id="liqRealVal">&mdash;</span>
+            <span class="liq-real-diff" id="liqRealDiff"></span>
+          </div>
         </div>
         <div class="liq-breakdown">
           <div class="liq-item"><div class="liq-item-val" id="liqBase">&mdash;</div><div class="liq-item-lbl">Base fija</div></div>
@@ -1613,6 +1636,23 @@ function renderLiquido() {
   const c = calcLiquido(y, m);
   document.getElementById('liqAmount').textContent = c.liquido.toFixed(2) + '€';
   document.getElementById('liqSub').textContent = 'Devengado: ' + c.totalDevengado.toFixed(2) + '€ · Deducido: ' + c.totalDedu.toFixed(2) + '€';
+
+  // Líquido real de nómina (si hay PDF cargado este mes) — visible en la tarjeta, sin tocar el detalle de abajo
+  const realRow = document.getElementById('liqRealRow');
+  const realVal = document.getElementById('liqRealVal');
+  const realDiff = document.getElementById('liqRealDiff');
+  if (realRow && realVal && realDiff) {
+    const savedNom = cargarCompNomina(y, m);
+    if (savedNom && savedNom.liquido != null) {
+      const diffReal = parseFloat((savedNom.liquido - c.liquido).toFixed(2));
+      realVal.textContent = savedNom.liquido.toFixed(2) + '€';
+      if (Math.abs(diffReal) < 0.5) { realDiff.textContent = '\u2713 exacto'; realDiff.style.color = '#86efac'; }
+      else { realDiff.textContent = (diffReal > 0 ? '+' : '\u2212') + Math.abs(diffReal).toFixed(2) + '€'; realDiff.style.color = diffReal < 0 ? '#fca5a5' : '#fde68a'; }
+      realRow.style.display = 'flex';
+    } else {
+      realRow.style.display = 'none';
+    }
+  }
   document.getElementById('liqBase').textContent = c.baseFija.toFixed(2) + '€';
   // Guardia badge
   const badge = document.getElementById('liqGuardiaBadge');
@@ -1722,11 +1762,13 @@ function renderGuardiaEditor() {
   const card = document.getElementById('guardiaEditCard');
   if (!card) return;
   const hoy = new Date();
+  const anio = cY; // año visible en el calendario
   const extras = guardiasCambios._extra || [];
   let h = '';
 
-  // Guardias base (excluir eliminadas)
-  GUARDIAS_2026.forEach(g => {
+  // ── Guardias base del año visible (GUARDIAS_2026 solo aplica en 2026) ──
+  const basesAnio = GUARDIAS_2026.filter(g => g.getFullYear() === anio);
+  basesAnio.forEach(g => {
     const key = g.toISOString().split('T')[0];
     if (guardiasCambios[key] === 'eliminada') return;
     const fin = new Date(g); fin.setDate(fin.getDate() + 6);
@@ -1746,12 +1788,19 @@ function renderGuardiaEditor() {
         <div class="ge-estado ${estadoCls}">${estadoTxt}</div>
       </div>
       <button class="ge-btn ${btnCls}" ${onclickToggle}>${btnTxt}</button>
-      <button class="ge-btn eliminar" onclick="eliminarGuardiaBase('${key}')" title="Eliminar guardia">\uD83D\uDDD1</button>
+      <button class="ge-btn-del" onclick="eliminarGuardiaBase('${key}', this)" title="Eliminar guardia">✕</button>
     </div>`;
   });
 
-  // Guardias extra añadidas
-  extras.forEach((dateStr, idx) => {
+  // ── Guardias extra filtradas por el año visible ──
+  const extrasAnio = extras.map((dateStr, idx) => ({ dateStr, idx }))
+    .filter(({ dateStr }) => dateStr.startsWith(String(anio)));
+
+  if (basesAnio.length === 0 && extrasAnio.length === 0) {
+    h += `<div style="padding:16px 14px;text-align:center;font-size:12px;color:var(--text3);font-family:var(--mono)">Sin guardias en ${anio} · añade una abajo</div>`;
+  }
+
+  extrasAnio.forEach(({ dateStr, idx }) => {
     const g = new Date(dateStr + 'T12:00:00');
     const fin = new Date(g); fin.setDate(fin.getDate() + 6);
     const pasada = fin < hoy, activa = g <= hoy && fin >= hoy;
@@ -1762,13 +1811,14 @@ function renderGuardiaEditor() {
         <div class="ge-rango">${g.getDate()}/${g.getMonth()+1} \u2192 ${fin.getDate()}/${fin.getMonth()+1}<span class="ge-badge-extra">+extra</span></div>
         <div class="ge-estado ${estadoCls}">${estadoTxt}</div>
       </div>
-      <button class="ge-btn eliminar" onclick="eliminarGuardiaExtra(${idx})">\uD83D\uDDD1 Quitar</button>
+      <button class="ge-btn-del" onclick="eliminarGuardiaExtra(${idx}, this)">✕</button>
     </div>`;
   });
 
-  // Fila para añadir nueva guardia
+  // ── Fila para añadir nueva guardia (min/max dinámicos por año) ──
   h += `<div class="guardia-add-row">
-    <input type="date" id="nuevaGuardiaFecha" class="ge-date-input" min="2026-01-01" max="2026-12-31" placeholder="Inicio semana">
+    <input type="date" id="nuevaGuardiaFecha" class="ge-date-input"
+      min="${anio}-01-01" max="${anio}-12-31" placeholder="Inicio semana">
     <button class="ge-btn anadir" onclick="anadirGuardia()">+ A\u00f1adir</button>
   </div>`;
 
@@ -1788,24 +1838,44 @@ function toggleGuardia(key) {
   showToast(guardiasCambios[key] === 'cancelada' ? 'Guardia marcada como cambiada' : 'Guardia restaurada');
 }
 
-function eliminarGuardiaBase(key) {
-  if (!confirm('Eliminar esta guardia de la lista?\nNo afecta a datos ya registrados.')) return;
-  guardiasCambios[key] = 'eliminada';
-  saveGuardias();
-  DIAS_GUARDIA = buildGuardiaSet();
-  renderGuardiaEditor(); renderJornada(); renderMesDatos(); renderLiquido();
-  showToast('\uD83D\uDDD1 Guardia eliminada');
+// Confirmación en dos toques (sin depender de confirm() nativo, poco fiable en PWA instalada)
+let _confirmaBorrado = { id: null, timeout: null };
+function _pedirConfirmacion(id, btn, callback) {
+  if (_confirmaBorrado.id === id) {
+    clearTimeout(_confirmaBorrado.timeout);
+    _confirmaBorrado.id = null;
+    callback();
+    return;
+  }
+  if (_confirmaBorrado.timeout) clearTimeout(_confirmaBorrado.timeout);
+  _confirmaBorrado.id = id;
+  if (btn) { btn.textContent = '✓'; btn.classList.add('confirmando'); }
+  _confirmaBorrado.timeout = setTimeout(() => {
+    _confirmaBorrado.id = null;
+    if (btn) { btn.textContent = '✕'; btn.classList.remove('confirmando'); }
+  }, 2500);
 }
 
-function eliminarGuardiaExtra(idx) {
-  if (!confirm('Eliminar esta guardia a\u00f1adida?')) return;
-  const extras = guardiasCambios._extra || [];
-  extras.splice(idx, 1);
-  guardiasCambios._extra = extras;
-  saveGuardias();
-  DIAS_GUARDIA = buildGuardiaSet();
-  renderGuardiaEditor(); renderJornada(); renderMesDatos(); renderLiquido();
-  showToast('\uD83D\uDDD1 Guardia eliminada');
+function eliminarGuardiaBase(key, btn) {
+  _pedirConfirmacion('base_' + key, btn, () => {
+    guardiasCambios[key] = 'eliminada';
+    saveGuardias();
+    DIAS_GUARDIA = buildGuardiaSet();
+    renderGuardiaEditor(); renderJornada(); renderMesDatos(); renderLiquido();
+    showToast('\uD83D\uDDD1 Guardia eliminada');
+  });
+}
+
+function eliminarGuardiaExtra(idx, btn) {
+  _pedirConfirmacion('extra_' + idx, btn, () => {
+    const extras = guardiasCambios._extra || [];
+    extras.splice(idx, 1);
+    guardiasCambios._extra = extras;
+    saveGuardias();
+    DIAS_GUARDIA = buildGuardiaSet();
+    renderGuardiaEditor(); renderJornada(); renderMesDatos(); renderLiquido();
+    showToast('\uD83D\uDDD1 Guardia eliminada');
+  });
 }
 
 function anadirGuardia() {
