@@ -5287,10 +5287,32 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
   // ── Comprobación fin de año ───────────────────────────────
   _comprobarFinDeAnio();
 
-  // Registro Service Worker (PWA)
+  // Registro Service Worker (PWA) con detección de actualizaciones y recarga automática.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        // Comprobar si hay versión nueva cada vez que se abre la app
+        reg.update();
+        // Cuando el SW nuevo termine de instalarse y quede "en espera", activarlo ya
+        reg.addEventListener('updatefound', () => {
+          const nuevo = reg.installing;
+          if (!nuevo) return;
+          nuevo.addEventListener('statechange', () => {
+            if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+              // Hay una versión nueva lista y ya había una app activa → forzar salto
+              nuevo.postMessage && nuevo.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+      }).catch(() => {});
+
+      // Cuando el SW que controla la página cambie, recargar una sola vez
+      let _recargando = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (_recargando) return;
+        _recargando = true;
+        location.reload();
+      });
     });
   }
 })();

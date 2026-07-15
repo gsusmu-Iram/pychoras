@@ -1,63 +1,72 @@
-// PycHoras Service Worker — caché offline + recepción de archivos compartidos
-const CACHE = 'pychoras-v2';
-const ASSETS = [
+// ⚠️  IMPORTANTE: sube ESTE número cada vez que subas un index.html nuevo.
+// Es lo que fuerza la actualización en todos los dispositivos. v2 → v3 → v4 …
+const CACHE_VERSION = 'pychoras-v2';
+
+const ARCHIVOS = [
   './',
   './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  './manifest.json'
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-    )).then(() => self.clients.claim())
+// Instalar: cachear los archivos base de la nueva versión
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_VERSION).then(cache => cache.addAll(ARCHIVOS).catch(() => {}))
   );
 });
 
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
+// Activar: borrar TODAS las cachés de versiones anteriores
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(nombres =>
+      Promise.all(
+        nombres
+          .filter(n => n !== CACHE_VERSION && n !== 'pychoras-shared')
+          .map(n => caches.delete(n))
+      )
+    ).then(() => self.clients.claim())
+  );
+});
 
-  // ── Recepción de archivo compartido (Web Share Target) ──
-  // Cuando el usuario comparte un PDF a PycHoras, Android hace POST a index.html.
-  if (e.request.method === 'POST' && url.pathname.endsWith('index.html')) {
-    e.respondWith((async () => {
-      try {
-        const formData = await e.request.formData();
-        const file = formData.get('hoja');
-        if (file) {
-          // Guardar el archivo en un cache temporal para que la app lo recoja
-          const tmp = await caches.open('pychoras-shared');
-          await tmp.put('shared-file', new Response(file, {
-            headers: {
-              'Content-Type': file.type || 'application/pdf',
-              'X-File-Name': encodeURIComponent(file.name || 'hoja.pdf')
-            }
-          }));
-        }
-      } catch (err) { /* si falla, abrimos la app igualmente */ }
-      // Redirigir a la app con una marca para que sepa que hay un archivo compartido
-      return Response.redirect('./index.html?compartido=1', 303);
-    })());
+// Mensaje desde la app: activar la versión nueva sin esperar
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Estrategia de red:
+// - HTML/JS (navegación y el propio index): NETWORK-FIRST → siempre intenta la
+//   versión fresca de GitHub; si no hay red, tira de caché. Esto evita que se
+//   quede pegada una versión vieja del index.html.
+// - Resto: cache-first para que funcione offline.
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
+  const esDocumento = req.mode === 'navigate' ||
+                      url.pathname.endsWith('/') ||
+                      url.pathname.endsWith('index.html');
+
+  if (esDocumento) {
+    event.respondWith(
+      fetch(req)
+        .then(resp => {
+          const copia = resp.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(req, copia).catch(() => {}));
+          return resp;
+        })
+        .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
+    );
     return;
   }
 
-  // ── Caché normal: cache-first con fallback a red ──
-  if (e.request.method === 'GET') {
-    e.respondWith(
-      caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
-        // Cachear nuevas respuestas GET del mismo origen
-        if (resp.ok && url.origin === location.origin) {
-          const copy = resp.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
-        }
-        return resp;
-      }).catch(() => caches.match('./index.html')))
-    );
-  }
+  event.respondWith(
+    caches.match(req).then(cache => cache || fetch(req).then(resp => {
+      const copia = resp.clone();
+      caches.open(CACHE_VERSION).then(c => c.put(req, copia).catch(() => {}));
+      return resp;
+    }).catch(() => cache))
+  );
 });
