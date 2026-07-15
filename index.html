@@ -5587,7 +5587,14 @@ async function _parsearPDFHoras(arrayBuffer) {
   const siMatch = fullText.match(/SALDO\s+INICIAL\s+(-?\d+[.,]\d{2})/i);
   if (siMatch) saldoInicial = parseFloat(siMatch[1].replace(',', '.'));
 
-  for (const ln of lineas) {
+  for (const lnRaw of lineas) {
+    // Normalizar: en algunos PDF (junio "encrypted") los caracteres vienen pegados,
+    // p.ej. "7:3019:2721:15" o "10,00-8,11". Insertar separadores para poder parsear.
+    const ln = lnRaw
+      .replace(/(\d{1,2}:\d{2})(?=\d)/g, '$1 ')          // separar hora pegada al siguiente número
+      .replace(/(:\d{2})(\d{1,2}:\d{2})/g, '$1 $2')      // por si quedan dos horas juntas
+      .replace(/(\d)(-?\d+[.,]\d{2})/g, '$1 $2')          // separar día/decimal pegados (10,00 → 1 0,00)
+      .replace(/\s+/g, ' ').trim();
     const md = ln.match(/^(\d{1,2})\b/);
     if (!md) continue;
     const dia = +md[1];
