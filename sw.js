@@ -1,6 +1,6 @@
 // ⚠️  IMPORTANTE: sube ESTE número cada vez que subas un index.html nuevo.
 // Es lo que fuerza la actualización en todos los dispositivos. v2 → v3 → v4 …
-const CACHE_VERSION = 'pychoras-v2';
+const CACHE_VERSION = 'pychoras-v3';
 
 const ARCHIVOS = [
   './',
