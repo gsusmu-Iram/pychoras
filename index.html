@@ -3057,7 +3057,7 @@ function renderTablaDatos() {
     let totalTxt='', extTxt='';
     if(cls==='fds'&&inf.mins===0) totalTxt='<span style="color:var(--text3);font-size:10px">FDS</span>';
     else if(cls==='fest'&&inf.mins===0) totalTxt='<span style="color:var(--purple);font-size:10px">FEST</span>';
-    else if(cls==='vac') totalTxt='<span style="color:#10b981;font-size:10px">VAC</span>';
+    else if(cls==='vac') totalTxt=`<span style="color:#10b981;font-size:10px;font-weight:700">VAC</span><span style="color:#10b981;font-size:10px;font-family:var(--mono);margin-left:3px">${m2hhmmFmt(inf.mins)}</span>`;
     else {
       totalTxt=`<span class="td total">${m2hhmmFmt(inf.mins)}</span>`;
       if(Math.abs(ext)>2) extTxt=`<span class="td-ext ${ext>0?'ext-pos':'ext-neg'}">${ext>0?'+':'\u2212'}${m2hm(Math.abs(ext))}</span>`;
@@ -5446,10 +5446,14 @@ function _parsearTextoHoras(text) {
   for (const rawLine of lines) {
     const line = rawLine.trim().replace(/\s+/g, ' ');
     if (!line) continue;
-    // Ignorar cabeceras y saldo inicial (incluyendo cuando OCR omite "INICIAL")
-    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO|DIA\s+DIETA|INSTALADOR|TÉCNICO/i.test(line)) {
+
+    // Solo omitir la línea SIGUIENTE para verdaderas cabeceras de bloque.
+    // PARCIAL / SALDO / TOTALES / VACAC: saltar solo la línea actual —
+    // la siguiente es un día real y no debe perderse.
+    if (/DIA\s+DIETA|INSTALADOR|TÉCNICO/i.test(line)) {
       saltarSiguiente = true; continue;
     }
+    if (/PARCIAL|TOTALE|SALDO|VACAC|COMPUTO/i.test(line)) { continue; }
     if (saltarSiguiente) { saltarSiguiente = false; continue; }
 
     const m0 = line.match(/^(\d{1,2})[\s,\.:]/);
@@ -5457,25 +5461,35 @@ function _parsearTextoHoras(text) {
     const day = parseInt(m0[1]);
     if (day < 1 || day > 31) continue;
 
-    // Validar que el día existe en el mes detectado
     if (mesIdx >= 0) {
       const dim = new Date(anio, mesIdx + 1, 0).getDate();
       if (day > dim) continue;
-      // Si el día es domingo (0) y la línea no tiene horas, muy probablemente es ruido
-      const dow = new Date(anio, mesIdx, day).getDay();
-      // No excluir — pueden trabajar domingos en guardia
     }
 
     const times = [...line.matchAll(/\b(\d{1,2}:\d{2})\b/g)]
       .map(m => m[1])
       .filter(t => { const [h,mm]=t.split(':').map(Number); return h<=23&&mm<=59; });
     if (!times.length) { if (!days[day]) days[day]={mins:0,totalStr:'0:00'}; continue; }
-    const totalStr = times[times.length - 1];
+
+    // El TOTAL de horas del día es el último tiempo ≥60 min (7:00, 8:10, 13:23…).
+    // Los valores menores (EXTRAS: 0:41, NOCT: 0:20…) quedan descartados.
+    // Para días de descanso/vacaciones con "0:00" o "5:13", si no hay ningún
+    // tiempo ≥60 min se toma el último disponible (puede ser 0:00 o 5:13).
+    const totalStr = times.slice().reverse().find(t => {
+      const [h,mm]=t.split(':').map(Number); return h*60+mm >= 60;
+    }) || times[times.length - 1];
+
     const [h, mm] = totalStr.split(':').map(Number);
-    if (!days[day] || days[day].mins < h*60+mm) {
-      days[day] = { mins: h*60+mm, totalStr,
+    const mins = h*60+mm;
+    const esEspecial = mins > 0 && mins < 9*60 && times.length === 1;
+    // FIN = hora de reloj inmediatamente anterior al TOTAL (cierre del último tramo).
+    // Robusto ante columnas EXTRAS/NOCT que van DESPUÉS del total (p.ej. día con guardia).
+    const idxTotal = times.lastIndexOf(totalStr);
+    const finReal = idxTotal > 0 ? times[idxTotal - 1] : null;
+    if (!days[day] || days[day].mins < mins) {
+      days[day] = { mins, totalStr, esEspecial: esEspecial||undefined,
         inicio: times[0]||null,
-        fin: times.length>2 ? times[times.length-2] : (times[1]||null) };
+        fin: finReal };
     }
   }
   return days;
@@ -5592,7 +5606,11 @@ async function _parsearPDFHoras(arrayBuffer) {
   }
 
   // Total oficial de horas del PDF (línea TOTALES ... HHH:MM)
-  const totalOficialMatch = fullText.match(/TOTALES?[^\n]*?(\d{3,4}:\d{2})/i);
+  // Total oficial: buscar primero en la misma línea; si no, cruzar saltos
+  // (en la hoja de gastos de junio "184:08" cae en una línea distinta a "TOTALES")
+  const totalOficialMatch =
+    fullText.match(/TOTALES?[^\n]*?(\d{3,4}:\d{2})/i) ||
+    fullText.match(/TOTALES?[\s\S]{0,400}?(\d{3,4}:\d{2})/i);
   if (totalOficialMatch) days._totalOficial = hm2min(totalOficialMatch[1]);
 
   // Gastos por día = bajada de saldo respecto al día anterior.
@@ -5617,6 +5635,18 @@ async function _parsearPDFHoras(arrayBuffer) {
     days._totIngresos = Math.round(totalIngresos * 100) / 100;
     days._saldoInicial = saldoInicial;
     days._saldoFinal = saldoPorDia[diasSaldo[diasSaldo.length - 1]];
+
+    // Mejor fuente: columna 12 del TOTALES (formato HOJA_GASTOS: col11=TOTAL personal).
+    // Más fiable que la suma de deltas cuando faltan días en saldoPorDia.
+    // Verificado: mayo col12 = 44,25 ✓  junio col12 = 18,14 ✓
+    const mTot = fullText.match(/TOTALES?[\s\S]{0,600}/i);
+    if (mTot) {
+      const decs = [...mTot[0].matchAll(/-?[\d]+[.,]\d{2}\b/g)]
+        .map(m => parseFloat(m[0].replace(',', '.')));
+      if (decs.length >= 12 && decs[11] >= 0 && decs[11] < 2000) {
+        days._totGastos = Math.round(decs[11] * 100) / 100;
+      }
+    }
   }
 
   const nDias = Object.values(days).filter(v => v && v.mins > 0).length;
