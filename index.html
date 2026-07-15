@@ -6565,18 +6565,24 @@ function _parsearHojaDiaria(txt) {
     gastos.push({ concepto: 'Comida', importe: parseFloat(comM[1].replace(',','.')) });
   }
 
-  // Parking, Peajes, Materiales, Otros — siempre registrar si > 0
+  // Parking, Peajes, Materiales, Otros — exigir € para no pillar horas como "Otros 15:33:15"
   [
-    [/PARKING\s+([\d.,]+)/i, 'Parking'],
-    [/PEAJES\s+([\d.,]+)/i, 'Peajes'],
-    [/MATERIALES\s+([\d.,]+)/i, 'Materiales'],
-    [/OTROS\s+([\d.,]+)/i, 'Otros'],
+    [/PARKING\s+([\d.,]+)\s*[€E]/i, 'Parking'],
+    [/PEAJES\s+([\d.,]+)\s*[€E]/i, 'Peajes'],
+    [/MATERIALES\s+([\d.,]+)\s*[€E]/i, 'Materiales'],
+    [/OTROS\s+([\d.,]+)\s*[€E]/i, 'Otros'],
   ].forEach(([re, nombre]) => {
     const m = txt.match(re);
     if (m && parseFloat(m[1].replace(',','.')) > 0) {
       gastos.push({ concepto: nombre, importe: parseFloat(m[1].replace(',','.')) });
     }
   });
+
+  // Lavado vehículo — solo si no es Tarjeta (gasto personal)
+  const lavM = txt.match(/LAV\.?\s*VEH[IÍ]CULO\s+([\d.,]+)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
+  if (lavM && parseFloat(lavM[1].replace(',','.')) > 0 && !lavM[2]) {
+    gastos.push({ concepto: 'Lavado vehículo', importe: parseFloat(lavM[1].replace(',','.')) });
+  }
 
   const inicio = inicioM ? inicioM[1] : '';
   const fin    = finM    ? finM[1]    : '';
