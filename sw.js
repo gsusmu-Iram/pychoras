@@ -1,5 +1,5 @@
 // ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v4 → v5 → v6 …
-const CACHE_VERSION = 'pychoras-v4';
+const CACHE_VERSION = 'pychoras-v5';
 
 // Solo cacheamos iconos/manifest (recursos que casi nunca cambian).
 // El index.html NUNCA se cachea: siempre se pide fresco a la red.
