@@ -5587,44 +5587,55 @@ async function _parsearPDFHoras(arrayBuffer) {
   const siMatch = fullText.match(/SALDO\s+INICIAL\s+(-?\d+[.,]\d{2})/i);
   if (siMatch) saldoInicial = parseFloat(siMatch[1].replace(',', '.'));
 
+  let diaSecuencial = 0;  // los días se listan SIEMPRE en orden 1..31
   for (const lnRaw of lineas) {
-    // Normalizar: en algunos PDF (junio "encrypted") los caracteres vienen pegados,
-    // p.ej. "7:3019:2721:15" o "10,00-8,11". Insertar separadores para poder parsear.
-    const ln = lnRaw
-      .replace(/(\d{1,2}:\d{2})(?=\d)/g, '$1 ')          // separar hora pegada al siguiente número
-      .replace(/(:\d{2})(\d{1,2}:\d{2})/g, '$1 $2')      // por si quedan dos horas juntas
-      .replace(/(\d)(-?\d+[.,]\d{2})/g, '$1 $2')          // separar día/decimal pegados (10,00 → 1 0,00)
+    // Normalización: separar todo lo pegado (pdf.js en junio "encrypted" pega los caracteres)
+    let ln = lnRaw
+      .replace(/(\d:\d{2})(?=\d)/g, '$1 ')                 // hora pegada a lo siguiente
+      .replace(/(:\d{2})(?=\d{1,2}:\d{2})/g, '$1 ')        // dos horas seguidas
+      .replace(/(:\d{2})(?=-?\d+[.,]\d{2})/g, '$1 ')       // hora pegada a decimal
+      .replace(/(-?\d+[.,]\d{2})(?=\d{1,2}:\d{2})/g, '$1 ')// decimal pegado a hora
+      .replace(/(-?\d+[.,]\d{2})(?=-?\d+[.,]\d{2})/g, '$1 ')// decimal pegado a decimal
       .replace(/\s+/g, ' ').trim();
-    const md = ln.match(/^(\d{1,2})\b/);
-    if (!md) continue;
-    const dia = +md[1];
+
+    // ¿Es una fila de día? Empieza por dígito y contiene al menos una hora H:MM.
+    if (!/^\d/.test(ln) || !/\d{1,2}:\d{2}/.test(ln)) continue;
+
+    // Día = siguiente en la secuencia (infalible ante el pegado del número).
+    // Se valida contra el primer dígito de la fila por si hay huecos.
+    diaSecuencial++;
+    let dia = diaSecuencial;
+    // Ajuste defensivo: si el primer token limpio es un día válido y coincide, mejor.
+    const mDiaLimpio = ln.match(/^(\d{1,2}) /);
+    if (mDiaLimpio && +mDiaLimpio[1] >= 1 && +mDiaLimpio[1] <= 31) {
+      dia = +mDiaLimpio[1]; diaSecuencial = dia;
+    }
     if (dia < 1 || dia > 31) continue;
 
-    // Capturar saldo del día: es el último número decimal antes de las horas.
-    // Quitamos las horas (H:MM) y tomamos el último decimal de la fila = saldo.
-    const sinHoras = ln.replace(/\d{1,2}:\d{2}/g, ' ');
-    const decimales = sinHoras.match(/-?\d+[.,]\d{2}/g);
+    const horas = ln.match(/\d{1,2}:\d{2}/g) || [];
+
+    // Saldo del día = último decimal que NO es una hora (antes de las columnas de horas).
+    const decimales = ln.replace(/\d{1,2}:\d{2}/g, ' ').match(/-?\d+[.,]\d{2}/g);
     if (decimales && decimales.length) {
       saldoPorDia[dia] = parseFloat(decimales[decimales.length - 1].replace(',', '.'));
     }
 
-    const horas = ln.match(/\d{1,2}:\d{2}/g);
-    if (!horas) continue;
+    if (!horas.length) continue;
     if (horas.length === 1 && horas[0] === '0:00') { if (days[dia] === undefined) days[dia] = { mins: 0, totalStr: '0:00' }; continue; }
 
-    // Reconstruir horas trabajadas desde pares inicio-fin (mañana + tarde)
+    // Reconstruir horas trabajadas desde pares inicio-fin (mañana + tarde + noche)
     const mins = horas.map(hm2min);
     let trabajado = 0, i = 0, inicio = null, fin = null;
     while (i + 1 < mins.length) {
       const ini = mins[i], f = mins[i + 1];
-      if (f > ini && (f - ini) < 18 * 60) { // tramo laboral plausible
+      if (f > ini && (f - ini) < 18 * 60) {
         trabajado += (f - ini);
         if (inicio === null) inicio = horas[i];
         fin = horas[i + 1];
         i += 2;
       } else break;
     }
-    // Día especial (vacaciones/formación): un solo valor suelto < 9h, sin tramos inicio-fin
+    // Día especial (vacaciones/formación): un solo valor suelto < 9h
     let esEspecial = false;
     if (trabajado === 0 && horas.length === 1 && mins[0] < 9 * 60) { trabajado = mins[0]; esEspecial = true; }
 

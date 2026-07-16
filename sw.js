@@ -1,21 +1,22 @@
-// ⚠️  IMPORTANTE: sube ESTE número cada vez que subas un index.html nuevo.
-// Es lo que fuerza la actualización en todos los dispositivos. v2 → v3 → v4 …
-const CACHE_VERSION = 'pychoras-v3';
+// ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v4 → v5 → v6 …
+const CACHE_VERSION = 'pychoras-v4';
 
-const ARCHIVOS = [
-  './',
-  './index.html',
-  './manifest.json'
+// Solo cacheamos iconos/manifest (recursos que casi nunca cambian).
+// El index.html NUNCA se cachea: siempre se pide fresco a la red.
+const ARCHIVOS_ESTATICOS = [
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-// Instalar: cachear los archivos base de la nueva versión
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(ARCHIVOS).catch(() => {}))
+    caches.open(CACHE_VERSION)
+      .then(cache => cache.addAll(ARCHIVOS_ESTATICOS).catch(() => {}))
   );
 });
 
-// Activar: borrar TODAS las cachés de versiones anteriores
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(nombres =>
@@ -28,45 +29,36 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Mensaje desde la app: activar la versión nueva sin esperar
 self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// Estrategia de red:
-// - HTML/JS (navegación y el propio index): NETWORK-FIRST → siempre intenta la
-//   versión fresca de GitHub; si no hay red, tira de caché. Esto evita que se
-//   quede pegada una versión vieja del index.html.
-// - Resto: cache-first para que funcione offline.
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  const esDocumento = req.mode === 'navigate' ||
-                      url.pathname.endsWith('/') ||
-                      url.pathname.endsWith('index.html');
+  const esDocumento =
+    req.mode === 'navigate' ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('index.html') ||
+    url.pathname.endsWith('.html');
 
+  // DOCUMENTO (index.html): SIEMPRE red, nunca caché. Solo cae a caché sin internet.
   if (esDocumento) {
     event.respondWith(
-      fetch(req)
-        .then(resp => {
-          const copia = resp.clone();
-          caches.open(CACHE_VERSION).then(c => c.put(req, copia).catch(() => {}));
-          return resp;
-        })
-        .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
+      fetch(req, { cache: 'no-store' })
+        .catch(() => caches.match('./index.html').then(r => r || caches.match('./')))
     );
     return;
   }
 
+  // Recursos estáticos: caché primero, red como respaldo.
   event.respondWith(
-    caches.match(req).then(cache => cache || fetch(req).then(resp => {
+    caches.match(req).then(hit => hit || fetch(req).then(resp => {
       const copia = resp.clone();
       caches.open(CACHE_VERSION).then(c => c.put(req, copia).catch(() => {}));
       return resp;
-    }).catch(() => cache))
+    }).catch(() => hit))
   );
 });
