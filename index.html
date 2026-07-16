@@ -5601,16 +5601,20 @@ async function _parsearPDFHoras(arrayBuffer) {
     // ¿Es una fila de día? Empieza por dígito y contiene al menos una hora H:MM.
     if (!/^\d/.test(ln) || !/\d{1,2}:\d{2}/.test(ln)) continue;
 
-    // Día = siguiente en la secuencia (infalible ante el pegado del número).
-    // Se valida contra el primer dígito de la fila por si hay huecos.
-    diaSecuencial++;
-    let dia = diaSecuencial;
-    // Ajuste defensivo: si el primer token limpio es un día válido y coincide, mejor.
-    const mDiaLimpio = ln.match(/^(\d{1,2}) /);
-    if (mDiaLimpio && +mDiaLimpio[1] >= 1 && +mDiaLimpio[1] <= 31) {
-      dia = +mDiaLimpio[1]; diaSecuencial = dia;
-    }
+    // Día = siguiente esperado en la secuencia. Pero el número real va pegado al inicio
+    // ("10,00…"=día 1, "283,83…"=día 2, "16150,…"=día 16). Desambiguamos leyendo 1 ó 2
+    // dígitos iniciales y quedándonos con el que coincide con el día esperado.
+    const esperado = diaSecuencial + 1;
+    const d1 = parseInt(ln.slice(0, 1), 10);
+    const d2 = parseInt(ln.slice(0, 2), 10);
+    let dia;
+    if (d2 === esperado && d2 >= 1 && d2 <= 31) dia = d2;
+    else if (d1 === esperado) dia = d1;
+    else if (esperado <= 31) dia = esperado;            // confiar en la secuencia
+    else if (d2 >= 1 && d2 <= 31) dia = d2;
+    else dia = d1;
     if (dia < 1 || dia > 31) continue;
+    diaSecuencial = dia;
 
     const horas = ln.match(/\d{1,2}:\d{2}/g) || [];
 
@@ -5645,13 +5649,19 @@ async function _parsearPDFHoras(arrayBuffer) {
     }
   }
 
-  // Total oficial de horas del PDF (línea TOTALES ... HHH:MM)
-  // Total oficial: buscar primero en la misma línea; si no, cruzar saltos
-  // (en la hoja de gastos de junio "184:08" cae en una línea distinta a "TOTALES")
-  const totalOficialMatch =
-    fullText.match(/TOTALES?[^\n]*?(\d{3,4}:\d{2})/i) ||
-    fullText.match(/TOTALES?[\s\S]{0,400}?(\d{3,4}:\d{2})/i);
-  if (totalOficialMatch) days._totalOficial = hm2min(totalOficialMatch[1]);
+  // Total oficial de horas del PDF (línea TOTALES ... HHH:MM).
+  // Puede venir pegado ("23,75184:08"): tomar los últimos 3 dígitos antes de ':' y
+  // validar que sea un total mensual plausible (100-320 h).
+  let totOf = null;
+  const zonaTot = (fullText.match(/TOTALES?[\s\S]{0,400}/i) || [''])[0];
+  const candidatos = [...zonaTot.matchAll(/(\d{2,4}):(\d{2})/g)];
+  for (const c of candidatos) {
+    let hh = parseInt(c[1], 10);
+    // Si son 4 dígitos pegados (5184), quedarnos con los 3 últimos (184)
+    if (c[1].length === 4) hh = parseInt(c[1].slice(1), 10);
+    if (hh >= 100 && hh <= 320) { totOf = hh * 60 + parseInt(c[2], 10); break; }
+  }
+  if (totOf !== null) days._totalOficial = totOf;
 
   // Gastos por día = bajada de saldo respecto al día anterior.
   // Si el saldo sube, es una aportación de fondos de la empresa (no un gasto).
