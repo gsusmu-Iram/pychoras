@@ -2433,8 +2433,16 @@ function exportarExcel() {
               inicio=tr[0].inicio; fin=tr[tr.length-1].fin;
               const pausaInline = tr.reduce((a,t)=>a+t.pausa,0);
               mins=totalTramos(tr);
-              if (pausaInline) {
-                comida=minsToHHMM(pausaInline); // pausa inline (-30min en tramos_txt)
+              // Hueco entre tramos (comida no marcada como pausa): p.ej. 14:00→15:00 en día partido.
+              // El Excel solo tiene Inicio/Fin/Comida, así que ese hueco se guarda como comida
+              // para que el TOTAL sobreviva a exportar+importar.
+              let huecoTramos = 0;
+              for (let k=0; k<tr.length-1; k++) {
+                const g = t2m(tr[k+1].inicio) - t2m(tr[k].fin);
+                if (g > 0) huecoTramos += g;
+              }
+              if (pausaInline || huecoTramos) {
+                comida=minsToHHMM(pausaInline + huecoTramos);
               } else if (o.pausa_min) {
                 comida=minsToHHMM(o.pausa_min); mins-=o.pausa_min;
               }
@@ -4638,6 +4646,7 @@ function irAMesDatos(m) {
 
 function abrirMesDetalle(m) {
   try {
+    window._mdMesAbierto = m;
     const y=cY_datos, st=mesStats(y,m), hoy=new Date();
     const esFuturo=(y===hoy.getFullYear()&&m>hoy.getMonth())||y>hoy.getFullYear();
     const compData=cargarCompHoras(y,m)||{};
@@ -5140,8 +5149,9 @@ function renderMesDetalleBody() {
       h+=`</div></div>`;
     }
 
-    // ── Botón cambiar PDF ─────────────────────────────────────
-    h+=`<div style="margin:10px 14px 0;display:flex;justify-content:flex-end">
+    // ── Botón cambiar PDF + copiar texto (depuración) ─────────
+    h+=`<div style="margin:10px 14px 0;display:flex;justify-content:flex-end;gap:8px">
+      ${compData._textoCompleto ? `<button onclick="_copiarTextoPDF()" style="font-size:11px;font-weight:700;color:var(--text3);cursor:pointer;padding:6px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">📋 Copiar texto PDF</button>` : ''}
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--text3);cursor:pointer;padding:6px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
         🔄 Cambiar PDF
         <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
@@ -5702,10 +5712,11 @@ async function _parsearPDFHoras(arrayBuffer) {
   const nDias = Object.values(days).filter(v => v && v.mins > 0).length;
   console.log('[PycHoras] PDF: ' + lineas.length + ' líneas, ' + nDias + ' días con horas',
     days._totalOficial ? '· Total oficial: ' + days._totalOficial + 'min' : '');
-  // Diagnóstico SIEMPRE: guardar muestra de las líneas reales que produjo pdf.js
+  // Diagnóstico SIEMPRE: guardar TODAS las líneas reales que produjo pdf.js (para depurar)
   days._numLineas = lineas.length;
   days._muestra = (lineas.slice(0, 8).join(' ⏎ ') || '(sin texto)').slice(0, 350);
   days._coords = _pdfDebugCoords.slice(0, 350);
+  days._textoCompleto = lineas.join('\n');   // texto íntegro para copiar
   if (nDias <= 1) {
     days._diagnostico = fullText.trim().length === 0
       ? 'No se pudo extraer texto del PDF.'
@@ -5713,6 +5724,39 @@ async function _parsearPDFHoras(arrayBuffer) {
   }
   return days;
 }
+let _textoPDFparaCopiar = '';
+function _copiarTextoPDF() {
+  const y = cY_datos, m = (window._mdMesAbierto != null ? window._mdMesAbierto : cM_datos);
+  const cd = cargarCompHoras(y, m) || {};
+  _textoPDFparaCopiar = cd._textoCompleto || '(no hay texto guardado)';
+  const ov = document.createElement('div');
+  ov.id = '_ovTextoPDF';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:14px;max-width:600px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden';
+  const head = document.createElement('div');
+  head.style.cssText = 'padding:12px 16px;font-weight:800;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center';
+  head.innerHTML = '<span>Texto del PDF (pdf.js)</span>';
+  const cerrar = document.createElement('span');
+  cerrar.textContent = '✕'; cerrar.style.cssText = 'cursor:pointer;font-size:20px;color:#888';
+  cerrar.onclick = () => ov.remove();
+  head.appendChild(cerrar);
+  const ta = document.createElement('textarea');
+  ta.readOnly = true; ta.value = _textoPDFparaCopiar;
+  ta.style.cssText = 'flex:1;min-height:300px;margin:0;padding:12px;border:none;font-family:monospace;font-size:11px;white-space:pre;overflow:auto;resize:none';
+  const btn = document.createElement('button');
+  btn.textContent = '📋 Copiar todo';
+  btn.style.cssText = 'margin:12px;padding:12px;background:#f97316;color:#fff;border:none;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer';
+  btn.onclick = () => {
+    ta.select();
+    if (navigator.clipboard) navigator.clipboard.writeText(_textoPDFparaCopiar).catch(()=>{});
+    try { document.execCommand('copy'); } catch(e){}
+    btn.textContent = '✓ Copiado';
+  };
+  box.appendChild(head); box.appendChild(ta); box.appendChild(btn);
+  ov.appendChild(box); document.body.appendChild(ov);
+}
+
 function _detectarMesPDF(nombre) {
   const n = nombre.toLowerCase();
   const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -6845,6 +6889,7 @@ function _guardarDesdeHoja(uid) {
   if (days._saldoFinal !== undefined)   merged._saldoFinal   = days._saldoFinal;
   if (days._ingresosDias) merged._ingresosDias = days._ingresosDias;
   if (days._totIngresos)  merged._totIngresos  = days._totIngresos;
+  if (days._textoCompleto) merged._textoCompleto = days._textoCompleto;
   const n = Object.keys(merged).filter(d => !d.startsWith('_') && merged[d].mins > 0).length;
   localStorage.setItem(_compHorasKey(y, m), JSON.stringify({ days: merged, guardada: new Date().toISOString() }));
   const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
