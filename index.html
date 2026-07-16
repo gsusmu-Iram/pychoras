@@ -2339,6 +2339,15 @@ function guardarConfig() {
 function exportarBackupCompleto() {
   const payload = { dat, cfg, nomina, guardiasCambios, exportado: new Date().toISOString() };
   try { payload.saldosEmp = JSON.parse(localStorage.getItem(KSE) || '{}'); } catch(e) {}
+  // Comparativas de empresa cargadas (pyc_comp_horas_AAAA_MM): para no perderlas al cambiar de móvil.
+  try {
+    const comp = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(KCH + '_') === 0) comp[k] = localStorage.getItem(k);
+    }
+    if (Object.keys(comp).length) payload.compHoras = comp;
+  } catch(e) {}
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url;
@@ -2358,6 +2367,11 @@ function importarBackupCompleto(input) {
       if (p.cfg) { cfg = { ...cfg, ...p.cfg }; saveCfg(); }
       if (p.nomina) { nomina = { ...nomina, ...p.nomina }; saveNomina(); }
       if (p.saldosEmp) localStorage.setItem(KSE, JSON.stringify(p.saldosEmp));
+      if (p.guardiasCambios) { guardiasCambios = p.guardiasCambios; try { saveGuardias(); } catch(_) {} }
+      // Restaurar comparativas de empresa por mes
+      if (p.compHoras) {
+        try { Object.keys(p.compHoras).forEach(k => { if (k.indexOf(KCH + '_') === 0) localStorage.setItem(k, p.compHoras[k]); }); } catch(_) {}
+      }
       renderAll(); showToast('✓ Backup cargado');
     } catch(err) { showToast('Error al leer el archivo'); }
   };
@@ -4658,9 +4672,18 @@ function abrirMesDetalle(m) {
     const empTotal=tieneComp?_calcEmpresaTotal(compData):null;
     const diff=empTotal!==null?st.tot-empTotal:null; // positivo = app>empresa = te pagan menos
 
-    const diffStr=diff===null?'—':diff===0?'0:00':(diff>0?'\u2212':'+')+ m2hm(Math.abs(diff));
+    // Diferencia clara: si es menos de 1h, mostrar en minutos ("−9 min") para que no
+    // se confunda con horas. Signo "−" = empresa registra menos (a tu favor pendiente).
+    let diffStr, diffSub;
+    if (diff === null) { diffStr = '—'; diffSub = ''; }
+    else if (diff === 0) { diffStr = '0 min'; diffSub = 'Cuadra exacto'; }
+    else {
+      const signo = diff > 0 ? '\u2212' : '+';
+      const abs = Math.abs(diff);
+      diffStr = abs < 60 ? (signo + abs + ' min') : (signo + m2hm(abs) + ' h');
+      diffSub = abs <= 5 ? 'Solo redondeo' : (diff > 0 ? 'Empresa te cuenta menos' : 'Empresa te cuenta más');
+    }
     const diffCol=diff===null?'#fb923c':Math.abs(diff)<5?'#4ade80':diff>0?'#f87171':'#fb923c';
-    const diffSub=diff===null?'':Math.abs(diff)<5?'Cuadra':'días con diff';
 
     document.getElementById('mesDetalleCards').innerHTML=
       _mdCard('Mi registro',m2hm(st.tot),(st.ext>=0?'+':'\u2212')+m2hm(Math.abs(st.ext))+' extras','#f97316')+
@@ -4823,13 +4846,18 @@ function renderMesDetalleBody() {
       const borderCol=sinDatos?'transparent':'#22c55e';
       const bgCol=sinDatos?'transparent':'rgba(34,197,94,0.03)';
 
-      h+=`<div class="mdt-row" style="padding:9px 14px;border-left:3px solid ${borderCol};background:${bgCol}">
+      // Si hay 2+ tramos, mostrar cada uno debajo (para ver el corte, p.ej. día con salida de guardia)
+      const detalleTramos = tr.length>1
+        ? `<div style="padding:0 14px 8px 65px;background:${bgCol}">${tr.map((t,i)=>`<div style="font-size:10px;font-family:var(--mono);color:#94a3b8">tramo ${i+1}: ${t.inicio}\u2013${t.fin}${t.pausa?' \u2212'+t.pausa+'min':''}</div>`).join('')}</div>`
+        : '';
+
+      h+=`<div class="mdt-row" style="padding:9px 14px 6px;border-left:3px solid ${borderCol};background:${bgCol}">
         <div style="width:48px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
         <span style="width:48px;font-size:12px;font-family:var(--mono);color:#374151">${inicio}</span>
-        <span style="width:48px;font-size:12px;font-family:var(--mono);color:#374151">${fin}</span>
+        <span style="width:48px;font-size:12px;font-family:var(--mono);color:#374151">${fin}${tr.length>1?'<span style="color:#f97316;font-weight:800">*</span>':''}</span>
         <span style="flex:1;text-align:center;font-size:12px;font-family:var(--mono);color:${pausa>0?'#f97316':'#cbd5e1'}">${pausaStr}</span>
         <span style="width:52px;text-align:right;font-size:13px;font-weight:700;font-family:var(--mono);color:${mins>0?'var(--acc)':'#cbd5e1'}">${mins>0?m2hm(mins):'—'}</span>
-      </div>`;
+      </div>${detalleTramos}`;
     }
     h+=`<div style="display:flex;align-items:center;padding:12px 14px;background:#f8fafc;border-top:2px solid #e2e8f0;border-left:3px solid var(--acc)">
       <span style="width:52px;font-size:11px;font-weight:900;color:#374151;text-transform:uppercase;letter-spacing:.05em">Total</span>
@@ -4965,6 +4993,8 @@ function renderMesDetalleBody() {
         const dIni=appIni-empIniM, dFin=appFinM-empFinM, dCom=appComida-empComida;
         if(Math.abs(dIni)<=2 && Math.abs(dFin)<=2 && Math.abs(dCom)>=1) causaComida=true;
       }
+      // Dato FINO del parte diario para el desfase de comida se evalúa más abajo (tras definir ok/diff).
+      const ci = o?.comidaInfo;
 
       // Colores:
       // Verde = coinciden (diff<=3)
@@ -4978,6 +5008,10 @@ function renderMesDetalleBody() {
 
       // Signo en convención "empresa me registra menos = −": app de más → −
       const signo = diff>0 ? '\u2212' : '+';
+
+      // Dato FINO del parte diario: la empresa cuenta la comida desde el fin del trayecto,
+      // no desde que empiezas a comer. Si el desfase explica (±3 min) la discrepancia, lo mostramos.
+      const desfaseComidaExplica = ci && ci.desfase && !ok && Math.abs(Math.abs(diff) - ci.desfase) <= 3;
 
       let borderCol, bg;
       if(ok || sinRegistro){
@@ -4994,7 +5028,7 @@ function renderMesDetalleBody() {
       // Etiqueta solo cuando supera el redondeo (>3 min)
       let etiqueta='';
       if(!ok && !sinRegistro){
-        if(causaComida){
+        if(desfaseComidaExplica || causaComida){
           etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(234,179,8,0.16);color:#a16207;border-radius:4px;padding:1px 5px;margin-left:4px">🍽 comida</span>`;
         } else if(diff>0){
           etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(192,57,43,0.12);color:#c0392b;border-radius:4px;padding:1px 5px;margin-left:4px">Verificar</span>`;
@@ -5017,7 +5051,7 @@ function renderMesDetalleBody() {
       const rowBg = ok ? 'rgba(34,197,94,0.06)' : sinRegistro ? 'transparent' : diff>0 ? 'rgba(192,57,43,0.05)' : 'rgba(211,84,0,0.05)';
       const rowBorder = ok ? '#22c55e' : sinRegistro ? 'transparent' : diff>0 ? '#c0392b' : '#d35400';
 
-      h+=`<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid ${rowBorder};background:${rowBg}">
+      h+=`<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:${(isLast && !desfaseComidaExplica)?'none':'1px solid #f1f5f9'};border-left:3px solid ${rowBorder};background:${rowBg}">
         <div style="width:52px"><span style="font-size:13px;font-weight:800;color:#1e293b">${d}</span> <span style="font-size:10px;color:#94a3b8">${dow}</span></div>
         <div style="flex:1;display:flex;align-items:center">
           <span style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--acc)">${appMin>0?m2hm(appMin):'—'}</span>
@@ -5026,6 +5060,20 @@ function renderMesDetalleBody() {
         <span style="flex:1;font-size:13px;font-weight:700;font-family:var(--mono);color:#374151">${empMin>0?m2hm(empMin):'—'}</span>
         <span style="width:80px;text-align:right">${diffStr}</span>
       </div>`;
+
+      // Sub-fila explicativa: la empresa cuenta la comida desde el fin del trayecto
+      if (desfaseComidaExplica) {
+        h+=`<div style="padding:8px 12px 10px 55px;border-bottom:${isLast?'none':'1px solid #f1f5f9'};border-left:3px solid ${rowBorder};background:rgba(234,179,8,0.07)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="font-size:12px">🍽</span>
+            <span style="font-size:11px;font-weight:800;color:#a16207">La comida empieza a contar antes</span>
+          </div>
+          <div style="font-size:10px;color:#78716c;line-height:1.5;font-family:var(--mono)">
+            Fin trayecto <b style="color:#a16207">${ci.finTrayecto}</b> → empiezas a comer <b style="color:#a16207">${ci.inicioComida}</b><br>
+            La empresa te cuenta esos <b style="color:#c0392b">${ci.desfase} min</b> como comida.
+          </div>
+        </div>`;
+      }
     }
     h+=`</div></div>`;
 
@@ -5344,24 +5392,41 @@ async function _recogerArchivoCompartido() {
     const tmp = await caches.open('pychoras-shared');
     const resp = await tmp.match('shared-file');
     if (!resp) return;
+    const blob = await resp.blob();
+    const nombre = decodeURIComponent(resp.headers.get('X-File-Name') || 'hoja.pdf');
     const file = new File([blob], nombre, { type: blob.type || 'application/pdf' });
     await tmp.delete('shared-file');                 // limpiar para no reprocesar
     history.replaceState(null, '', './index.html');  // quitar el ?compartido de la URL
 
-    // Enrutar por el NOMBRE del archivo (fiable y sin consumir el blob):
-    // parte diario = "..._DD-MM-AAAA.pdf" ; hoja mensual = "HOJA_GASTOS..." o similar.
-    const esParteDiario = /_\d{2}-\d{2}-\d{4}\.pdf$/i.test(nombre) ||
-                          /parte/i.test(nombre);
-    const esHojaMensual = /gastos|mensual|hoja[_\s]*gastos/i.test(nombre);
+    // Detectar tipo de PDF leyendo su texto: parte diario vs hoja mensual de empresa
+    let tipo = 'mensual';
+    try {
+      if ((file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) && _initPdfJs()) {
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
+        let txt = '';
+        const page = await pdf.getPage(1);
+        const content = await page.getTextContent();
+        txt = content.items.map(i => i.str).join(' ');
+        // Parte diario: tiene INICIO/FIN JORNADA. Hoja mensual: INSTALADOR + TOTALES
+        if (/INICIO JORNADA|FIN JORNADA/i.test(txt) && !/INSTALADOR/i.test(txt)) tipo = 'parte';
+        // Reconstruir el File porque arrayBuffer lo consumió
+      }
+    } catch(_) {}
 
-    if (esHojaMensual && !esParteDiario) {
+    const file2 = new File([blob], nombre, { type: blob.type || 'application/pdf' });
+
+    if (tipo === 'parte') {
+      // Parte diario → procesarlo en el chat como jornada
+      showToast('\ud83d\udcc4 Procesando parte diario\u2026');
+      if (typeof showModule === 'function') showModule('chat');
+      await procesarHojaDia({ files: [file2], value: '' });
+    } else {
+      // Hoja mensual → comparativa en Datos
+      showToast('\ud83d\udcc4 Procesando hoja de empresa\u2026');
       if (typeof showModule === 'function') showModule('datos');
       _mdTab = 'comp';
-      await cargarHojaEmpresa({ files: [file], value: '' });
-    } else {
-      // Por defecto y para partes: al chat. procesarHojaDia auto-detecta el contenido.
-      if (typeof showModule === 'function') showModule('chat');
-      await procesarHojaDia({ files: [file], value: '' });
+      await cargarHojaEmpresa({ files: [file2], value: '' });
     }
   } catch (e) { /* si falla, el usuario puede subirlo a mano */ }
 }
@@ -5628,6 +5693,39 @@ async function _parsearPDFHoras(arrayBuffer) {
       }
       if (totGas !== null) days._totGastos = Math.round(totGas * 100) / 100;
 
+      // ── Saldo, ingresos y saldo inicial/final (formato transpuesto) ──
+      // Fila SALDO: valores del día 31→1 (misma orientación que los totales) + saldo inicial suelto.
+      // La detectamos como la línea con más decimales que NO es la de gastos-total (tiene negativos y repes).
+      const siM = fullText.match(/SALDO\s*INICIAL[\s\S]{0,40}?(-?\d+[.,]\d{2})/i);
+      if (siM) days._saldoInicial = parseFloat(siM[1].replace(',', '.'));
+      // Buscar la fila de saldos diaria: muchos decimales, con valores repetidos y/o negativos.
+      let filaSaldo = null, mejorSaldoN = 0;
+      for (const ln of lineas) {
+        const arr = (ln.trim().match(/-?\d+[.,]\d{2}/g) || []).map(x => parseFloat(x.replace(',', '.')));
+        const esGastoTotal = arr.length && arr.filter(x => x === 0).length >= arr.length / 2;
+        if (arr.length >= 15 && !esGastoTotal && arr.length > mejorSaldoN) { mejorSaldoN = arr.length; filaSaldo = arr; }
+      }
+      if (filaSaldo) {
+        // Asignar saldo por día (31→1) y detectar ingresos como subidas bruscas de saldo.
+        const NS = filaSaldo.length;
+        const saldoDia = {};
+        for (let i = 0; i < NS; i++) { const dia = NS - i; if (dia >= 1 && dia <= 31) saldoDia[dia] = filaSaldo[i]; }
+        // Ingresos: fila FONDOS/PROV (valores como 50,00). Buscar "50,00" u otros positivos grandes aislados.
+        const ingresos = {}; let totIng = 0;
+        const dias = Object.keys(saldoDia).map(Number).sort((a, b) => a - b);
+        let prev = (days._saldoInicial != null) ? days._saldoInicial : null;
+        for (const d of dias) {
+          if (prev !== null) {
+            const delta = saldoDia[d] - prev; // subida de saldo = ingreso de fondos
+            if (delta > 5) { ingresos[d] = Math.round(delta * 100) / 100; totIng += ingresos[d]; }
+          }
+          prev = saldoDia[d];
+        }
+        days._ingresosDias = ingresos;
+        days._totIngresos = Math.round(totIng * 100) / 100;
+        days._saldoFinal = saldoDia[dias[dias.length - 1]];
+      }
+
       days._transpuesto = true;
       // Nº de días con horas
       const nT = Object.keys(days).filter(d => !d.startsWith('_') && days[d].mins > 0).length;
@@ -5766,10 +5864,15 @@ async function _parsearPDFHoras(arrayBuffer) {
   days._muestra = (lineas.slice(0, 8).join(' ⏎ ') || '(sin texto)').slice(0, 350);
   days._coords = _pdfDebugCoords.slice(0, 350);
   days._textoCompleto = lineas.join('\n');   // texto íntegro para copiar
-  if (nDias <= 1) {
+  // Aviso de formato no reconocido: un mes normal tiene ~18-23 días laborables.
+  // Si se reconocen muy pocos, es probable un formato nuevo de PDF → avisar, no fallar en silencio.
+  if (nDias === 0) {
     days._diagnostico = fullText.trim().length === 0
-      ? 'No se pudo extraer texto del PDF.'
-      : 'Leído pero solo ' + nDias + ' día reconocido. Revisa la muestra.';
+      ? 'No se pudo extraer texto del PDF. Puede estar escaneado o protegido.'
+      : 'No se reconoció ningún día. Formato de PDF no visto antes — usa "Copiar texto PDF" y pásalo para ajustarlo.';
+  } else if (nDias < 5) {
+    days._diagnostico = 'Solo se reconocieron ' + nDias + ' días (un mes suele tener ~20). '
+      + 'Puede ser un formato de PDF distinto. Revisa la tabla; si falta información, usa "Copiar texto PDF".';
   }
   return days;
 }
@@ -6007,16 +6110,17 @@ async function cargarHojaEmpresa(input) {
     const diasConHoras = Object.keys(days).filter(d => days[d].mins > 0);
     const n = diasConHoras.length;
 
-    if (n === 0 || (isPDF && n <= 2)) {
+    if (n === 0 || (isPDF && n < 5)) {
       const diag = days._diagnostico || ('Solo ' + n + ' día(s) reconocido(s).');
       const muestra = days._muestra || '';
       const numL = days._numLineas != null ? days._numLineas : '?';
+      _textoPDFparaCopiar = days._textoCompleto || '';
       if (body) body.innerHTML = `<div style="padding:40px 20px;text-align:center">
         <div style="font-size:32px;margin-bottom:12px">⚠️</div>
         <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:8px">${n === 0 ? 'No se detectaron días' : 'Pocos días detectados (' + n + ')'}</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">${isPDF ? 'Diagnóstico de lectura del PDF:' : 'Prueba con una imagen más nítida o en horizontal.'}</div>
-        ${isPDF && diag ? `<div style="font-size:11px;color:var(--acc);margin-bottom:8px;font-weight:700">${diag}</div>` : ''}
-        ${isPDF ? `<div style="font-size:9px;color:var(--text2);background:var(--bg);border-radius:8px;padding:10px;margin-bottom:16px;text-align:left;font-family:var(--mono);word-break:break-word;line-height:1.5">Líneas: ${numL}<br><br>LÍNEAS:<br>${muestra || '(vacío)'}<br><br>COORDS x,y:str:<br>${(days._coords || '(sin coords)')}</div>` : ''}
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">${isPDF ? 'Puede ser un formato de PDF distinto:' : 'Prueba con una imagen más nítida o en horizontal.'}</div>
+        ${isPDF && diag ? `<div style="font-size:11px;color:var(--acc);margin-bottom:12px;font-weight:700">${diag}</div>` : ''}
+        ${isPDF ? `<button onclick="_copiarTextoPDF()" style="display:inline-block;background:#0f172a;color:white;border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px">📋 Copiar texto PDF (para diagnóstico)</button><br>` : ''}
         <label style="display:inline-flex;align-items:center;gap:8px;background:var(--acc);color:white;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer">
           Intentar con otro archivo
           <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="cargarHojaEmpresaDetalle(this)">
@@ -6712,6 +6816,22 @@ function _parsearHojaDiaria(txt) {
   const comidaM = txt.match(/Tiempo Comida\s+([\d.]+)\s*hrs/i);
   const comidaMins = comidaM ? Math.round(parseFloat(comidaM[1]) * 60) : 0;
 
+  // ── Desfase de comida: la empresa cuenta la comida desde el FIN del último trayecto
+  // antes de comer, no desde que empiezas a comer. En el parte, la fila COMIDA trae su
+  // HORA INICIO justo antes de la palabra "COMIDA", y el fin del trayecto anterior una hora antes.
+  let comidaInfo = null;
+  const idxComida = txt.search(/COMIDA(?!S)/i);
+  if (idxComida > 0) {
+    const antes = txt.slice(0, idxComida);
+    const horasAntes = antes.match(/\d{1,2}:\d{2}(?::\d{2})?/g);
+    if (horasAntes && horasAntes.length >= 2) {
+      const inicioComida = horasAntes[horasAntes.length - 1].slice(0, 5); // última = inicio comida
+      const finTrayecto  = horasAntes[horasAntes.length - 2].slice(0, 5); // penúltima = fin trayecto
+      const gap = t2m(inicioComida) - t2m(finTrayecto);
+      if (gap > 0 && gap < 90) comidaInfo = { finTrayecto, inicioComida, desfase: gap };
+    }
+  }
+
   // Total horas (ya descontadas por la empresa)
   const totalM = txt.match(/Horas Totales\s+([\d.]+)\s*hrs/i);
   let mins = 0;
@@ -6776,7 +6896,7 @@ function _parsearHojaDiaria(txt) {
     minsFinales = Math.max(0, t2m(fin) - t2m(inicioReal) - comidaMins);
   }
 
-  return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, gastos, totalStr: m2hm(minsFinales) };
+  return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, comidaInfo, gastos, totalStr: m2hm(minsFinales) };
 }
 
 
@@ -6840,6 +6960,7 @@ function _persistirHoja(confirm, data, o, tramoNuevo, sumar) {
   if (sumar && o.tramos_txt) tramoFinal = o.tramos_txt + ', ' + tramoNuevo;
   const primerGasto = gastos[0];
   sD(anio, mes, dia, { ...o, tipo:'laboral', tramos_txt:tramoFinal,
+    comidaInfo: data.comidaInfo || o.comidaInfo || null,
     gasto: primerGasto ? primerGasto.importe : (o.gasto||0),
     concepto: primerGasto ? primerGasto.concepto : (o.concepto||'') });
   const totalMins = totalTramos(parsearTramos(tramoFinal));
