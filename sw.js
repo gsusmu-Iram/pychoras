@@ -1,91 +1,84 @@
-// ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v5 → v6 → v7 …
-const CACHE_VERSION = 'pychoras-v5';
-
-// Solo cacheamos iconos/manifest. El index.html NUNCA se cachea (siempre red).
-const ARCHIVOS_ESTATICOS = [
+// PycHoras Service Worker — caché + recepción de archivos compartidos + auto-update
+// ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v6 → v7 → v8 …
+const CACHE = 'pychoras-v6';
+const ASSETS = [
+  './',
+  './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
 ];
 
-self.addEventListener('install', event => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(ARCHIVOS_ESTATICOS).catch(() => {}))
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(()=>{})).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(k => k !== CACHE && k !== 'pychoras-shared').map(k => caches.delete(k))
+    )).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(nombres =>
-      Promise.all(
-        nombres
-          .filter(n => n !== CACHE_VERSION && n !== 'pychoras-shared')
-          .map(n => caches.delete(n))
-      )
-    ).then(() => self.clients.claim())
-  );
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
-});
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
 
-self.addEventListener('fetch', event => {
-  const req = event.request;
-  const url = new URL(req.url);
-
-  // ── WEB SHARE TARGET ──────────────────────────────────────────
-  // Cuando compartes una hoja diaria a PycHoras, Android envía un POST con el
-  // archivo. GitHub Pages rechaza los POST con "405 Not Allowed", así que el SW
-  // TIENE que interceptarlo aquí: guarda el PDF en caché y redirige a la app.
-  // (Se detecta por método POST hacia una ruta de esta app, no por URL exacta.)
-  if (req.method === 'POST' && url.origin === self.location.origin) {
-    event.respondWith((async () => {
+  // ── Recepción de archivo compartido (Web Share Target) ──
+  // Cuando el usuario comparte un PDF a PycHoras, Android hace POST. GitHub Pages
+  // lo rechazaría con "405 Not Allowed", así que el SW DEBE interceptarlo aquí.
+  // Aceptamos el POST a cualquier ruta de la app (raíz o index.html) por robustez.
+  if (e.request.method === 'POST' && url.origin === self.location.origin) {
+    e.respondWith((async () => {
       try {
-        const formData = await req.formData();
-        // Buscar el primer archivo en cualquier campo del formulario
-        let file = null;
-        for (const value of formData.values()) {
-          if (value instanceof File) { file = value; break; }
+        const formData = await e.request.formData();
+        // El campo se llama 'hoja' (manifest), pero por si acaso buscamos cualquier File.
+        let file = formData.get('hoja');
+        if (!(file instanceof File)) {
+          for (const v of formData.values()) { if (v instanceof File) { file = v; break; } }
         }
         if (file) {
-          const cache = await caches.open('pychoras-shared');
-          const headers = new Headers();
-          headers.set('Content-Type', file.type || 'application/pdf');
-          headers.set('X-File-Name', encodeURIComponent(file.name || 'hoja.pdf'));
-          await cache.put('shared-file', new Response(file, { headers }));
+          const tmp = await caches.open('pychoras-shared');
+          await tmp.put('shared-file', new Response(file, {
+            headers: {
+              'Content-Type': file.type || 'application/pdf',
+              'X-File-Name': encodeURIComponent(file.name || 'hoja.pdf')
+            }
+          }));
         }
-      } catch (e) { /* si algo falla, igualmente redirigimos a la app */ }
-      // Redirigir a la app con la marca ?compartido=1 (la app recoge el archivo del caché)
+      } catch (err) { /* si falla, abrimos la app igualmente */ }
       return Response.redirect('./index.html?compartido=1', 303);
     })());
     return;
   }
 
-  if (req.method !== 'GET') return;
+  if (e.request.method !== 'GET') return;
 
-  const esDocumento =
-    req.mode === 'navigate' ||
-    url.pathname.endsWith('/') ||
-    url.pathname.endsWith('index.html') ||
-    url.pathname.endsWith('.html');
-
-  // DOCUMENTO (index.html): SIEMPRE red, nunca caché. Solo cae a caché sin internet.
-  if (esDocumento) {
-    event.respondWith(
-      fetch(req, { cache: 'no-store' })
+  // ── index.html / navegación: SIEMPRE red fresca (evita quedarse pegado en versión vieja) ──
+  const esDoc = e.request.mode === 'navigate' ||
+                url.pathname.endsWith('/') ||
+                url.pathname.endsWith('index.html') ||
+                url.pathname.endsWith('.html');
+  if (esDoc) {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' })
         .catch(() => caches.match('./index.html').then(r => r || caches.match('./')))
     );
     return;
   }
 
-  // Recursos estáticos: caché primero, red como respaldo.
-  event.respondWith(
-    caches.match(req).then(hit => hit || fetch(req).then(resp => {
-      const copia = resp.clone();
-      caches.open(CACHE_VERSION).then(c => c.put(req, copia).catch(() => {}));
+  // ── Resto (iconos, manifest): cache-first con fallback a red ──
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+      if (resp.ok && url.origin === location.origin) {
+        const copy = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy).catch(()=>{}));
+      }
       return resp;
-    }).catch(() => hit))
+    }).catch(() => caches.match('./index.html')))
   );
 });
