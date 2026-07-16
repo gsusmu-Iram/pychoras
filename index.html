@@ -5344,41 +5344,24 @@ async function _recogerArchivoCompartido() {
     const tmp = await caches.open('pychoras-shared');
     const resp = await tmp.match('shared-file');
     if (!resp) return;
-    const blob = await resp.blob();
-    const nombre = decodeURIComponent(resp.headers.get('X-File-Name') || 'hoja.pdf');
     const file = new File([blob], nombre, { type: blob.type || 'application/pdf' });
     await tmp.delete('shared-file');                 // limpiar para no reprocesar
     history.replaceState(null, '', './index.html');  // quitar el ?compartido de la URL
 
-    // Detectar tipo de PDF leyendo su texto: parte diario vs hoja mensual de empresa
-    let tipo = 'mensual';
-    try {
-      if ((file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) && _initPdfJs()) {
-        const buf = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
-        let txt = '';
-        const page = await pdf.getPage(1);
-        const content = await page.getTextContent();
-        txt = content.items.map(i => i.str).join(' ');
-        // Parte diario: tiene INICIO/FIN JORNADA. Hoja mensual: INSTALADOR + TOTALES
-        if (/INICIO JORNADA|FIN JORNADA/i.test(txt) && !/INSTALADOR/i.test(txt)) tipo = 'parte';
-        // Reconstruir el File porque arrayBuffer lo consumió
-      }
-    } catch(_) {}
+    // Enrutar por el NOMBRE del archivo (fiable y sin consumir el blob):
+    // parte diario = "..._DD-MM-AAAA.pdf" ; hoja mensual = "HOJA_GASTOS..." o similar.
+    const esParteDiario = /_\d{2}-\d{2}-\d{4}\.pdf$/i.test(nombre) ||
+                          /parte/i.test(nombre);
+    const esHojaMensual = /gastos|mensual|hoja[_\s]*gastos/i.test(nombre);
 
-    const file2 = new File([blob], nombre, { type: blob.type || 'application/pdf' });
-
-    if (tipo === 'parte') {
-      // Parte diario → procesarlo en el chat como jornada
-      showToast('\ud83d\udcc4 Procesando parte diario\u2026');
-      if (typeof showModule === 'function') showModule('chat');
-      await procesarHojaDia({ files: [file2], value: '' });
-    } else {
-      // Hoja mensual → comparativa en Datos
-      showToast('\ud83d\udcc4 Procesando hoja de empresa\u2026');
+    if (esHojaMensual && !esParteDiario) {
       if (typeof showModule === 'function') showModule('datos');
       _mdTab = 'comp';
-      await cargarHojaEmpresa({ files: [file2], value: '' });
+      await cargarHojaEmpresa({ files: [file], value: '' });
+    } else {
+      // Por defecto y para partes: al chat. procesarHojaDia auto-detecta el contenido.
+      if (typeof showModule === 'function') showModule('chat');
+      await procesarHojaDia({ files: [file], value: '' });
     }
   } catch (e) { /* si falla, el usuario puede subirlo a mano */ }
 }
