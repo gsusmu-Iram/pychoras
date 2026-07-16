@@ -1228,7 +1228,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build VAC-16jul</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -1265,7 +1265,7 @@ const KCH = 'pyc_comp_horas'; // prefix: KCH_2026_03
 const KCN = 'pyc_comp_nom';   // prefix: KCN_2026_03
 
 let dat = {};
-let cfg = { precioH: 13.94, precioNoct: 1.652, guardia: 180, festivo: 70, convenio: 162, vacDias: 31, vacMinDia: 314, prorrata: 275.98 };
+let cfg = { precioH: 13.94, precioNoct: 1.652, guardia: 180, festivo: 70, convenio: 162, vacDias: 31, vacMinDia: 313, prorrata: 275.98 };
 let nomina = { salario: 1495.86, antiguedad: 135.10, beneficios: 137.99, transporte: 137.81, vestuario: 73.60, complemento: 24.92, prima: 1.92, irpf: 17.50, nocturnidad: 0 };
 let guardiasCambios = {};
 let frasesCustom = {};
