@@ -4863,7 +4863,8 @@ function renderMesDetalleBody() {
       if(tipo==='fds'||tipo==='fest') continue;
       const tr=parsearTramos(o?.tramos_txt||'');
       const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
-      const appMin=totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0);
+      const vacM=(cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60));
+      const appMin=tipo==='vac' ? vacM : (tipo==='ausencia' ? 0 : totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0));
       const empDay=compData[d];
       const empRegistra=!!empDay&&empDay.mins>0;
       const empMin=empRegistra?empDay.mins:0;
@@ -4945,7 +4946,8 @@ function renderMesDetalleBody() {
 
       const tr=parsearTramos(o?.tramos_txt||'');
       const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
-      const appMin=totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0);
+      const vacM=(cfg.vacMinDia || Math.round(cfg.convenio / cfg.vacDias * 60));
+      const appMin=tipo==='vac' ? vacM : (tipo==='ausencia' ? 0 : totalTramos(tr)-(o?.pausa_min&&!pausaInline?o.pausa_min:0));
       const empRegistra=!!empDay && empDay.mins>0;
       const empMin=empRegistra?empDay.mins:0;
       const diff=appMin-empMin;
