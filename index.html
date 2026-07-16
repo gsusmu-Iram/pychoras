@@ -5593,6 +5593,66 @@ async function _parsearPDFHoras(arrayBuffer) {
   const saldoPorDia = {};  // día -> saldo al final de ese día
   let saldoInicial = null;
 
+  // ── FORMATO TRANSPUESTO (pdf.js lee por columnas) ──────────────
+  // En este PDF, pdf.js devuelve la tabla girada: los TOTALES de cada día vienen
+  // todos en una misma línea, en orden 31→1. La detectamos y la parseamos aparte.
+  // Firma: una línea con muchos H:MM (>=15) y que contiene "EXTRAS" o va tras "TOTAL".
+  {
+    // Total oficial: línea/token HHH:MM con horas 100-320
+    let totOfMin = null;
+    const mTot = fullText.match(/\b(\d{3}):(\d{2})\b/g);
+    if (mTot) {
+      for (const t of mTot) { const h = +t.split(':')[0]; if (h >= 100 && h <= 320) { totOfMin = hm2min(t); break; } }
+    }
+    // Buscar la línea con la ristra de totales diarios (la que tiene más H:MM sueltos)
+    let mejor = null, mejorN = 0;
+    for (const ln of lineas) {
+      const hs = ln.match(/\b\d{1,2}:\d{2}\b/g) || [];
+      // descartar líneas de inicio/fin (esas tienen horas de reloj tipo 7:30, 15:04…)
+      // la de totales incluye 0:00 y valores < 8h variados y suele ser la más larga
+      if (hs.length > mejorN) { mejorN = hs.length; mejor = hs; }
+    }
+    if (mejor && mejorN >= 15) {
+      // Los valores van del día (N) al día 1. N = nº de valores.
+      const N = mejor.length;
+      for (let i = 0; i < N; i++) {
+        const dia = N - i;               // primer valor = día más alto
+        if (dia < 1 || dia > 31) continue;
+        const v = mejor[i];
+        const mins = hm2min(v);
+        // Solo asignar días con horas > 0 como trabajados; 0:00 = descanso
+        days[dia] = { mins, totalStr: v, especial: (mins > 0 && mins < 6 * 60) || undefined };
+      }
+      if (totOfMin !== null) days._totalOficial = totOfMin;
+
+      // Gastos del mes: en la fila de TOTAL de conceptos, el primer valor es el total.
+      // Buscamos una línea que empiece por decimal y tenga muchos ceros (fila TOTAL girada).
+      let totGas = null;
+      for (const ln of lineas) {
+        const decs = ln.trim().match(/^-?\d+[.,]\d{2}(\s+-?\d+[.,]\d{2}){10,}/);
+        if (decs) {
+          const arr = ln.trim().split(/\s+/).map(x => parseFloat(x.replace(',', '.'))).filter(x => !isNaN(x));
+          // La fila de gastos-total tiene el total al principio y muchos 0,00
+          const ceros = arr.filter(x => x === 0).length;
+          if (arr.length >= 12 && ceros >= arr.length / 2 && arr[0] >= 0 && arr[0] < 2000) { totGas = arr[0]; break; }
+        }
+      }
+      if (totGas !== null) days._totGastos = Math.round(totGas * 100) / 100;
+
+      days._transpuesto = true;
+      // Nº de días con horas
+      const nT = Object.keys(days).filter(d => !d.startsWith('_') && days[d].mins > 0).length;
+      if (nT >= 10) {
+        days._numLineas = lineas.length;
+        days._textoCompleto = lineas.join('\n');
+        return days;
+      } else {
+        // no era transpuesto fiable: limpiar y seguir con el parser normal
+        for (const k of Object.keys(days)) delete days[k];
+      }
+    }
+  }
+
   // Saldo inicial de la hoja
   const siMatch = fullText.match(/SALDO\s+INICIAL\s+(-?\d+[.,]\d{2})/i);
   if (siMatch) saldoInicial = parseFloat(siMatch[1].replace(',', '.'));
