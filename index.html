@@ -122,6 +122,8 @@ body{
 .chat-msgs::-webkit-scrollbar{width:2px;}
 .chat-msgs::-webkit-scrollbar-thumb{background:var(--border2);}
 .msg{max-width:86%;display:flex;flex-direction:column;gap:3px;}
+.msg:has(.hoja-confirm){max-width:100%;width:100%;align-self:stretch;}
+.msg:has(.hoja-confirm) .bubble{padding:0;background:transparent;border:none;box-shadow:none;}
 .msg.bot{align-self:flex-start;}
 .msg.user{align-self:flex-end;}
 .bubble{padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.58;}
@@ -139,9 +141,13 @@ body{
 .chat-input:focus{border-color:rgba(249,115,22,0.4);}
 .hoja-btn{width:42px;height:42px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s;font-size:19px;line-height:1;}
 .hoja-btn:active{transform:scale(.92);background:rgba(255,255,255,0.14);}
-.hoja-confirm{background:white;border-radius:12px;padding:12px 14px;margin:4px 0;box-shadow:var(--sh-card);}
-.hoja-confirm-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.hoja-confirm{background:white;border-radius:14px;padding:16px 16px;margin:6px 0;box-shadow:var(--sh-card);width:100%;box-sizing:border-box;}
+.hoja-confirm-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:14px;}
 .hoja-confirm-row:last-child{border-bottom:none;}
+.hoja-btn-ok{width:100%;padding:15px;background:var(--acc);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px var(--acc-lt);transition:transform .12s,filter .12s;}
+.hoja-btn-ok:active{transform:scale(.98);filter:brightness(.94);}
+.hoja-btn-cancel{padding:13px;background:var(--acc-lt);color:var(--acc-dk);border:1.5px solid var(--acc-mid);border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;transition:transform .12s;}
+.hoja-btn-cancel:active{transform:scale(.97);}
 .send-btn{width:42px;height:42px;background:var(--acc);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(249,115,22,0.35);flex-shrink:0;transition:all .15s;}
 .send-btn:active{transform:scale(.92);box-shadow:0 2px 6px rgba(249,115,22,0.2);}
 .send-btn svg{width:18px;height:18px;stroke:white;fill:none;stroke-width:2.3;}
