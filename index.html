@@ -3445,8 +3445,12 @@ const FRASES_DEFAULT = {
 
   // PROACTIVO: POCAS EXTRAS
   pocasExtras: [
-    ctx => `😌 Este mes vas tranquilo — solo ${ctx.mesExtStr} de diferencia`,
-    ctx => `Mes relajado de horas 😌 ${ctx.mesExtStr} de balance`,
+    ctx => (ctx.mesExt < 0)
+      ? `Este mes vas un pelín por debajo del convenio (${ctx.mesExtStr}) — se recupera 😉`
+      : `😌 Este mes vas tranquilo — solo ${ctx.mesExtStr} de extra`,
+    ctx => (ctx.mesExt < 0)
+      ? `Aún debes alguna hora este mes (${ctx.mesExtStr}), sin prisa`
+      : `Mes relajado de horas 😌 ${ctx.mesExtStr} de balance`,
     'Este mes vas bastante tranquilo de horas 😌'
   ],
 
@@ -6838,6 +6842,58 @@ function _parsearHojaDiaria(txt) {
     }
   }
 
+  // ── Datos para las frases personales de Iram ──
+  const infoParte = { operario: null, cliente: null, nClientes: 0, comidaLugar: null,
+                      kmMax: 0, totalKm: 0, traysLargos: 0, destinoLargo: null,
+                      finReal: finM ? finM[1] : null, comidaGap: null };
+  // Operario (cabecera del parte)
+  const opM = txt.match(/Operario\s+([A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+){1,3})/);
+  if (opM) infoParte.operario = opM[1].trim().replace(/\s+/g, ' ');
+  // Cliente(s): el que más se repite = principal del día
+  const clientesM = txt.match(/CLIENTE:\s*(.+?)(?=\s+(?:TRAYECTO|CLIENTE|COMIDA|ASUNTOS|FIN|INICIO)|$)/gi);
+  if (clientesM && clientesM.length) {
+    const cuenta = {};
+    clientesM.forEach(c => {
+      let nom = c.replace(/CLIENTE:\s*/i, '').trim().replace(/\s+/g, ' ')
+                 .replace(/[,;:]+$/, '').replace(/\s*\d{1,2}:\d{2}(?::\d{2})?$/, '').trim();
+      if (nom && nom.length > 2 && nom.length < 40) cuenta[nom] = (cuenta[nom] || 0) + 1;
+    });
+    const orden = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a]);
+    infoParte.nClientes = orden.length;
+    if (orden.length) infoParte.cliente = orden[0];
+  }
+  // Sitio de comida
+  const mComidaLugar = txt.match(/COMIDA:\s*([^0-9\n]+?)(?=\s+\d{1,2}:\d{2}|\s+\d+\.\d+|$)/i);
+  if (mComidaLugar) infoParte.comidaLugar = mComidaLugar[1].trim().replace(/\s+/g, ' ').replace(/[,;]+$/, '');
+  // Trayectos: km por trayecto (total, máximo, cuántos largos, destino del más largo)
+  const traysM = [...txt.matchAll(/TRAYECTO:\s*[^\n]*?->\s*([^\n0-9]+?)\s+(?:\d{1,2}:\d{2}:\d{2}\s+)?(\d{2,4})\b/gi)];
+  traysM.forEach(t => {
+    const km = parseInt(t[2]);
+    if (km > 0 && km < 2000) {
+      infoParte.totalKm += km;
+      if (km >= 50) infoParte.traysLargos++;
+      if (km > infoParte.kmMax) { infoParte.kmMax = km; infoParte.destinoLargo = t[1].trim().replace(/\s+/g, ' '); }
+    }
+  });
+  // Último destino del día (para detectar que acabas en la oficina)
+  const destinos = [...txt.matchAll(/->\s*([^\n0-9]+?)\s+\d{1,2}:\d{2}/gi)];
+  if (destinos.length) infoParte.ultimoDestino = destinos[destinos.length - 1][1].trim().replace(/\s+/g, ' ');
+  // Huecos de comida (antes de empezar a comer / después de comer)
+  if (comidaInfo) {
+    const gap = { antes: comidaInfo.desfase || 0, despues: 0 };
+    // después: fin de comida → inicio de la siguiente actividad (2 primeras horas tras COMIDA)
+    if (idxComida > 0) {
+      const despues = txt.slice(idxComida);
+      const hDesp = despues.match(/\d{1,2}:\d{2}(?::\d{2})?/g);
+      if (hDesp && hDesp.length >= 2) {
+        const finComida = hDesp[0].slice(0, 5), inicioSig = hDesp[1].slice(0, 5);
+        const g = t2m(inicioSig) - t2m(finComida);
+        if (g > 0 && g < 90) gap.despues = g;
+      }
+    }
+    infoParte.comidaGap = gap;
+  }
+
   // Total horas (ya descontadas por la empresa)
   const totalM = txt.match(/Horas Totales\s+([\d.]+)\s*hrs/i);
   let mins = 0;
@@ -6902,7 +6958,7 @@ function _parsearHojaDiaria(txt) {
     minsFinales = Math.max(0, t2m(fin) - t2m(inicioReal) - comidaMins);
   }
 
-  return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, comidaInfo, gastos, totalStr: m2hm(minsFinales) };
+  return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, comidaInfo, infoParte, gastos, totalStr: m2hm(minsFinales) };
 }
 
 
@@ -6960,6 +7016,150 @@ function _guardarHojaNode(btn, sumar) {
   } catch(e) { console.error(e); }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  FRASES CON CHISPA DE IRAM  ·  fácil de ampliar
+//  Salen al GUARDAR el parte (el día ya acabó → todo en PASADO).
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── 1) Apodos por operario (editar/añadir libremente) ──
+//     Clave = trozo del nombre que aparece en el parte (en minúsculas, sin tildes).
+//     Valor = apodo, o array de apodos que van ALTERNANDO al azar.
+//     Si el operario no está aquí → se usa su nombre de pila tal cual, sin apodo.
+const IRAM_APODOS = {
+  'jesus munoz':     'Jes',
+  'francisco morales': ['Paco', 'Paquito'],
+  'francisco moreno':  'Fran',
+  'antonio martinez':  'Toni',
+};
+
+function _apodoOperario(nombreCompleto) {
+  if (!nombreCompleto) return '';
+  const norm = nombreCompleto.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+  // Buscar coincidencia por "nombre apellido" contenido en la clave
+  for (const clave in IRAM_APODOS) {
+    if (norm.indexOf(clave) === 0 || norm.indexOf(' ' + clave) >= 0 || norm.indexOf(clave) >= 0) {
+      const v = IRAM_APODOS[clave];
+      return Array.isArray(v) ? v[Math.floor(Math.random() * v.length)] : v;
+    }
+  }
+  // No está en el diccionario → nombre de pila a secas
+  return nombreCompleto.trim().split(/\s+/)[0];
+}
+
+// ── 2) Reglas de frase. Cada una: cuándo aplica (test) y qué frases puede decir (frases).
+//     ctx = { nombre, totalMins, ip, m2hm }  ·  ip = infoParte del día.
+//     Para AÑADIR una situación nueva: copia un bloque { test, frases } y edítalo.
+//     Todas las frases en PASADO (el día ya terminó).
+const IRAM_REGLAS = [
+  { // Desfase de comida: la empresa cuenta comida antes/después de lo que comes
+    test: c => c.ip.comidaGap && (c.ip.comidaGap.antes >= 4 || c.ip.comidaGap.despues >= 4),
+    frases: c => {
+      const g = c.ip.comidaGap, tot = (g.antes||0) + (g.despues||0);
+      const out = [];
+      if (g.antes >= 4)   out.push(`Ojo ${c.nombre} 👀 hoy te quitan más comida: paraste ${g.antes} min antes de comer de verdad`);
+      if (g.despues >= 4) out.push(`${c.nombre}, acabaste de comer y tardaste ${g.despues} min en arrancar 🍽 eso te lo cuentan de comida`);
+      if (tot >= 6)       out.push(`Hoy el bocadillo te sale caro 😅 la empresa te cuenta ${tot} min más de comida de los que comiste`);
+      return out;
+    }
+  },
+  { // Te marearon con las rutas: muchos km y varios trayectos largos
+    test: c => c.ip.totalKm >= 200 && c.ip.traysLargos >= 2,
+    frases: c => [
+      `Madre mía ${c.nombre}, cómo te ha mareado hoy el coordinador 🗺️ ${c.ip.totalKm} km de un lado a otro`,
+      `${c.ip.totalKm} km dando bandazos hoy... el de las rutas se ha lucido 🚗💨`,
+      `De un cliente a otro cruzando media provincia, ${c.nombre}. Planificación de 10 👏😏`,
+    ]
+  },
+  { // Un solo viaje largo (sin culpar a nadie)
+    test: c => c.ip.kmMax >= 90 && c.ip.traysLargos <= 1,
+    frases: c => [
+      `Menuda paliza hasta ${c.ip.destinoLargo} hoy 🚗 ${c.ip.kmMax} km te has hecho, ${c.nombre}`,
+      `Vaya día de carretera te has pegado, ${c.nombre} 🛣️`,
+    ]
+  },
+  { // Día entero en un mismo cliente → posible instalación (sin nombrar acompañante)
+    test: c => c.ip.cliente && c.ip.nClientes === 1 && c.totalMins >= 7 * 60,
+    frases: c => [
+      `Día entero en ${c.ip.cliente} 🔧 ¿instalación con el compañero?`,
+      `Todo el día en el mismo sitio, ${c.nombre}. Eso huele a montaje gordo 💪`,
+    ]
+  },
+  { // Cliente repetido varios días seguidos
+    test: c => c.racha >= 3,
+    frases: c => [
+      `Otra vez en ${c.ip.cliente} 😜 ya te lo sabes de memoria, ${c.nombre}`,
+      `${c.racha} días seguidos en ${c.ip.cliente}, ya te queda poco 💪`,
+      `Llevas ${c.racha} días en ${c.ip.cliente} 🔁 ¿te dan ya de comer gratis?`,
+    ]
+  },
+  { // Comida en un sitio con nombre
+    test: c => c.ip.comidaLugar && c.ip.comidaLugar.length > 3,
+    frases: c => {
+      const lugar = c.ip.comidaLugar.replace(/^(en|el|la)\s+/i, '');
+      return [`Has comido en ${lugar}, buen sitio 😋`, `${lugar} para comer hoy 🍽 apuntado, ${c.nombre}`];
+    }
+  },
+  { // Jornada maratón
+    test: c => c.totalMins >= 12 * 60,
+    frases: c => [
+      `${c.m2hm(c.totalMins)} clavadas hoy 😮‍💨 día de los largos... a descansar, ${c.nombre}`,
+      `Vaya jornadón, ${c.m2hm(c.totalMins)} 💪 eso hay que celebrarlo`,
+    ]
+  },
+  { // Acabar tarde
+    test: c => c.ip.finReal && t2m(c.ip.finReal) >= 20 * 60,
+    frases: c => [`Vaya horas de acabar hoy (${c.ip.finReal}) 🌙 día completo, ${c.nombre}`]
+  },
+  { // Día corto
+    test: c => c.totalMins > 0 && c.totalMins <= 7 * 60,
+    frases: c => [`Día corto hoy (${c.m2hm(c.totalMins)}) 😌 no está mal de vez en cuando, ${c.nombre}`]
+  },
+  { // Viernes + acabas pronto en la oficina → cervecita
+    test: c => new Date(c.anio, c.mes, c.dia).getDay() === 5
+            && c.ip.ultimoDestino && /oficina/i.test(c.ip.ultimoDestino)
+            && c.ip.finReal && t2m(c.ip.finReal) < 15 * 60 + 30,
+    frases: c => [
+      `Viernes y a la oficina antes de las 3:30 🍺 hoy cerveza y bravas, ${c.nombre} 😋`,
+      `Bien ${c.nombre} 🍺 viernes finiquitado prontito... ¡bravas merecidas! 😋`,
+    ]
+  },
+  { // Viernes normal (no acabó pronto en oficina) — no se pisa con la de cerveza
+    test: c => new Date(c.anio, c.mes, c.dia).getDay() === 5
+            && !(c.ip.ultimoDestino && /oficina/i.test(c.ip.ultimoDestino) && c.ip.finReal && t2m(c.ip.finReal) < 15 * 60 + 30),
+    frases: c => [`Viernes 🎉 jornada guardada y el finde a la vista, ${c.nombre}`]
+  },
+];
+
+function _fraseIram(data, totalMins) {
+  const ip = data.infoParte || {};
+  const nombre = _apodoOperario(ip.operario) || 'crack';
+
+  // Racha de cliente: días laborables seguidos con el mismo cliente
+  let racha = 0;
+  if (ip.cliente) {
+    racha = 1;
+    const d = new Date(data.anio, data.mes, data.dia);
+    for (let i = 0; i < 6 && racha < 6; i++) {
+      d.setDate(d.getDate() - 1);
+      if (d.getDay() === 0 || d.getDay() === 6) continue;
+      const od = gD(d.getFullYear(), d.getMonth(), d.getDate());
+      if (od && od.infoParte && od.infoParte.cliente === ip.cliente) racha++;
+      else break;
+    }
+  }
+
+  const ctx = { nombre, totalMins, ip, racha, dia: data.dia, mes: data.mes, anio: data.anio, m2hm };
+
+  // Reunir TODAS las frases de las reglas que aplican y elegir una al azar
+  const pool = [];
+  for (const regla of IRAM_REGLAS) {
+    try { if (regla.test(ctx)) pool.push(...regla.frases(ctx)); } catch(_) {}
+  }
+  if (!pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function _persistirHoja(confirm, data, o, tramoNuevo, sumar) {
   const { dia, mes, anio, gastos } = data;
   let tramoFinal = tramoNuevo;
@@ -6967,10 +7167,10 @@ function _persistirHoja(confirm, data, o, tramoNuevo, sumar) {
   const primerGasto = gastos[0];
   sD(anio, mes, dia, { ...o, tipo:'laboral', tramos_txt:tramoFinal,
     comidaInfo: data.comidaInfo || o.comidaInfo || null,
+    infoParte: data.infoParte || o.infoParte || null,
     gasto: primerGasto ? primerGasto.importe : (o.gasto||0),
     concepto: primerGasto ? primerGasto.concepto : (o.concepto||'') });
   const totalMins = totalTramos(parsearTramos(tramoFinal));
-  const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const wrap = confirm.parentElement;
   if (wrap) {
     wrap.innerHTML = `<div style="color:var(--green);font-size:13px;font-weight:700">\u2713 Jornada del ${dia} ${MESES_C[mes]} guardada \u00b7 ${m2hm(totalMins)}${sumar ? ' (sumada)' : ''}</div>`;
@@ -6980,6 +7180,16 @@ function _persistirHoja(confirm, data, o, tramoNuevo, sumar) {
   }
   showToast('\u2713 Jornada guardada');
   renderJornada();
+
+  // Frase con chispa de Iram — ocasional (no siempre), para que no canse
+  try {
+    if (Math.random() < 0.6) {
+      const frase = _fraseIram(data, totalMins);
+      if (frase && typeof addMsg === 'function') {
+        setTimeout(() => { addMsg('bot', frase); if (typeof saveMsgs === 'function') saveMsgs(); }, 700);
+      }
+    }
+  } catch(_) {}
 }
 
 function _cancelarHojaNode(btn) {
