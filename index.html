@@ -7060,6 +7060,8 @@ const IRAM_REGLAS = [
       if (g.antes >= 4)   out.push(`Ojo ${c.nombre} 👀 hoy te quitan más comida: paraste ${g.antes} min antes de comer de verdad`);
       if (g.despues >= 4) out.push(`${c.nombre}, acabaste de comer y tardaste ${g.despues} min en arrancar 🍽 eso te lo cuentan de comida`);
       if (tot >= 6)       out.push(`Hoy el bocadillo te sale caro 😅 la empresa te cuenta ${tot} min más de comida de los que comiste`);
+      out.push(`${c.nombre}, la comida te la han recortado ${tot} min otra vez 🤨`);
+      out.push(`Ojo con el reloj de la comida, ${c.nombre}, hoy no cuadra`);
       return out;
     }
   },
@@ -7069,6 +7071,7 @@ const IRAM_REGLAS = [
       `Madre mía ${c.nombre}, cómo te ha mareado hoy el coordinador 🗺️ ${c.ip.totalKm} km de un lado a otro`,
       `${c.ip.totalKm} km dando bandazos hoy... el de las rutas se ha lucido 🚗💨`,
       `De un cliente a otro cruzando media provincia, ${c.nombre}. Planificación de 10 👏😏`,
+      `Hoy has hecho más kilómetros que un taxista, ${c.nombre} 🚕`,
     ]
   },
   { // Un solo viaje largo (sin culpar a nadie)
@@ -7076,6 +7079,8 @@ const IRAM_REGLAS = [
     frases: c => [
       `Menuda paliza hasta ${c.ip.destinoLargo} hoy 🚗 ${c.ip.kmMax} km te has hecho, ${c.nombre}`,
       `Vaya día de carretera te has pegado, ${c.nombre} 🛣️`,
+      `${c.ip.kmMax} km del tirón hasta ${c.ip.destinoLargo}, menudo viajecito 🛣️`,
+      `${c.nombre}, hoy tocaba carretera y manta hasta ${c.ip.destinoLargo}`,
     ]
   },
   { // Día entero en un mismo cliente → posible instalación (sin nombrar acompañante)
@@ -7083,21 +7088,32 @@ const IRAM_REGLAS = [
     frases: c => [
       `Día entero en ${c.ip.cliente} 🔧 ¿instalación con el compañero?`,
       `Todo el día en el mismo sitio, ${c.nombre}. Eso huele a montaje gordo 💪`,
+      `${c.nombre} desaparecido todo el día en ${c.ip.cliente} 🔧 algo gordo se está montando`,
+      `Ni rastro de ti en todo el día, ${c.nombre}, ¿sigues en ${c.ip.cliente}?`,
     ]
   },
   { // Cliente repetido varios días seguidos
     test: c => c.racha >= 3,
     frases: c => [
-      `Otra vez en ${c.ip.cliente} 😜 ya te lo sabes de memoria, ${c.nombre}`,
+      `Otra vez en ${c.ip.cliente} 😜 ¿te lo sabrás ya de memoria, ${c.nombre}?`,
       `${c.racha} días seguidos en ${c.ip.cliente}, ya te queda poco 💪`,
-      `Llevas ${c.racha} días en ${c.ip.cliente} 🔁 ¿te dan ya de comer gratis?`,
+      `¿Otra vez por ${c.ip.cliente}, ${c.nombre}? Ya casi tienes taquilla propia 🗄️`,
+      `${c.racha} días en ${c.ip.cliente}... como sigas así te hacen fijo ahí 😅`,
+      `${c.nombre}, en ${c.ip.cliente} otra vez 👀 esto ya es una relación seria`,
+      `Vaya fidelidad con ${c.ip.cliente}, ${c.racha} días ya 🔁`,
+      `${c.ip.cliente} otra vez, ${c.nombre} 😜 al final te van a poner en la nómina de ellos`,
     ]
   },
   { // Comida en un sitio con nombre
     test: c => c.ip.comidaLugar && c.ip.comidaLugar.length > 3,
     frases: c => {
       const lugar = c.ip.comidaLugar.replace(/^(en|el|la)\s+/i, '');
-      return [`Has comido en ${lugar}, buen sitio 😋`, `${lugar} para comer hoy 🍽 apuntado, ${c.nombre}`];
+      return [
+        `Has comido en ${lugar}, buen sitio 😋`,
+        `${lugar} para comer hoy 🍽 apuntado, ${c.nombre}`,
+        `${lugar}, buena elección para comer, ${c.nombre} 👌`,
+        `Hoy tocaba ${lugar}, se nota que sabes elegir 😋`,
+      ];
     }
   },
   { // Jornada maratón
@@ -7105,15 +7121,25 @@ const IRAM_REGLAS = [
     frases: c => [
       `${c.m2hm(c.totalMins)} clavadas hoy 😮‍💨 día de los largos... a descansar, ${c.nombre}`,
       `Vaya jornadón, ${c.m2hm(c.totalMins)} 💪 eso hay que celebrarlo`,
+      `${c.m2hm(c.totalMins)} de curro hoy, ${c.nombre} 😮‍💨 ya puedes fichar récord`,
+      `Menuda machada hoy, ${c.m2hm(c.totalMins)}... descansa, ${c.nombre}`,
     ]
   },
   { // Acabar tarde
     test: c => c.ip.finReal && t2m(c.ip.finReal) >= 20 * 60,
-    frases: c => [`Vaya horas de acabar hoy (${c.ip.finReal}) 🌙 día completo, ${c.nombre}`]
+    frases: c => [
+      `Vaya horas de acabar hoy (${c.ip.finReal}) 🌙 día completo, ${c.nombre}`,
+      `${c.nombre} saliendo a las ${c.ip.finReal} 🌙 vaya día se te ha hecho largo`,
+      `Todavía currando a las ${c.ip.finReal}, ${c.nombre}... a casa ya 🏠`,
+    ]
   },
   { // Día corto
     test: c => c.totalMins > 0 && c.totalMins <= 7 * 60,
-    frases: c => [`Día corto hoy (${c.m2hm(c.totalMins)}) 😌 no está mal de vez en cuando, ${c.nombre}`]
+    frases: c => [
+      `Día corto hoy (${c.m2hm(c.totalMins)}) 😌 no está mal de vez en cuando, ${c.nombre}`,
+      `Hoy jornada suave, ${c.m2hm(c.totalMins)} y a otra cosa 😌`,
+      `Poquito curro hoy, ${c.nombre}, disfrútalo`,
+    ]
   },
   { // Viernes + acabas pronto en la oficina → cervecita
     test: c => new Date(c.anio, c.mes, c.dia).getDay() === 5
@@ -7122,12 +7148,18 @@ const IRAM_REGLAS = [
     frases: c => [
       `Viernes y a la oficina antes de las 3:30 🍺 hoy cerveza y bravas, ${c.nombre} 😋`,
       `Bien ${c.nombre} 🍺 viernes finiquitado prontito... ¡bravas merecidas! 😋`,
+      `${c.nombre}, viernes y ya en la oficina antes de tiempo... ¡a por las bravas! 🍺`,
+      `Modo finde activado pronto, ${c.nombre} 🍻`,
     ]
   },
   { // Viernes normal (no acabó pronto en oficina) — no se pisa con la de cerveza
     test: c => new Date(c.anio, c.mes, c.dia).getDay() === 5
             && !(c.ip.ultimoDestino && /oficina/i.test(c.ip.ultimoDestino) && c.ip.finReal && t2m(c.ip.finReal) < 15 * 60 + 30),
-    frases: c => [`Viernes 🎉 jornada guardada y el finde a la vista, ${c.nombre}`]
+    frases: c => [
+      `Viernes 🎉 jornada guardada y el finde a la vista, ${c.nombre}`,
+      `Último día de la semana, ${c.nombre} 💪 ya casi está`,
+      `Viernes cumplido, ${c.nombre}, el finde ya huele cerca 😌`,
+    ]
   },
 ];
 
