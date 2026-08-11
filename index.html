@@ -6910,14 +6910,15 @@ function _parsearHojaDiaria(txt) {
   // Gastos — excluir gasolina y comidas con tarjeta empresa
   let gastos = [];
 
-  // Gasolina: solo registrar si NO pone "Tarjeta"
-  const gasoM = txt.match(/GASOLINA\s+([\d.,]+)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
+  // Gasolina: solo registrar si NO pone "Tarjeta". (?!:) evita capturar una hora
+  // pegada tipo "GASOLINA 18:00" (falso positivo con la hora de fin de jornada).
+  const gasoM = txt.match(/GASOLINA\s+([\d.,]+)(?!\s*:)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
   if (gasoM && parseFloat(gasoM[1].replace(',','.')) > 0 && !gasoM[2]) {
     gastos.push({ concepto: 'Gasolina', importe: parseFloat(gasoM[1].replace(',','.')) });
   }
 
-  // Comidas: solo registrar si NO pone "Tarjeta"
-  const comM = txt.match(/COMIDAS\s+([\d.,]+)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
+  // Comidas: solo registrar si NO pone "Tarjeta". Mismo resguardo contra horas pegadas.
+  const comM = txt.match(/COMIDAS\s+([\d.,]+)(?!\s*:)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
   if (comM && parseFloat(comM[1].replace(',','.')) > 0 && !comM[2]) {
     gastos.push({ concepto: 'Comida', importe: parseFloat(comM[1].replace(',','.')) });
   }
@@ -6935,8 +6936,8 @@ function _parsearHojaDiaria(txt) {
     }
   });
 
-  // Lavado vehículo — solo si no es Tarjeta (gasto personal)
-  const lavM = txt.match(/LAV\.?\s*VEH[IÍ]CULO\s+([\d.,]+)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
+  // Lavado vehículo — solo si no es Tarjeta (gasto personal). Mismo resguardo contra horas pegadas.
+  const lavM = txt.match(/LAV\.?\s*VEH[IÍ]CULO\s+([\d.,]+)(?!\s*:)\s*[€E]?\s*[-–]?\s*(Tarjeta)?/i);
   if (lavM && parseFloat(lavM[1].replace(',','.')) > 0 && !lavM[2]) {
     gastos.push({ concepto: 'Lavado vehículo', importe: parseFloat(lavM[1].replace(',','.')) });
   }
