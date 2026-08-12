@@ -5116,17 +5116,21 @@ function renderMesDetalleBody() {
     </div>`;
 
     // ── Saldo de la cartilla: continuidad e ingresos de fondos ──
-    const sIni = compData._saldoInicial;
     const sFin = compData._saldoFinal;
     const totIngresos = compData._totIngresos || 0;
     const ingDias = compData._ingresosDias || {};
-    if (sIni !== undefined && sFin !== undefined) {
-      // Saldo final del mes anterior (para verificar continuidad)
-      const pm = m === 0 ? 11 : m - 1;
-      const py = m === 0 ? y - 1 : y;
-      const prevComp = cargarCompHoras(py, pm);
-      const sFinPrev = prevComp && prevComp._saldoFinal !== undefined ? prevComp._saldoFinal : null;
-      const continua = sFinPrev !== null ? Math.abs(sFinPrev - sIni) < 0.02 : null;
+    // Saldo final del mes anterior (para verificar continuidad y como respaldo del inicial)
+    const pm = m === 0 ? 11 : m - 1;
+    const py = m === 0 ? y - 1 : y;
+    const prevComp = cargarCompHoras(py, pm);
+    const sFinPrev = prevComp && prevComp._saldoFinal !== undefined ? prevComp._saldoFinal : null;
+    // El formato transpuesto (Adobe Sign) no imprime "SALDO INICIAL" como valor suelto;
+    // en ese caso deducimos el inicial del saldo final del mes anterior.
+    const sIniDetectado = compData._saldoInicial;
+    const sIni = sIniDetectado !== undefined ? sIniDetectado : sFinPrev;
+    const sIniEsInferido = sIniDetectado === undefined && sFinPrev !== null;
+    if (sIni !== undefined && sIni !== null && sFin !== undefined) {
+      const continua = sIniEsInferido ? true : (sFinPrev !== null ? Math.abs(sFinPrev - sIni) < 0.02 : null);
 
       h+=`<div style="margin:0 14px;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px">Saldo de la cartilla</div>`;
       h+=`<div style="margin:0 14px 10px;background:white;border-radius:12px;box-shadow:var(--sh-card);overflow:hidden">`;
@@ -5135,7 +5139,7 @@ function renderMesDetalleBody() {
         <span style="font-size:12px;color:#374151">Saldo inicial</span>
         <span style="display:flex;align-items:center;gap:6px">
           <span style="font-size:14px;font-weight:800;font-family:var(--mono);color:#1e293b">${sIni.toFixed(2)}\u20ac</span>
-          ${continua === true ? '<span style="font-size:9px;color:var(--green);font-weight:800">✓ enlaza</span>' : continua === false ? `<span style="font-size:9px;color:var(--red);font-weight:800">⚠ ${MESES[pm].slice(0,3)} acabó en ${sFinPrev.toFixed(2)}\u20ac</span>` : `<span style="font-size:9px;color:#94a3b8">sin ${MESES[pm].slice(0,3)}</span>`}
+          ${sIniEsInferido ? `<span style="font-size:9px;color:#94a3b8;font-weight:800">≈ estimado de ${MESES[pm].slice(0,3)}</span>` : continua === true ? '<span style="font-size:9px;color:var(--green);font-weight:800">✓ enlaza</span>' : continua === false ? `<span style="font-size:9px;color:var(--red);font-weight:800">⚠ ${MESES[pm].slice(0,3)} acabó en ${sFinPrev.toFixed(2)}\u20ac</span>` : `<span style="font-size:9px;color:#94a3b8">sin ${MESES[pm].slice(0,3)}</span>`}
         </span>
       </div>`;
       // Ingresos de fondos
@@ -5711,11 +5715,18 @@ async function _parsearPDFHoras(arrayBuffer) {
       const siM = fullText.match(/SALDO\s*INICIAL[\s\S]{0,40}?(-?\d+[.,]\d{2})/i);
       if (siM) days._saldoInicial = parseFloat(siM[1].replace(',', '.'));
       // Buscar la fila de saldos diaria: muchos decimales, con valores repetidos y/o negativos.
-      let filaSaldo = null, mejorSaldoN = 0;
-      for (const ln of lineas) {
+      let filaSaldo = null, mejorSaldoN = 0, filaSaldoIdx = -1;
+      for (let li = 0; li < lineas.length; li++) {
+        const ln = lineas[li];
         const arr = (ln.trim().match(/-?\d+[.,]\d{2}/g) || []).map(x => parseFloat(x.replace(',', '.')));
         const esGastoTotal = arr.length && arr.filter(x => x === 0).length >= arr.length / 2;
-        if (arr.length >= 15 && !esGastoTotal && arr.length > mejorSaldoN) { mejorSaldoN = arr.length; filaSaldo = arr; }
+        if (arr.length >= 15 && !esGastoTotal && arr.length > mejorSaldoN) { mejorSaldoN = arr.length; filaSaldo = arr; filaSaldoIdx = li; }
+      }
+      // Algunos meses traen el saldo inicial suelto en su propia línea justo tras la fila SALDO
+      // (celda aparte en el PDF). Si aparece, es más fiable que estimarlo del mes anterior.
+      if (!siM && filaSaldoIdx >= 0 && lineas[filaSaldoIdx + 1]) {
+        const suelto = lineas[filaSaldoIdx + 1].trim().match(/^-?\d+[.,]\d{2}$/);
+        if (suelto) days._saldoInicial = parseFloat(suelto[0].replace(',', '.'));
       }
       if (filaSaldo) {
         // Asignar saldo por día (31→1) y detectar ingresos como subidas bruscas de saldo.
