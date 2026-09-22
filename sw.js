@@ -1,6 +1,6 @@
 // PycHoras Service Worker — caché + recepción de archivos compartidos + auto-update
 // ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v6 → v7 → v8 …
-const CACHE = 'pychoras-v6';
+const CACHE = 'pychoras-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -41,8 +41,11 @@ self.addEventListener('fetch', e => {
         if (!(file instanceof File)) {
           for (const v of formData.values()) { if (v instanceof File) { file = v; break; } }
         }
-        if (file) {
-          const tmp = await caches.open('pychoras-shared');
+        const tmp = await caches.open('pychoras-shared');
+        await tmp.delete('shared-error');
+        if (!(file instanceof File)) {
+          await tmp.put('shared-error', new Response('no venía ningún archivo'));
+        } else {
           await tmp.put('shared-file', new Response(file, {
             headers: {
               'Content-Type': file.type || 'application/pdf',
@@ -50,7 +53,13 @@ self.addEventListener('fetch', e => {
             }
           }));
         }
-      } catch (err) { /* si falla, abrimos la app igualmente */ }
+      } catch (err) {
+        // Apuntar el error para que la app lo muestre (antes se perdía en silencio)
+        try {
+          const tmp = await caches.open('pychoras-shared');
+          await tmp.put('shared-error', new Response(String((err && err.message) || err)));
+        } catch (_) {}
+      }
       return Response.redirect('./index.html?compartido=1', 303);
     })());
     return;

@@ -1234,7 +1234,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build VAC-16jul</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build SHARE-22sep</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -5400,14 +5400,35 @@ document.getElementById('nuevoPdfBtn').onclick=()=>nuevoPDF();
 // ── Recepción de hoja compartida desde otra app (Web Share Target) ──
 // Si la app se abre con ?compartido=1, recoge el PDF del caché temporal
 // que dejó el service worker y lo procesa como si lo hubieras subido.
+let _recogiendoCompartido = false;
 async function _recogerArchivoCompartido() {
+  if (_recogiendoCompartido) return;           // evita doble proceso (load + visibilidad)
+  _recogiendoCompartido = true;
+  const params = new URLSearchParams(location.search);
+  const vieneDeCompartir = params.get('compartido') === '1';
   try {
-    const params = new URLSearchParams(location.search);
-    if (params.get('compartido') !== '1') return;
-    if (!('caches' in window)) return;
+    if (!('caches' in window)) {
+      if (vieneDeCompartir) showToast('\u26A0\uFE0F Este navegador no permite recibir archivos compartidos', 6000);
+      return;
+    }
     const tmp = await caches.open('pychoras-shared');
+    // ¿El service worker dejó apuntado un error al recibir el archivo?
+    const errResp = await tmp.match('shared-error');
+    if (errResp) {
+      const errTxt = await errResp.text();
+      await tmp.delete('shared-error');
+      history.replaceState(null, '', './index.html');
+      showToast('\u26A0\uFE0F No se pudo recibir el archivo: ' + errTxt, 8000);
+      return;
+    }
     const resp = await tmp.match('shared-file');
-    if (!resp) return;
+    if (!resp) {
+      if (vieneDeCompartir) {
+        history.replaceState(null, '', './index.html');
+        showToast('\u26A0\uFE0F No lleg\u00f3 el archivo compartido. S\u00fabelo a mano con el bot\u00f3n de la c\u00e1mara.', 7000);
+      }
+      return;
+    }
     const blob = await resp.blob();
     const nombre = decodeURIComponent(resp.headers.get('X-File-Name') || 'hoja.pdf');
     const file = new File([blob], nombre, { type: blob.type || 'application/pdf' });
@@ -5444,9 +5465,18 @@ async function _recogerArchivoCompartido() {
       _mdTab = 'comp';
       await cargarHojaEmpresa({ files: [file2], value: '' });
     }
-  } catch (e) { /* si falla, el usuario puede subirlo a mano */ }
+  } catch (e) {
+    console.error('Compartido error:', e);
+    try { showToast('\u26A0\uFE0F Error al recibir el parte: ' + (e && e.message || e) + '. S\u00fabelo a mano.', 8000); } catch(_) {}
+  } finally {
+    _recogiendoCompartido = false;
+  }
 }
 window.addEventListener('load', () => { setTimeout(_recogerArchivoCompartido, 600); });
+// Si Chrome trae al frente la app ya abierta (sin recargarla), buscar también el archivo
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') setTimeout(_recogerArchivoCompartido, 400);
+});
 
 // ── Comprobación fin de año y nuevo año ──────────────────────
 function _comprobarFinDeAnio() {
