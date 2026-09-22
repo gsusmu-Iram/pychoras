@@ -1,6 +1,6 @@
 // PycHoras Service Worker — caché + recepción de archivos compartidos + auto-update
 // ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v6 → v7 → v8 …
-const CACHE = 'pychoras-v7';
+const CACHE = 'pychoras-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -44,11 +44,22 @@ self.addEventListener('fetch', e => {
         const tmp = await caches.open('pychoras-shared');
         await tmp.delete('shared-error');
         if (!(file instanceof File)) {
-          await tmp.put('shared-error', new Response('no venía ningún archivo'));
+          // Contar qué llegó de verdad, para diagnosticar
+          const campos = [];
+          for (const [k, v] of formData.entries()) {
+            if (v instanceof File) campos.push(k + '=archivo(' + (v.type || 'sin tipo') + ')');
+            else campos.push(k + '="' + String(v).slice(0, 40) + '"');
+          }
+          await tmp.put('shared-error', new Response(
+            'no venía ningún archivo. Llegó: ' + (campos.length ? campos.join(', ') : 'nada')));
         } else {
+          // Algunas apps mandan el PDF como tipo genérico: si el nombre es .pdf, tratarlo como PDF
+          const nom = (file.name || '').toLowerCase();
+          const tipo = (nom.endsWith('.pdf') || !file.type || file.type === 'application/octet-stream')
+                       && !(file.type || '').startsWith('image/') ? 'application/pdf' : file.type;
           await tmp.put('shared-file', new Response(file, {
             headers: {
-              'Content-Type': file.type || 'application/pdf',
+              'Content-Type': tipo,
               'X-File-Name': encodeURIComponent(file.name || 'hoja.pdf')
             }
           }));

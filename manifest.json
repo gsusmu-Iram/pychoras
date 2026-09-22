@@ -23,7 +23,7 @@
       "files": [
         {
           "name": "hoja",
-          "accept": ["application/pdf", ".pdf", "image/*"]
+          "accept": ["application/pdf", "application/x-pdf", "application/octet-stream", ".pdf", "image/*"]
         }
       ]
     }
