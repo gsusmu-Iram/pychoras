@@ -1,6 +1,6 @@
 // PycHoras Service Worker — caché + recepción de archivos compartidos + auto-update
 // ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v6 → v7 → v8 …
-const CACHE = 'pychoras-v8';
+const CACHE = 'pychoras-v9';
 const ASSETS = [
   './',
   './index.html',
@@ -34,24 +34,35 @@ self.addEventListener('fetch', e => {
   // Aceptamos el POST a cualquier ruta de la app (raíz o index.html) por robustez.
   if (e.request.method === 'POST' && url.origin === self.location.origin) {
     e.respondWith((async () => {
+      let bytesRecibidos = -1;
       try {
-        const formData = await e.request.formData();
-        // El campo se llama 'hoja' (manifest), pero por si acaso buscamos cualquier File.
-        let file = formData.get('hoja');
-        if (!(file instanceof File)) {
-          for (const v of formData.values()) { if (v instanceof File) { file = v; break; } }
+        // Copia en crudo del envío ANTES de nada (formData() consume el cuerpo)
+        let crudo = null;
+        try {
+          crudo = await e.request.clone().arrayBuffer();
+          bytesRecibidos = crudo.byteLength;
+        } catch (_) {}
+
+        // 1) Intento normal
+        let file = null;
+        try {
+          const formData = await e.request.formData();
+          file = formData.get('hoja');
+          if (!(file instanceof File)) {
+            for (const v of formData.values()) { if (v instanceof File) { file = v; break; } }
+          }
+        } catch (_) { /* en algunos Chrome falla: seguimos a mano */ }
+
+        // 2) Si falló, descifrar el envío a mano desde los bytes en crudo
+        if (!(file instanceof File) && crudo && crudo.byteLength > 0) {
+          file = _leerMultipartAMano(crudo, e.request.headers.get('content-type') || '');
         }
+
         const tmp = await caches.open('pychoras-shared');
         await tmp.delete('shared-error');
         if (!(file instanceof File)) {
-          // Contar qué llegó de verdad, para diagnosticar
-          const campos = [];
-          for (const [k, v] of formData.entries()) {
-            if (v instanceof File) campos.push(k + '=archivo(' + (v.type || 'sin tipo') + ')');
-            else campos.push(k + '="' + String(v).slice(0, 40) + '"');
-          }
           await tmp.put('shared-error', new Response(
-            'no venía ningún archivo. Llegó: ' + (campos.length ? campos.join(', ') : 'nada')));
+            'el envío llegó sin archivo (' + bytesRecibidos + ' bytes)'));
         } else {
           // Algunas apps mandan el PDF como tipo genérico: si el nombre es .pdf, tratarlo como PDF
           const nom = (file.name || '').toLowerCase();
@@ -68,7 +79,8 @@ self.addEventListener('fetch', e => {
         // Apuntar el error para que la app lo muestre (antes se perdía en silencio)
         try {
           const tmp = await caches.open('pychoras-shared');
-          await tmp.put('shared-error', new Response(String((err && err.message) || err)));
+          await tmp.put('shared-error', new Response(
+            String((err && err.message) || err) + ' (' + bytesRecibidos + ' bytes)'));
         } catch (_) {}
       }
       return Response.redirect('./index.html?compartido=1', 303);
@@ -102,3 +114,68 @@ self.addEventListener('fetch', e => {
     }).catch(() => caches.match('./index.html')))
   );
 });
+
+
+// ── Lector manual de envíos multipart ────────────────────────
+// Algunas versiones de Chrome entregan el archivo compartido pero request.formData()
+// devuelve vacío. Aquí leemos los bytes en crudo y sacamos el archivo nosotros.
+function _leerMultipartAMano(buffer, contentType) {
+  try {
+    const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType || '');
+    if (!m) return null;
+    const boundary = '--' + (m[1] || m[2]).trim();
+    const bytes = new Uint8Array(buffer);
+    const bBytes = new TextEncoder().encode(boundary);
+
+    // Localizar todas las separaciones
+    const cortes = [];
+    for (let i = 0; i <= bytes.length - bBytes.length; i++) {
+      let ok = true;
+      for (let j = 0; j < bBytes.length; j++) {
+        if (bytes[i + j] !== bBytes[j]) { ok = false; break; }
+      }
+      if (ok) { cortes.push(i); i += bBytes.length - 1; }
+    }
+    if (cortes.length < 2) return null;
+
+    const dec = new TextDecoder();
+    for (let k = 0; k < cortes.length - 1; k++) {
+      const ini = cortes[k] + bBytes.length;
+      const fin = cortes[k + 1];
+      if (fin <= ini) continue;
+      const trozo = bytes.subarray(ini, fin);
+
+      // Separar cabeceras del contenido: línea en blanco (\r\n\r\n)
+      let sep = -1;
+      for (let i = 0; i < trozo.length - 3; i++) {
+        if (trozo[i] === 13 && trozo[i+1] === 10 && trozo[i+2] === 13 && trozo[i+3] === 10) { sep = i; break; }
+      }
+      if (sep < 0) continue;
+
+      const cabeceras = dec.decode(trozo.subarray(0, sep));
+      if (!/filename\s*=/i.test(cabeceras)) continue;   // este trozo no es un archivo
+
+      const fn = /filename\s*=\s*"([^"]*)"/i.exec(cabeceras);
+      let nombre = (fn && fn[1]) ? fn[1] : 'hoja.pdf';
+      const ct = /content-type\s*:\s*([^\r\n]+)/i.exec(cabeceras);
+      let tipo = ct ? ct[1].trim() : '';
+
+      // Quitar el \r\n final que precede a la siguiente separación
+      let finCuerpo = fin - cortes[k] - bBytes.length;
+      let ini2 = sep + 4;
+      let fin2 = trozo.length;
+      if (fin2 >= 2 && trozo[fin2-2] === 13 && trozo[fin2-1] === 10) fin2 -= 2;
+      if (fin2 <= ini2) continue;
+
+      const nomL = nombre.toLowerCase();
+      if (nomL.endsWith('.pdf') || !tipo || tipo === 'application/octet-stream') {
+        if (!tipo.startsWith('image/')) tipo = 'application/pdf';
+      }
+      const datos = trozo.slice(ini2, fin2);
+      return new File([datos], nombre, { type: tipo });
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
