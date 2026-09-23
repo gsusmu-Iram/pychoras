@@ -1,6 +1,6 @@
 // PycHoras Service Worker — caché + recepción de archivos compartidos + auto-update
 // ⚠️  Sube ESTE número cada vez que subas un index.html nuevo:  v6 → v7 → v8 …
-const CACHE = 'pychoras-v9';
+const CACHE = 'pychoras-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -61,8 +61,14 @@ self.addEventListener('fetch', e => {
         const tmp = await caches.open('pychoras-shared');
         await tmp.delete('shared-error');
         if (!(file instanceof File)) {
+          // Enseñar el contenido literal del envío para ver qué manda Chrome
+          let literal = '';
+          try {
+            if (crudo) literal = new TextDecoder().decode(new Uint8Array(crudo))
+              .replace(/\r/g, '').replace(/\n/g, ' | ').slice(0, 300);
+          } catch (_) {}
           await tmp.put('shared-error', new Response(
-            'el envío llegó sin archivo (' + bytesRecibidos + ' bytes)'));
+            'envío sin archivo (' + bytesRecibidos + ' bytes). Contenido: ' + (literal || '(vacío)')));
         } else {
           // Algunas apps mandan el PDF como tipo genérico: si el nombre es .pdf, tratarlo como PDF
           const nom = (file.name || '').toLowerCase();
