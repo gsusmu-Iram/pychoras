@@ -922,6 +922,10 @@ body{
         📷
         <input type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="procesarHojaDia(this)">
       </label>
+      <label class="hoja-btn" title="Subir PDF descargado">
+        📄
+        <input type="file" accept="application/pdf" style="display:none" onchange="procesarHojaDia(this)">
+      </label>
       <input class="chat-input" id="chatIn" type="text" placeholder="inicio 7:30 · fin 15:40 · extras mes..." autocomplete="off">
       <button class="send-btn" id="sendBtn">
         <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -1234,7 +1238,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build SHARE-22sep</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build PDF-23sep</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -5418,7 +5422,13 @@ async function _recogerArchivoCompartido() {
       const errTxt = await errResp.text();
       await tmp.delete('shared-error');
       history.replaceState(null, '', './index.html');
-      showToast('\u26A0\uFE0F No se pudo recibir el archivo: ' + errTxt, 8000);
+      // Fallo conocido de Chrome 153: entrega el envío sin el archivo dentro
+      if (/sin archivo/i.test(errTxt)) {
+        showToast('\u26A0\uFE0F Chrome no ha podido pasar el archivo (fallo suyo). '
+                + 'Desc\u00e1rgalo y s\u00fabelo con el bot\u00f3n \ud83d\udcc4', 8000);
+      } else {
+        showToast('\u26A0\uFE0F No se pudo recibir el archivo: ' + errTxt, 8000);
+      }
       return;
     }
     const resp = await tmp.match('shared-file');
