@@ -275,6 +275,11 @@ body{
 .cextra{font-size:13px;font-weight:800;font-family:var(--mono);}
 .cextra.pos{color:var(--green);}.cextra.neg{color:var(--red);}
 .frow{display:flex;gap:8px;}
+.btn-addgasto{flex:0 0 46px;background:var(--acc);color:#fff;border:none;border-radius:var(--rs);font-size:20px;font-weight:800;line-height:1;cursor:pointer;}
+.ge-row{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:6px;}
+.ge-con{flex:1;font-size:13px;color:var(--text2);}
+.ge-imp{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--text);}
+.ge-del{flex:0 0 28px;background:none;border:none;color:#ef4444;font-size:17px;font-weight:800;cursor:pointer;}
 .ibox{flex:1;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);font-size:15px;font-family:var(--mono);font-weight:700;color:var(--text);text-align:center;outline:none;}
 .ibox:focus{border-color:rgba(249,115,22,0.4);}
 .itxt{flex:1;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);font-size:14px;font-family:var(--sans);color:var(--text);outline:none;}
@@ -1194,7 +1199,9 @@ body{
         <div class="cextra zer" id="cExtJornada">&plusmn;0h</div>
       </div>
     </div>
-    <span class="flabel">Gasto</span><div class="frow"><input class="ibox" id="iGastoJornada" type="number" placeholder="0,00"><input class="itxt" id="iConcJornada" placeholder="Concepto"></div>
+    <span class="flabel">Gastos</span>
+    <div id="listaGastosEdit"></div>
+    <div class="frow"><input class="ibox" id="iGastoJornada" type="number" placeholder="0,00"><input class="itxt" id="iConcJornada" placeholder="Concepto"><button type="button" class="btn-addgasto" onclick="addGastoEdit()">+</button></div>
     <span class="flabel">Nota</span><input class="itxt" id="iNotaJornada" type="text" placeholder="Incidencia...">
     <button class="btn-p" onclick="guardarJornada()">GUARDAR JORNADA</button>
     <button class="btn-s" onclick="closeModal()">Cancelar</button>
@@ -1238,7 +1245,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build GASTOS2-15oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build COMIDA-15oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -2804,7 +2811,7 @@ function dayInfJornada(y, m, d) {
     else if (mins < 475) estado = 'und';
     else estado = 'norm';
   }
-  return { tipo, estado, mins, tramos_txt: o.tramos_txt || '', gasto: o.gasto || 0, concepto: o.concepto || '', nota: o.nota || '', fds, fest, fut, custom: true };
+  return { tipo, estado, mins, tramos_txt: o.tramos_txt || '', gasto: o.gasto || 0, concepto: o.concepto || '', nota: o.nota || '', gastos: gastosDia(o), fds, fest, fut, custom: true };
 }
 
 function renderJornada() {
@@ -2886,8 +2893,10 @@ function openModalJornada(y, m, d) {
   } else {
     document.getElementById('iTramos').value = '';
   }
-  document.getElementById('iGastoJornada').value = inf.gasto   || '';
-  document.getElementById('iConcJornada').value  = inf.concepto || '';
+  _gastosEdit = (inf.gastos || []).map(g => ({ concepto: g.concepto, importe: g.importe }));
+  renderGastosEdit();
+  document.getElementById('iGastoJornada').value = '';
+  document.getElementById('iConcJornada').value  = '';
   document.getElementById('iNotaJornada').value  = inf.nota     || '';
   document.getElementById('btnDelJornada').classList.toggle('hidden', !inf.custom);
   updSec(); recalcJornada();
@@ -2955,10 +2964,39 @@ function recalcJornada() {
   cb.classList.remove('hidden');
 }
 
+// ── Lista de gastos del editor manual ──
+let _gastosEdit = [];
+function renderGastosEdit() {
+  const cont = document.getElementById('listaGastosEdit');
+  if (!cont) return;
+  cont.innerHTML = _gastosEdit.map((g, i) =>
+    `<div class="ge-row"><span class="ge-con">${g.concepto || 'Varios'}</span>` +
+    `<span class="ge-imp">${g.importe.toFixed(2)}\u20ac</span>` +
+    `<button type="button" class="ge-del" onclick="delGastoEdit(${i})">\u00d7</button></div>`).join('');
+}
+function addGastoEdit(silencioso) {
+  const iImp = document.getElementById('iGastoJornada');
+  const iCon = document.getElementById('iConcJornada');
+  const imp = Math.round((parseFloat(String(iImp.value).replace(',', '.')) || 0) * 100) / 100;
+  if (imp <= 0) { if (!silencioso) showToast('Escribe el importe'); return; }
+  _gastosEdit.push({ concepto: iCon.value.trim() || 'Varios', importe: imp });
+  iImp.value = ''; iCon.value = '';
+  renderGastosEdit();
+}
+function delGastoEdit(i) { _gastosEdit.splice(i, 1); renderGastosEdit(); }
+
 function guardarJornada() {
   if (!mF) return;
   const { y, m, d } = mF;
-  const o = { tipo: mT, tramos_txt: ['laboral','fds'].includes(mT) ? document.getElementById('iTramos').value.trim() : '', gasto: parseFloat(document.getElementById('iGastoJornada').value) || 0, concepto: document.getElementById('iConcJornada').value.trim(), nota: document.getElementById('iNotaJornada').value.trim() };
+  addGastoEdit(true);                       // recoger lo que quede escrito sin añadir
+  const gas = _normGastos(_gastosEdit);
+  const prev = gD(y, m, d) || {};           // conservar comida, datos del parte, etc.
+  const o = { ...prev, tipo: mT,
+    tramos_txt: ['laboral','fds'].includes(mT) ? document.getElementById('iTramos').value.trim() : '',
+    gastos: gas.length ? gas : undefined,
+    gasto: _totGastos(gas),
+    concepto: _conceptoGastos(gas),
+    nota: document.getElementById('iNotaJornada').value.trim() };
   sD(y, m, d, o); closeModal(); renderJornada(); showToast('\u2713 Jornada guardada');
 }
 
@@ -4332,7 +4370,9 @@ function responder(int_){
   if(accion==='gasto'){
     const {fecha,valor,concepto}=int_;
     const o=gD(fecha.y,fecha.m,fecha.d)||{tipo:'laboral',tramos_txt:'07:30-15:30'};
-    sD(fecha.y,fecha.m,fecha.d,{...o,gasto:valor,concepto});ctxConv.ultimaFecha=fecha;
+    // Se suma a los gastos que ya tuviera el día (antes los sustituía)
+    const gasL=_normGastos([...gastosDia(o),{concepto,importe:valor}]);
+    sD(fecha.y,fecha.m,fecha.d,{...o,gastos:gasL,gasto:_totGastos(gasL),concepto:_conceptoGastos(gasL)});ctxConv.ultimaFecha=fecha;
     const st=mesStats(fecha.y,fecha.m);
     const f=frase('gasto',{valor:valor.toFixed(2),concepto,totalMes:st.gas.toFixed(2)})||`Gasto apuntado \u2705`;
     const card=`<div class="res-card"><div class="res-row"><span class="res-lbl">Importe</span><span class="res-val">${valor.toFixed(2)}\u20ac</span></div><div class="res-row"><span class="res-lbl">Concepto</span><span class="res-val">${concepto}</span></div><div class="res-row"><span class="res-lbl">Total gastos mes</span><span class="res-val">${st.gas.toFixed(2)}\u20ac</span></div></div>`;
@@ -5028,7 +5068,12 @@ function renderMesDetalleBody() {
 
       // Dato FINO del parte diario: la empresa cuenta la comida desde el fin del trayecto,
       // no desde que empiezas a comer. Si el desfase explica (±3 min) la discrepancia, lo mostramos.
-      const desfaseComidaExplica = ci && ci.desfase && !ok && Math.abs(Math.abs(diff) - ci.desfase) <= 3;
+      // El desfase real es todo el corte menos la comida oficial del parte
+      const cr = o?.comidaReal;
+      const desfaseCorte = cr && cr.oficial != null ? (cr.mins - cr.oficial) : null;
+      const desfaseComidaExplica = !ok && (
+        (desfaseCorte && Math.abs(Math.abs(diff) - desfaseCorte) <= 3) ||
+        (ci && ci.desfase && Math.abs(Math.abs(diff) - ci.desfase) <= 3));
 
       let borderCol, bg;
       if(ok || sinRegistro){
@@ -5046,7 +5091,8 @@ function renderMesDetalleBody() {
       let etiqueta='';
       if(!ok && !sinRegistro){
         if(desfaseComidaExplica || causaComida){
-          etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(234,179,8,0.16);color:#a16207;border-radius:4px;padding:1px 5px;margin-left:4px">🍽 comida</span>`;
+          const det = cr ? ` ${cr.desde}\u2192${cr.hasta}` : '';
+          etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(234,179,8,0.16);color:#a16207;border-radius:4px;padding:1px 5px;margin-left:4px">\ud83c\udf7d desfase comida${det}</span>`;
         } else if(diff>0){
           etiqueta=`<span style="font-size:8px;font-weight:800;background:rgba(192,57,43,0.12);color:#c0392b;border-radius:4px;padding:1px 5px;margin-left:4px">Verificar</span>`;
         } else {
@@ -5188,12 +5234,16 @@ function renderMesDetalleBody() {
 
     if(gasRows.length){
       h+=`<div style="margin:0 14px;background:white;border-radius:10px;box-shadow:var(--sh-card);overflow:hidden">`;
+      // Solo comparamos por día si el PDF de la empresa trae el reparto diario.
+      const hayDesgloseEmp = Object.keys(gasEmpDias).length > 0;
       gasRows.forEach((g,i)=>{
-        const enEmpresa = gasEmpDias[g.d] !== undefined || totGasEmp === 0;
+        const enEmpresa = !hayDesgloseEmp || gasEmpDias[g.d] !== undefined || totGasEmp === 0;
         const color = enEmpresa ? '#22c55e' : '#f97316';
-        const badge = enEmpresa
+        const badge = !hayDesgloseEmp
+          ? ''
+          : enEmpresa
           ? `<span style="margin-left:8px;font-size:13px;color:#22c55e;font-weight:900">✓</span>`
-          : `<span style="margin-left:8px;font-size:9px;font-weight:800;background:rgba(249,115,22,0.1);color:#f97316;border-radius:4px;padding:2px 5px">Sin justificante</span>`;
+          : `<span style="margin-left:8px;font-size:9px;font-weight:800;background:rgba(249,115,22,0.1);color:#f97316;border-radius:4px;padding:2px 5px">La empresa no lo apunta</span>`;
         h+=`<div style="display:flex;align-items:center;padding:10px 12px;border-bottom:${i<gasRows.length-1?'1px solid #f1f5f9':'none'};border-left:3px solid ${color}">
           <span style="width:28px;font-size:13px;font-weight:800;color:#1e293b">${g.d}</span>
           <span style="flex:1;font-size:12px;color:#374151">${g.concepto||'\u2014'}</span>
@@ -5887,10 +5937,14 @@ async function _parsearPDFHoras(arrayBuffer) {
   // Gastos por día = bajada de saldo respecto al día anterior.
   // Si el saldo sube, es una aportación de fondos de la empresa (no un gasto).
   const diasSaldo = Object.keys(saldoPorDia).map(Number).sort((a, b) => a - b);
-  if (diasSaldo.length && saldoInicial !== null) {
+  // Si la hoja no trae "SALDO INICIAL", usamos el saldo del primer día como punto
+  // de partida: los primeros días del mes repiten el saldo de arranque.
+  const saldoBase = (saldoInicial !== null) ? saldoInicial
+                    : (diasSaldo.length ? saldoPorDia[diasSaldo[0]] : null);
+  if (diasSaldo.length && saldoBase !== null) {
     const gastos = {};
     const ingresos = {};  // día -> importe ingresado (prov. fondos)
-    let prev = saldoInicial;
+    let prev = saldoBase;
     let totalGastos = 0, totalIngresos = 0;
     for (const d of diasSaldo) {
       const delta = prev - saldoPorDia[d];   // baja saldo => gasto positivo
@@ -5904,7 +5958,8 @@ async function _parsearPDFHoras(arrayBuffer) {
     days._totGastos = Math.round(totalGastos * 100) / 100;
     days._ingresosDias = ingresos;
     days._totIngresos = Math.round(totalIngresos * 100) / 100;
-    days._saldoInicial = saldoInicial;
+    if (saldoInicial !== null) days._saldoInicial = saldoInicial;
+    else if (days._saldoInicial === undefined) days._saldoInicial = saldoBase;
     days._saldoFinal = saldoPorDia[diasSaldo[diasSaldo.length - 1]];
 
     // Mejor fuente: columna 12 del TOTALES (formato HOJA_GASTOS: col11=TOTAL personal).
@@ -6876,9 +6931,13 @@ function _parsearHojaDiaria(txt) {
   const inicioM = txt.match(/(\d{2}:\d{2})(?::\d{2})?\s+INICIO JORNADA/i);
   const finM    = txt.match(/FIN JORNADA\s+(\d{2}:\d{2})(?::\d{2})?/i);
 
-  // Tiempo comida (en horas decimales)
+  // Tiempo comida oficial del parte (en horas decimales)
   const comidaM = txt.match(/Tiempo Comida\s+([\d.]+)\s*hrs/i);
-  const comidaMins = comidaM ? Math.round(parseFloat(comidaM[1]) * 60) : 0;
+  const comidaOficial = comidaM ? Math.round(parseFloat(comidaM[1]) * 60) : 0;
+  // Comida REAL que descuenta la empresa: desde el FIN de la actividad anterior
+  // hasta el INICIO de la siguiente (todo el corte, no solo la fila COMIDA).
+  let comidaMins = comidaOficial;
+  let comidaReal = null;
 
   // ── Desfase de comida: la empresa cuenta la comida desde el FIN del último trayecto
   // antes de comer, no desde que empiezas a comer. En el parte, la fila COMIDA trae su
@@ -6893,6 +6952,20 @@ function _parsearHojaDiaria(txt) {
       const finTrayecto  = horasAntes[horasAntes.length - 2].slice(0, 5); // penúltima = fin trayecto
       const gap = t2m(inicioComida) - t2m(finTrayecto);
       if (gap > 0 && gap < 90) comidaInfo = { finTrayecto, inicioComida, desfase: gap };
+
+      // Tras la palabra COMIDA: 1ª hora = fin de la comida, 2ª = inicio de lo siguiente
+      const horasDespues = txt.slice(idxComida).match(/\d{1,2}:\d{2}(?::\d{2})?/g);
+      if (horasDespues && horasDespues.length >= 2) {
+        const finComida      = horasDespues[0].slice(0, 5);
+        const inicioSiguiente = horasDespues[1].slice(0, 5);
+        const corte = t2m(inicioSiguiente) - t2m(finTrayecto);
+        if (corte > 0 && corte < 180 && corte >= comidaOficial) {
+          comidaMins = corte;
+          comidaReal = { desde: finTrayecto, hasta: inicioSiguiente,
+                         mins: corte, oficial: comidaOficial, finComida };
+          if (comidaInfo) comidaInfo.corte = corte;
+        }
+      }
     }
   }
 
@@ -7013,7 +7086,7 @@ function _parsearHojaDiaria(txt) {
     minsFinales = Math.max(0, t2m(fin) - t2m(inicioReal) - comidaMins);
   }
 
-  return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, comidaInfo, infoParte, gastos, totalStr: m2hm(minsFinales) };
+  return { dia, mes, anio, mins: minsFinales, inicio: inicioReal, fin, comidaMins, comidaReal, comidaInfo, infoParte, gastos, totalStr: m2hm(minsFinales) };
 }
 
 
@@ -7027,7 +7100,11 @@ function _mostrarConfirmHojaDiaria(uid, data, nombre) {
     <div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:8px">📋 Hoja de jornada · ${dia} ${MESES_N[mes]} ${anio}</div>
     <div class="hoja-confirm-row"><span>Entrada</span><span style="font-weight:700">${inicio||'—'}</span></div>
     <div class="hoja-confirm-row"><span>Salida</span><span style="font-weight:700">${fin||'—'}</span></div>`;
-  if (comidaMins > 0) h += `<div class="hoja-confirm-row"><span>Comida</span><span style="font-weight:700;color:#ef4444">−${m2hm(comidaMins)}</span></div>`;
+  if (comidaMins > 0) {
+    const cr = data.comidaReal;
+    const detalle = cr ? `<span style="font-size:10px;color:var(--text3);font-weight:400"> ${cr.desde}→${cr.hasta}</span>` : '';
+    h += `<div class="hoja-confirm-row"><span>Comida${detalle}</span><span style="font-weight:700;color:#ef4444">−${m2hm(comidaMins)}</span></div>`;
+  }
   h += `<div class="hoja-confirm-row"><span>Total</span><span style="font-weight:700;color:var(--acc)">${totalStr}</span></div>
     <div class="hoja-confirm-row"><span>vs 8h</span><span style="font-weight:700;color:${ext>=0?'var(--green)':'#ef4444'}">${ext>=0?'+':'−'}${m2hm(Math.abs(ext))}</span></div>`;
   if (gastos.length > 0) {
@@ -7285,6 +7362,7 @@ function _persistirHoja(confirm, data, o, tramoNuevo, sumar) {
   const gas = _normGastos(gastos);
   sD(anio, mes, dia, { ...o, tipo:'laboral', tramos_txt:tramoFinal,
     comidaInfo: data.comidaInfo || o.comidaInfo || null,
+    comidaReal: data.comidaReal || o.comidaReal || null,
     infoParte: data.infoParte || o.infoParte || null,
     gastos: gas.length ? gas : (o.gastos || undefined),
     gasto: gas.length ? _totGastos(gas) : (o.gasto||0),
