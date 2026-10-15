@@ -1238,7 +1238,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build PDF-23sep</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build GASTOS-15oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -7031,7 +7031,13 @@ function _mostrarConfirmHojaDiaria(uid, data, nombre) {
     <div class="hoja-confirm-row"><span>vs 8h</span><span style="font-weight:700;color:${ext>=0?'var(--green)':'#ef4444'}">${ext>=0?'+':'−'}${m2hm(Math.abs(ext))}</span></div>`;
   if (gastos.length > 0) {
     const totGasto = gastos.reduce((a,g) => a+g.importe, 0);
-    h += `<div class="hoja-confirm-row"><span>Gastos</span><span style="font-weight:700;color:var(--acc)">${totGasto.toFixed(2)}€</span></div>`;
+    // Una línea por gasto (materiales, parking, peajes...)
+    gastos.forEach(g => {
+      h += `<div class="hoja-confirm-row"><span style="font-size:12px;color:var(--text2)">${g.concepto}</span><span style="font-weight:700;color:var(--acc)">${g.importe.toFixed(2)}€</span></div>`;
+    });
+    if (gastos.length > 1) {
+      h += `<div class="hoja-confirm-row"><span>Total gastos</span><span style="font-weight:700;color:var(--acc)">${totGasto.toFixed(2)}€</span></div>`;
+    }
   } else {
     h += `<div class="hoja-confirm-row"><span style="color:var(--text3);font-size:11px">Gastos empresa (tarjeta)</span><span style="font-size:11px;color:var(--text3)">no se registran</span></div>`;
   }
@@ -7246,16 +7252,42 @@ function _fraseIram(data, totalMins) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// ── Gastos de un día: lista {concepto, importe} + total y concepto resumidos ──
+// Los campos 'gasto' y 'concepto' se siguen guardando (total y conceptos unidos)
+// para que todo lo que ya los lee (Excel, Datos, comparativa) siga funcionando.
+function _normGastos(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista
+    .map(g => ({ concepto: String(g && g.concepto || '').trim() || 'Varios',
+                 importe: Math.round((parseFloat(g && g.importe) || 0) * 100) / 100 }))
+    .filter(g => g.importe > 0);
+}
+function _totGastos(lista) {
+  return Math.round(_normGastos(lista).reduce((a, g) => a + g.importe, 0) * 100) / 100;
+}
+function _conceptoGastos(lista) {
+  return _normGastos(lista).map(g => g.concepto).join(' + ');
+}
+// Gastos de un día ya guardado: usa la lista si existe; si no, el campo antiguo
+function gastosDia(o) {
+  if (!o) return [];
+  if (Array.isArray(o.gastos) && o.gastos.length) return _normGastos(o.gastos);
+  if ((o.gasto || 0) > 0) return [{ concepto: o.concepto || 'Varios', importe: o.gasto }];
+  return [];
+}
+
 function _persistirHoja(confirm, data, o, tramoNuevo, sumar) {
   const { dia, mes, anio, gastos } = data;
   let tramoFinal = tramoNuevo;
   if (sumar && o.tramos_txt) tramoFinal = o.tramos_txt + ', ' + tramoNuevo;
-  const primerGasto = gastos[0];
+  // Guardar TODOS los gastos del parte (antes solo se guardaba el primero)
+  const gas = _normGastos(gastos);
   sD(anio, mes, dia, { ...o, tipo:'laboral', tramos_txt:tramoFinal,
     comidaInfo: data.comidaInfo || o.comidaInfo || null,
     infoParte: data.infoParte || o.infoParte || null,
-    gasto: primerGasto ? primerGasto.importe : (o.gasto||0),
-    concepto: primerGasto ? primerGasto.concepto : (o.concepto||'') });
+    gastos: gas.length ? gas : (o.gastos || undefined),
+    gasto: gas.length ? _totGastos(gas) : (o.gasto||0),
+    concepto: gas.length ? _conceptoGastos(gas) : (o.concepto||'') });
   const totalMins = totalTramos(parsearTramos(tramoFinal));
   const wrap = confirm.parentElement;
   if (wrap) {
@@ -7298,14 +7330,15 @@ function _guardarDesdeHojaDiaria(uid) {
   // Tramo con pausa si hay comida
   let tramoTxt = inicio && fin ? `${inicio}-${fin}` : '';
   if (comidaMins > 0 && tramoTxt) tramoTxt += ` -${comidaMins}min`;
-  // Primer gasto personal (si hay)
-  const primerGasto = gastos[0];
+  // Todos los gastos del parte (antes solo se guardaba el primero)
+  const gas = _normGastos(gastos);
   sD(anio, mes, dia, {
     ...o,
     tipo: 'laboral',
     tramos_txt: tramoTxt,
-    gasto: primerGasto ? primerGasto.importe : (o.gasto||0),
-    concepto: primerGasto ? primerGasto.concepto : (o.concepto||''),
+    gastos: gas.length ? gas : (o.gastos || undefined),
+    gasto: gas.length ? _totGastos(gas) : (o.gasto||0),
+    concepto: gas.length ? _conceptoGastos(gas) : (o.concepto||''),
   });
   const MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const elSave = document.getElementById(uid);
