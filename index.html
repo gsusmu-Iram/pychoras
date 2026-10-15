@@ -1238,7 +1238,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build GASTOS-15oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build GASTOS2-15oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -3000,9 +3000,9 @@ function dayInfoDatos(y, m, d) {
     mins=totalTramos(tr)-(pausaTramos ? 0 : pausaMin); // si ya hay pausa inline no restar pausaMin encima
     if(tr.length){inicio=tr[0].inicio;fin=tr[tr.length-1].fin;}
     else{inicio='07:30';fin='15:30';}
-    return{tipo,mins,inicio,fin,pausa,numTramos:tr.length,tramos:tr,gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
+    return{tipo,mins,inicio,fin,pausa,numTramos:tr.length,tramos:tr,gasto:o.gasto||0,concepto:o.concepto||'',gastos:gastosDia(o),fds,fest,fut};
   }
-  return{tipo,mins,inicio,fin,pausa:pausaMin,numTramos:0,tramos:[],gasto:o.gasto||0,concepto:o.concepto||'',fds,fest,fut};
+  return{tipo,mins,inicio,fin,pausa:pausaMin,numTramos:0,tramos:[],gasto:o.gasto||0,concepto:o.concepto||'',gastos:gastosDia(o),fds,fest,fut};
 }
 
 function guardiaDelMesDatos(y, m) {
@@ -3053,7 +3053,8 @@ function renderMesDatos() {
 
   h+=`<div class="sec-label">Gastos${st.gas>0?' \u00b7 '+st.gas.toFixed(2)+'\u20ac':''}</div>`;
   const dm=new Date(y,m+1,0).getDate(); let gasRows='',gasT=0;
-  for(let d=1;d<=dm;d++){const inf=dayInfoDatos(y,m,d);if(inf.gasto>0){gasT+=inf.gasto;gasRows+=`<div class="gasto-row"><span class="gasto-dia">${d}</span><span class="gasto-concepto">${inf.concepto||'Varios'}</span><span class="gasto-importe">${inf.gasto.toFixed(2)}\u20ac</span></div>`;}}
+  for(let d=1;d<=dm;d++){const inf=dayInfoDatos(y,m,d);const lst=inf.gastos&&inf.gastos.length?inf.gastos:(inf.gasto>0?[{concepto:inf.concepto||'Varios',importe:inf.gasto}]:[]);
+    lst.forEach((g,i)=>{gasT+=g.importe;gasRows+=`<div class="gasto-row"><span class="gasto-dia">${i===0?d:''}</span><span class="gasto-concepto">${g.concepto||'Varios'}</span><span class="gasto-importe">${g.importe.toFixed(2)}\u20ac</span></div>`;});}
   h+=gasRows||`<div class="gasto-nodata">Sin gastos este mes</div>`;
   if(gasRows) h+=`<div class="gasto-total-row"><span style="font-size:10px;font-weight:800;font-family:var(--mono);color:var(--text2)">TOTAL</span><span style="font-size:12px;font-weight:900;font-family:var(--mono);color:var(--acc)">${gasT.toFixed(2)}\u20ac</span></div>`;
 
@@ -4365,7 +4366,7 @@ function responder(int_){
       return`Gastos ${int_.y}:<div class="res-card">${rows}<div class="res-row"><span class="res-lbl"><b>TOTAL</b></span><span class="res-val">${totalG.toFixed(2)}\u20ac</span></div></div>`;
     }
     const dm=new Date(int_.y,int_.mes+1,0).getDate();let rows='',totalG=0;
-    for(let d=1;d<=dm;d++){const o=gD(int_.y,int_.mes,d);if(o&&(o.gasto||0)>0){totalG+=o.gasto;rows+=`<div class="res-row"><span class="res-lbl">D\u00eda ${d} \u00b7 ${o.concepto||'Varios'}</span><span class="res-val">${o.gasto.toFixed(2)}\u20ac</span></div>`;}}
+    for(let d=1;d<=dm;d++){const o=gD(int_.y,int_.mes,d);gastosDia(o).forEach(g=>{totalG+=g.importe;rows+=`<div class="res-row"><span class="res-lbl">D\u00eda ${d} \u00b7 ${g.concepto||'Varios'}</span><span class="res-val">${g.importe.toFixed(2)}\u20ac</span></div>`;});}
     return`Gastos ${MESES[int_.mes]}:<div class="res-card">${rows||'<div style="color:var(--text3);font-size:12px;padding:6px 0">Sin gastos</div>'}<div class="res-row"><span class="res-lbl"><b>Total</b></span><span class="res-val">${totalG.toFixed(2)}\u20ac</span></div></div>`;
   }
 
@@ -4427,7 +4428,7 @@ function responder(int_){
     const pausaShow=pausaInline||pausa;
     if(pausaShow)h+=`<div class="res-row"><span class="res-lbl">Pausa</span><span class="res-val neg">\u2212${m2str(pausaShow)}</span></div>`;
     h+=`<div class="res-row"><span class="res-lbl">Total</span><span class="res-val">${m2str(mins)}</span></div>`;
-    if(o.gasto>0)h+=`<div class="res-row"><span class="res-lbl">Gasto</span><span class="res-val">${o.gasto.toFixed(2)}\u20ac \u00b7 ${o.concepto||''}</span></div>`;
+    gastosDia(o).forEach(g=>{h+=`<div class="res-row"><span class="res-lbl">Gasto</span><span class="res-val">${g.importe.toFixed(2)}\u20ac \u00b7 ${g.concepto||''}</span></div>`;});
     return h+'</div>';
   }
 
@@ -4903,7 +4904,7 @@ function renderMesDetalleBody() {
     for(let d=1;d<=dim;d++){
       const o=gD(y,m,d);
       const tipo=o?o.tipo||'laboral':'laboral';
-      if(o?.gasto>0) { gasRows.push({d,gasto:o.gasto,concepto:o.concepto||''}); totGasApp+=o.gasto; }
+      gastosDia(o).forEach(g=>{ gasRows.push({d,gasto:g.importe,concepto:g.concepto||''}); totGasApp+=g.importe; });
       if(tipo==='fds'||tipo==='fest') continue;
       const tr=parsearTramos(o?.tramos_txt||'');
       const pausaInline=tr.reduce((a,t)=>a+t.pausa,0);
@@ -5239,7 +5240,7 @@ function renderMesDetalleBody() {
     const gasRows=[];
     for(let d=1;d<=dim;d++){
       const o=gD(y,m,d);
-      if(o&&o.gasto>0) gasRows.push({d,gasto:o.gasto,concepto:o.concepto||''});
+      gastosDia(o).forEach(g=>gasRows.push({d,gasto:g.importe,concepto:g.concepto||''}));
       totG+=o?.gasto||0;
     }
     if(!gasRows.length){
