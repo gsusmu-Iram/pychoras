@@ -1245,7 +1245,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build SALDO-16oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build SALDO2-16oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -5808,9 +5808,12 @@ async function _parsearPDFHoras(arrayBuffer) {
       // La fila SALDO suele venir PARTIDA en varias líneas tras la etiqueta "SALDO".
       // Las unimos todas; si no, caemos al método antiguo (línea con más decimales).
       let filaSaldo = null, mejorSaldoN = 0, filaSaldoIdx = -1;
+      // La etiqueta "SALDO" puede ir sola en su línea (los valores vienen debajo) o al
+      // final de la línea de valores. En ambos casos el resto sigue en líneas sueltas.
       for (let li = 0; li < lineas.length; li++) {
-        if (!/^\s*SALDO\s*$/i.test(lineas[li])) continue;
-        const juntos = [];
+        const ln = lineas[li];
+        if (!/(^|\s)SALDO(\s|$)/i.test(ln) || /INICIAL/i.test(ln)) continue;
+        const juntos = (ln.match(/-?\d+[.,]\d{2}/g) || []).map(x => parseFloat(x.replace(',', '.')));
         for (let lj = li + 1; lj < lineas.length; lj++) {
           const nums = lineas[lj].trim().match(/-?\d+[.,]\d{2}/g) || [];
           const soloNums = nums.length && lineas[lj].trim().replace(/-?\d+[.,]\d{2}|\s+/g, '') === '';
