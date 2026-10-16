@@ -1245,7 +1245,7 @@ body{
           <label class="btn-import"><svg viewBox="0 0 24 24" style="fill:none;width:13px;height:13px;stroke:currentColor;stroke-width:2.2;flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Cargar JSON<input type="file" accept=".json" id="backupFileInput"></label>
         </div>
         <div class="import-hint" style="margin-top:6px">Excel: abre en cualquier app · JSON: restaura todo incluyendo config y nómina</div>
-        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build COMIDA-15oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
+        <div class="info-card" style="margin-top:12px"><div class="info-row"><span class="info-lbl">Versión</span><span class="info-val">PycHoras v1.0 · build SALDO-16oct</span></div><div class="info-row"><span class="info-lbl">Registros</span><span class="info-val" id="infoRegistros">&mdash;</span></div><div class="info-row"><span class="info-lbl">Último backup</span><span class="info-val" id="infoBackup">Nunca</span></div></div>
         <button class="btn-danger" onclick="confirmarBorrarTodo()">Borrar todos los datos</button>
       </div>
     </div>
@@ -5805,9 +5805,22 @@ async function _parsearPDFHoras(arrayBuffer) {
       // La detectamos como la línea con más decimales que NO es la de gastos-total (tiene negativos y repes).
       const siM = fullText.match(/SALDO\s*INICIAL[\s\S]{0,40}?(-?\d+[.,]\d{2})/i);
       if (siM) days._saldoInicial = parseFloat(siM[1].replace(',', '.'));
-      // Buscar la fila de saldos diaria: muchos decimales, con valores repetidos y/o negativos.
+      // La fila SALDO suele venir PARTIDA en varias líneas tras la etiqueta "SALDO".
+      // Las unimos todas; si no, caemos al método antiguo (línea con más decimales).
       let filaSaldo = null, mejorSaldoN = 0, filaSaldoIdx = -1;
       for (let li = 0; li < lineas.length; li++) {
+        if (!/^\s*SALDO\s*$/i.test(lineas[li])) continue;
+        const juntos = [];
+        for (let lj = li + 1; lj < lineas.length; lj++) {
+          const nums = lineas[lj].trim().match(/-?\d+[.,]\d{2}/g) || [];
+          const soloNums = nums.length && lineas[lj].trim().replace(/-?\d+[.,]\d{2}|\s+/g, '') === '';
+          if (!soloNums) break;
+          juntos.push(...nums.map(x => parseFloat(x.replace(',', '.'))));
+        }
+        if (juntos.length >= 15) { filaSaldo = juntos; mejorSaldoN = juntos.length; filaSaldoIdx = li; }
+        break;
+      }
+      if (!filaSaldo) for (let li = 0; li < lineas.length; li++) {
         const ln = lineas[li];
         const arr = (ln.trim().match(/-?\d+[.,]\d{2}/g) || []).map(x => parseFloat(x.replace(',', '.')));
         const esGastoTotal = arr.length && arr.filter(x => x === 0).length >= arr.length / 2;
@@ -5820,20 +5833,37 @@ async function _parsearPDFHoras(arrayBuffer) {
         if (suelto) days._saldoInicial = parseFloat(suelto[0].replace(',', '.'));
       }
       if (filaSaldo) {
-        // Asignar saldo por día (31→1) y detectar ingresos como subidas bruscas de saldo.
+        // La hoja trae 31 columnas de día en orden 31→1. Cuando vienen 32 valores o más,
+        // el ÚLTIMO es el saldo inicial y los 31 anteriores son los días.
         const NS = filaSaldo.length;
         const saldoDia = {};
-        for (let i = 0; i < NS; i++) { const dia = NS - i; if (dia >= 1 && dia <= 31) saldoDia[dia] = filaSaldo[i]; }
-        // Ingresos: fila FONDOS/PROV (valores como 50,00). Buscar "50,00" u otros positivos grandes aislados.
-        const ingresos = {}; let totIng = 0;
+        let iniFila = null;
+        if (NS >= 32) {
+          iniFila = filaSaldo[NS - 1];
+          const diasVals = filaSaldo.slice(NS - 32, NS - 1);   // 31 valores, día 31 primero
+          diasVals.forEach((v, i) => { saldoDia[31 - i] = v; });
+        } else {
+          for (let i = 0; i < NS; i++) { const dia = NS - i; if (dia >= 1 && dia <= 31) saldoDia[dia] = filaSaldo[i]; }
+        }
+        if (days._saldoInicial == null && iniFila != null) days._saldoInicial = iniFila;
+
+        // Recorrer los días en orden: baja el saldo => gasto · sube => ingreso de fondos
+        const gastos = {}, ingresos = {}; let totIng = 0, totGasDelta = 0;
         const dias = Object.keys(saldoDia).map(Number).sort((a, b) => a - b);
         let prev = (days._saldoInicial != null) ? days._saldoInicial : null;
         for (const d of dias) {
           if (prev !== null) {
-            const delta = saldoDia[d] - prev; // subida de saldo = ingreso de fondos
-            if (delta > 5) { ingresos[d] = Math.round(delta * 100) / 100; totIng += ingresos[d]; }
+            const delta = prev - saldoDia[d];           // baja saldo = gasto
+            if (delta > 0.005) { gastos[d] = Math.round(delta * 100) / 100; totGasDelta += gastos[d]; }
+            else if (delta < -0.005) { ingresos[d] = Math.round(-delta * 100) / 100; totIng += ingresos[d]; }
           }
           prev = saldoDia[d];
+        }
+        // Solo damos por bueno el reparto por días si cuadra con el total de la hoja
+        const totDelta = Math.round(totGasDelta * 100) / 100;
+        if (days._totGastos == null || Math.abs(totDelta - days._totGastos) < 0.05) {
+          days._gastosDias = gastos;
+          if (days._totGastos == null) days._totGastos = totDelta;
         }
         days._ingresosDias = ingresos;
         days._totIngresos = Math.round(totIng * 100) / 100;
